@@ -8,11 +8,12 @@ import { NoteGrid } from "./note-grid";
 import { OnboardingView } from "./onboarding-view";
 import { AppShell } from "@/components/shared";
 import { NovelEditor } from "@features/editor";
+import { SettingsView } from "../../settings/_components/settings-view";
 
 export function HomeDashboard() {
   const {
     workspace,
-    setWorkspace,
+    refreshWorkspace,
     searchQuery,
     setSearchQuery,
     viewMode,
@@ -20,6 +21,10 @@ export function HomeDashboard() {
     notes,
     selectedFolder,
     setSelectedFolder,
+    createNote,
+    deleteNote,
+    toggleStar,
+    updateNote,
   } = useHomeData();
 
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
@@ -28,9 +33,7 @@ export function HomeDashboard() {
   if (!workspace) {
     return (
       <OnboardingView
-        onSelectFolder={() =>
-          setWorkspace({ name: "My Workspace", path: "~/Documents/Notes", totalNotes: 1 })
-        }
+        onSelectFolder={refreshWorkspace}
       />
     );
   }
@@ -40,17 +43,33 @@ export function HomeDashboard() {
     return (
       <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden">
         <NovelEditor
-          initialTitle={activeNote?.title || "Getting Started with Markidown"}
+          initialTitle={activeNote?.title || "New Document"}
           initialContent={
             activeNote
-              ? `# ${activeNote.title}\n\n${activeNote.excerpt}\n\nStart editing this note...`
+              ? `# ${activeNote.title}\n\n${activeNote.excerpt}`
               : "# New Document\n\nStart typing markdown here..."
           }
           onBack={() => setActiveNoteId(null)}
+          onSave={(title, content) => {
+             if (activeNoteId === "new" || !activeNote) {
+                 // The actual creation flow happens before setting activeNoteId, but just in case
+             } else {
+                 updateNote(activeNote.path, title, content, activeNote.tags);
+             }
+          }}
         />
       </div>
     );
   }
+
+  const handleNewNote = async () => {
+      // Create a default note in the current folder (or Personal if recents)
+      const folderPath = selectedFolder === "recents" || selectedFolder === "starred" ? `${workspace.path}/Personal` : `${workspace.path}/${selectedFolder}`;
+      const newNote = await createNote(folderPath, "Untitled Note");
+      if (newNote) {
+          setActiveNoteId(newNote.id);
+      }
+  };
 
   // Standard Dashboard Grid View
   return (
@@ -70,7 +89,7 @@ export function HomeDashboard() {
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onNewNote={() => setActiveNoteId("new")}
+          onNewNote={handleNewNote}
         />
       }
     >
@@ -80,11 +99,25 @@ export function HomeDashboard() {
           <span className="text-xs text-txt-muted">{notes.length} documents</span>
         </div>
 
-        <NoteGrid
-          notes={notes}
-          viewMode={viewMode}
-          onOpenNote={(id) => setActiveNoteId(id)}
-        />
+        {selectedFolder === "settings" ? (
+             <div className="flex-1 overflow-y-auto p-6 bg-background">
+                <SettingsView onWorkspaceChanged={refreshWorkspace} />
+             </div>
+        ) : (
+            <NoteGrid
+              notes={notes}
+              viewMode={viewMode}
+              onOpenNote={(id) => setActiveNoteId(id)}
+              onDelete={async (id) => {
+                 const note = notes.find(n => n.id === id);
+                 if (note) await deleteNote(note.path);
+              }}
+              onToggleStar={async (id) => {
+                 const note = notes.find(n => n.id === id);
+                 if (note) await toggleStar(note.path, !note.isStarred);
+              }}
+            />
+        )}
       </div>
     </AppShell>
   );

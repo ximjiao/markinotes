@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus } from "lucide-react";
+import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -196,6 +196,17 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
       {/* Sidebar Footer */}
       <SidebarFooter className="px-1 py-1 border-t border-border group-data-[collapsible=icon]:px-0">
         <SidebarMenu>
+          <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+            <SidebarMenuButton
+              tooltip="Settings"
+              isActive={selectedView === "settings"}
+              onClick={() => onSelectView("settings")}
+              className="text-xs text-txt-secondary group-data-[collapsible=icon]:mx-auto"
+            >
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton
               tooltip="Help Center"

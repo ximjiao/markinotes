@@ -21,6 +21,7 @@ notify = "6"
 rusqlite = { version = "0.32", features = ["bundled"] }
 anyhow = "1"
 thiserror = "1"
+uuid = { version = "1.26.0", features = ["v4"] }
 
 [profile.release]
 panic = "abort"

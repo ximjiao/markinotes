@@ -72,6 +72,7 @@ interface NovelEditorProps {
   initialTitle?: string;
   initialContent?: string;
   onBack?: () => void;
+  onSave?: (title: string, content: string) => void;
 }
 
 interface CustomSlashItem {
@@ -290,6 +291,7 @@ export function NovelEditor({
   initialTitle = "Getting Started with Markidown",
   initialContent = "# Getting Started with Markidown\n\nWelcome to Markidown! Click anywhere and start typing. Fast, local-first markdown note taking.\n\nStart editing this note...",
   onBack,
+  onSave,
 }: NovelEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [isTitleCustom, setIsTitleCustom] = useState(false);
@@ -298,6 +300,20 @@ export function NovelEditor({
   const [charCount, setCharCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving">("saved");
   const [editorInstance, setEditorInstance] = useState<any>(null);
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (saveStatus !== "dirty") return;
+    
+    setSaveStatus("saving");
+    const handler = setTimeout(() => {
+      onSave?.(title, content);
+      setSaveStatus("saved");
+    }, 1000);
+    
+    return () => clearTimeout(handler);
+  }, [title, content, saveStatus, onSave]);
+
 
   // Mass Auto-Sweeper for all unused '/' paragraphs in document
   useEffect(() => {
@@ -373,6 +389,7 @@ export function NovelEditor({
           onChange={(e) => {
             setTitle(e.target.value);
             setIsTitleCustom(true);
+            setSaveStatus("dirty");
           }}
           placeholder="Untitled document"
           className="text-xs font-semibold text-txt-primary bg-transparent outline-none border border-transparent hover:border-border focus:border-txt-brand rounded px-2 py-1 w-40 min-w-0 transition-colors shrink-0"
@@ -604,10 +621,6 @@ export function NovelEditor({
 
                 const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
                 setContent(md);
-
-                setTimeout(() => {
-                  setSaveStatus("saved");
-                }, 500);
               }}
             >
               {/* Notion Slash Commands Popup */}

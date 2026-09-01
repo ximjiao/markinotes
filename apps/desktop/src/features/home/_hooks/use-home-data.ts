@@ -1,32 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { NoteCardData, ViewMode, WorkspaceFolderInfo } from "../_types/home.types";
-
-const MOCK_NOTES: NoteCardData[] = [
-  {
-    id: "1",
-    path: "/notes/getting-started.md",
-    title: "Getting Started with Markidown",
-    excerpt: "Welcome to Markidown! Click anywhere and start typing. Fast, local-first markdown note taking.",
-    groupName: "In My Space",
-    updatedAt: "2 mins ago",
-    isStarred: true,
-    tags: ["guide", "welcome"],
-    coverColor: "bg-purple-500/10 border-purple-500/20",
-  },
-];
+import { noteIpc } from "../_lib/note-ipc";
+import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 
 export function useHomeData() {
-  const [workspace, setWorkspace] = useState<WorkspaceFolderInfo | null>({
-    name: "My Workspace",
-    path: "~/Documents/Notes",
-    totalNotes: MOCK_NOTES.length,
-  });
+  const [workspace, setWorkspace] = useState<WorkspaceFolderInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [notes] = useState<NoteCardData[]>(MOCK_NOTES);
+  const [notes, setNotes] = useState<NoteCardData[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("recents");
+
+  // Load config on mount
+  useEffect(() => {
+    const config = workspaceConfig.get();
+    if (config.setupDone) {
+      setWorkspace({
+        name: config.name,
+        path: config.rootPath,
+        totalNotes: 0, // Will be updated by IPC
+      });
+    } else {
+      setWorkspace(null); // Triggers onboarding
+    }
+  }, []);
+
+  // Load notes when workspace is set
+  const loadNotes = async () => {
+    if (workspace?.path) {
+      const data = await noteIpc.list(workspace.path);
+      setNotes(data);
+      setWorkspace(prev => prev ? { ...prev, totalNotes: data.length } : null);
+    }
+  };
+
+  useEffect(() => {
+    loadNotes();
+  }, [workspace?.path]);
+
+  const createNote = async (folderPath: string, title: string) => {
+    if (!workspace?.path) return null;
+    const newNote = await noteIpc.create(workspace.path, folderPath, title);
+    await loadNotes();
+    return newNote;
+  };
+
+  const deleteNote = async (notePath: string) => {
+    if (!workspace?.path) return;
+    await noteIpc.delete(workspace.path, notePath);
+    await loadNotes();
+  };
+
+  const toggleStar = async (notePath: string, starred: boolean) => {
+    if (!workspace?.path) return;
+    await noteIpc.toggleStar(workspace.path, notePath, starred);
+    await loadNotes();
+  };
+
+  const updateNote = async (notePath: string, title: string, content: string, tags?: string[]) => {
+    if (!workspace?.path) return;
+    await noteIpc.update(workspace.path, notePath, title, content, tags);
+    // Don't auto-reload list here to prevent focus loss if actively editing,
+    // rely on editor closing to refresh or just optimistic update.
+    setNotes(prev => prev.map(n => n.path === notePath ? { ...n, title, excerpt: content.substring(0, 100) } : n));
+  };
+  
+  const refreshWorkspace = () => {
+     const config = workspaceConfig.get();
+    if (config.setupDone) {
+      setWorkspace({
+        name: config.name,
+        path: config.rootPath,
+        totalNotes: notes.length,
+      });
+      loadNotes();
+    }
+  };
 
   const filteredNotes = notes.filter(
     (note) =>
@@ -37,7 +87,7 @@ export function useHomeData() {
 
   return {
     workspace,
-    setWorkspace,
+    refreshWorkspace,
     searchQuery,
     setSearchQuery,
     viewMode,
@@ -45,5 +95,9 @@ export function useHomeData() {
     notes: filteredNotes,
     selectedFolder,
     setSelectedFolder,
+    createNote,
+    deleteNote,
+    toggleStar,
+    updateNote,
   };
 }

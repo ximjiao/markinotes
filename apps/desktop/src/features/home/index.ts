@@ -6,3 +6,4 @@ export { NoteGrid } from "./_components/note-grid";
 export { OnboardingView } from "./_components/onboarding-view";
 export { useHomeData } from "./_hooks/use-home-data";
 export type { NoteCardData, ViewMode, WorkspaceFolderInfo } from "./_types/home.types";
+export * from "./_lib/note-ipc";
