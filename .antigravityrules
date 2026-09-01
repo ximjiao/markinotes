@@ -1,0 +1,4 @@
+- Always run typecheck before finalizing edits.
+- Do not edit files inside /dist or .tauri build artifacts directly.
+- In Ask mode: provide short explanation and code blocks only.
+- In Agent mode: apply diffs directly and format using standard prettier.
