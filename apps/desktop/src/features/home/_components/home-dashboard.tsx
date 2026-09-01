@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useHomeData } from "../_hooks/use-home-data";
 import { HomeHeader } from "./home-header";
 import { HomeSidebar } from "./home-sidebar";
 import { NoteGrid } from "./note-grid";
 import { OnboardingView } from "./onboarding-view";
 import { AppShell } from "@/components/shared";
+import { NovelEditor } from "@features/editor";
 
 export function HomeDashboard() {
   const {
@@ -21,26 +22,55 @@ export function HomeDashboard() {
     setSelectedFolder,
   } = useHomeData();
 
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const activeNote = notes.find((n) => n.id === activeNoteId);
+
   if (!workspace) {
     return (
       <OnboardingView
         onSelectFolder={() =>
-          setWorkspace({ name: "My Workspace", path: "~/Documents/Notes", totalNotes: 4 })
+          setWorkspace({ name: "My Workspace", path: "~/Documents/Notes", totalNotes: 1 })
         }
       />
     );
   }
 
+  // Pure Fullscreen Novel Editor View (Notion Prebuilt Mode)
+  if (activeNoteId) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden">
+        <NovelEditor
+          initialTitle={activeNote?.title || "Getting Started with Markidown"}
+          initialContent={
+            activeNote
+              ? `# ${activeNote.title}\n\n${activeNote.excerpt}\n\nStart editing this note...`
+              : "# New Document\n\nStart typing markdown here..."
+          }
+          onBack={() => setActiveNoteId(null)}
+        />
+      </div>
+    );
+  }
+
+  // Standard Dashboard Grid View
   return (
     <AppShell
-      sidebar={<HomeSidebar selectedView={selectedFolder} onSelectView={setSelectedFolder} />}
+      sidebar={
+        <HomeSidebar
+          selectedView={selectedFolder}
+          onSelectView={(v) => {
+            setSelectedFolder(v);
+            setActiveNoteId(null);
+          }}
+        />
+      }
       header={
         <HomeHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onNewNote={() => console.log("New Note")}
+          onNewNote={() => setActiveNoteId("new")}
         />
       }
     >
@@ -50,7 +80,11 @@ export function HomeDashboard() {
           <span className="text-xs text-txt-muted">{notes.length} documents</span>
         </div>
 
-        <NoteGrid notes={notes} viewMode={viewMode} />
+        <NoteGrid
+          notes={notes}
+          viewMode={viewMode}
+          onOpenNote={(id) => setActiveNoteId(id)}
+        />
       </div>
     </AppShell>
   );

@@ -15,38 +15,6 @@ const MOCK_NOTES: NoteCardData[] = [
     tags: ["guide", "welcome"],
     coverColor: "bg-purple-500/10 border-purple-500/20",
   },
-  {
-    id: "2",
-    path: "/notes/architecture-decisions.md",
-    title: "Architecture & Design System",
-    excerpt: "Tauri v2 + Next.js static export + Tiptap serializer + SQLite read-cache. Zero vendor lock-in.",
-    groupName: "In Projects",
-    updatedAt: "1 hour ago",
-    isStarred: false,
-    tags: ["tech", "architecture"],
-    coverColor: "bg-blue-500/10 border-blue-500/20",
-  },
-  {
-    id: "3",
-    path: "/notes/craft-handbook.md",
-    title: "Craft-Style Dashboard Handbook",
-    excerpt: "Grid views, slash commands, instant Cmd+K switcher, and beautiful typography.",
-    groupName: "In Handbooks",
-    updatedAt: "Yesterday",
-    isStarred: true,
-    tags: ["design", "ui"],
-    coverColor: "bg-amber-500/10 border-amber-500/20",
-  },
-  {
-    id: "4",
-    path: "/notes/tauri-ipc-spec.md",
-    title: "Tauri IPC Command Specification",
-    excerpt: "Rust command bindings for native file system CRUD, SQLite indexing, and notify watcher.",
-    groupName: "In Backend",
-    updatedAt: "3 days ago",
-    isStarred: false,
-    tags: ["rust", "backend"],
-  },
 ];
 
 export function useHomeData() {

@@ -1,19 +1,92 @@
 "use client";
 
-import { useEditorAutosave } from "../_hooks/use-editor-autosave";
+import React, { useState, useEffect } from "react";
+import { EditorContent } from "@tiptap/react";
+import { useTiptapEditor } from "../_hooks/use-tiptap-editor";
+import { EditorToolbar } from "./editor-toolbar";
+import { NotionBlockSideHandle } from "./notion-block-side-handle";
+import { SlashCommandMenu } from "./slash-command-menu";
+import { BubbleToolbar } from "./bubble-toolbar";
+import { EditorFooter } from "./editor-footer";
+import type { NoteDocument } from "../_types/editor.types";
 
-export function TiptapEditor() {
-  const { saveStatus } = useEditorAutosave();
+interface TiptapEditorProps {
+  initialContent?: string;
+  initialTitle?: string;
+  onSave?: (markdown: string, doc: NoteDocument) => void;
+}
+
+export function TiptapEditor({ initialContent, initialTitle = "Getting Started with Markidown", onSave }: TiptapEditorProps) {
+  const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+  const [noteTitle, setNoteTitle] = useState(initialTitle);
+
+  const { editor, frontmatter, saveStatus, wordCount, charCount } = useTiptapEditor({
+    initialContent,
+    initialFrontmatter: { title: initialTitle },
+    onContentChange: (markdown, fm) => {
+      onSave?.(markdown, { frontmatter: { ...fm, title: noteTitle }, content: markdown });
+    },
+  });
+
+  useEffect(() => {
+    const handleOpenSlashMenu = () => setIsSlashMenuOpen(true);
+    window.addEventListener("open-slash-menu", handleOpenSlashMenu);
+    return () => window.removeEventListener("open-slash-menu", handleOpenSlashMenu);
+  }, []);
+
+  if (!editor) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12 text-xs text-txt-muted">
+        Loading editor...
+      </div>
+    );
+  }
+
+  const currentDoc: NoteDocument = {
+    frontmatter: { ...frontmatter, title: noteTitle },
+    content: (editor.storage as any).markdown?.getMarkdown?.() || editor.getText() || "",
+  };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background text-txt-primary">
-      <div className="flex justify-between items-center px-4 py-2 border-b border-border">
-        <span className="text-xs text-txt-secondary font-medium">Editor</span>
-        <span className="text-xs text-txt-muted capitalize">Status: {saveStatus}</span>
+    <div className="flex flex-col h-full w-full bg-background text-txt-primary overflow-y-auto">
+      {/* 1. Top Docs Formatting Toolbar with Ellipsis Export Button */}
+      <EditorToolbar editor={editor} doc={currentDoc} />
+
+      {/* 2. Main Writing Canvas Area (Outer Scrollable Container) */}
+      <div className="relative flex-1 px-16 py-10 max-w-4xl mx-auto w-full">
+        {/* Inline Editable Page Title H1 */}
+        <input
+          type="text"
+          value={noteTitle}
+          onChange={(e) => setNoteTitle(e.target.value)}
+          placeholder="Untitled"
+          className="w-full text-4xl font-black text-txt-primary bg-transparent outline-none border-b border-border/40 pb-3 mb-8 placeholder:text-txt-muted tracking-tight"
+        />
+
+        {/* Notion-style Block Side Handle (+ and :: Grip) */}
+        <NotionBlockSideHandle editor={editor} onOpenSlashMenu={() => setIsSlashMenuOpen(true)} />
+
+        {/* Floating Text Selection Bubble Toolbar */}
+        <BubbleToolbar editor={editor} />
+
+        {/* Slash Command Menu (Triggered by / or + button) */}
+        <SlashCommandMenu
+          editor={editor}
+          isOpen={isSlashMenuOpen}
+          onClose={() => setIsSlashMenuOpen(false)}
+        />
+
+        {/* Tiptap Canvas without blue focus box */}
+        <div className="w-full" suppressHydrationWarning>
+          <EditorContent
+            editor={editor}
+            className="prose dark:prose-invert max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:border-none text-txt-primary text-base leading-relaxed min-h-[600px]"
+          />
+        </div>
       </div>
-      <div className="flex-1 p-6 overflow-auto">
-        <p className="text-txt-secondary text-sm">Start typing your Markdown note...</p>
-      </div>
+
+      {/* 3. Footer Bar */}
+      <EditorFooter saveStatus={saveStatus} wordCount={wordCount} charCount={charCount} />
     </div>
   );
 }

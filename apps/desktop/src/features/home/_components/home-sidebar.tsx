@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, Share2, Sparkles, Folder, Star, Calendar, Bookmark, HelpCircle } from "lucide-react";
+import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,8 @@ import {
   SidebarFooter,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useFolderTree, FolderTreeItem } from "@features/workspace";
 
 interface HomeSidebarProps {
   selectedView: string;
@@ -21,6 +23,8 @@ interface HomeSidebarProps {
 }
 
 export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
+  const { folders, toggleExpand, createSubfolder } = useFolderTree();
+
   const navItems = [
     { id: "recents", label: "Recents", icon: Clock },
     { id: "shared", label: "Shared with me", icon: Share2 },
@@ -95,26 +99,97 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
 
         {/* OS Folders Group */}
         <SidebarGroup>
-          <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:hidden">
-            <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted uppercase tracking-wider p-0">
-              Folders
-            </SidebarGroupLabel>
+          {/* A. Uncollapsed View: Full inline folder tree */}
+          <div className="group-data-[collapsible=icon]:hidden space-y-1">
+            <div className="flex items-center justify-between px-2 py-1">
+              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted uppercase tracking-wider p-0">
+                Folders
+              </SidebarGroupLabel>
+              <button
+                onClick={() => {
+                  const name = prompt("Enter root folder name:");
+                  if (name && name.trim()) {
+                    createSubfolder("f-1", name.trim());
+                  }
+                }}
+                className="text-txt-muted hover:text-txt-primary transition-colors"
+                title="New Folder"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {folders.map((folder) => (
+                  <FolderTreeItem
+                    key={folder.id}
+                    folder={folder}
+                    activeId={selectedView}
+                    onSelect={onSelectView}
+                    onToggleExpand={toggleExpand}
+                    onCreateSubfolder={createSubfolder}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
           </div>
-          <SidebarGroupContent>
+
+          {/* B. Collapsed Icon View: Flyout Popover Sub-Sidebar to the right */}
+          <div className="hidden group-data-[collapsible=icon]:block">
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={selectedView === "folder-craft"}
-                  onClick={() => onSelectView("folder-craft")}
-                  tooltip="How to use Markidown"
-                  className="text-xs font-normal text-txt-secondary"
-                >
-                  <Folder className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="truncate">👋 How to use Markidown</span>
-                </SidebarMenuButton>
+              <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip="Browse Folders"
+                      className="text-xs text-txt-secondary group-data-[collapsible=icon]:mx-auto"
+                    >
+                      <FolderTree className="h-4 w-4 text-amber-500" />
+                      <span>Folders</span>
+                    </SidebarMenuButton>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="right"
+                    align="start"
+                    sideOffset={12}
+                    className="w-64 p-3 bg-popover border-border shadow-xl rounded-lg z-50 space-y-2"
+                  >
+                    <div className="flex items-center justify-between px-1 pb-1.5 border-b border-border">
+                      <span className="text-xs font-semibold text-txt-muted uppercase tracking-wider">
+                        Workspace Folders
+                      </span>
+                      <button
+                        onClick={() => {
+                          const name = prompt("Enter root folder name:");
+                          if (name && name.trim()) {
+                            createSubfolder("f-1", name.trim());
+                          }
+                        }}
+                        className="text-txt-muted hover:text-txt-primary transition-colors"
+                        title="New Folder"
+                      >
+                        <FolderPlus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                      <SidebarMenu>
+                        {folders.map((folder) => (
+                          <FolderTreeItem
+                            key={folder.id}
+                            folder={folder}
+                            activeId={selectedView}
+                            onSelect={onSelectView}
+                            onToggleExpand={toggleExpand}
+                            onCreateSubfolder={createSubfolder}
+                          />
+                        ))}
+                      </SidebarMenu>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </SidebarMenuItem>
             </SidebarMenu>
-          </SidebarGroupContent>
+          </div>
         </SidebarGroup>
       </SidebarContent>
 
