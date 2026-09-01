@@ -1,0 +1,13 @@
+{
+  "name": "markidown",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.1.3",
+  "scripts": {
+    "dev": "pnpm --filter @markidown/desktop tauri dev",
+    "build": "pnpm --filter @markidown/desktop tauri build",
+    "web:dev": "pnpm --filter @markidown/desktop dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

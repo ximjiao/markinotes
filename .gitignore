@@ -1,0 +1,17 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next
+.next/
+out/
+
+# tauri
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# misc
+.DS_Store
+*.log
+.env
+.env.local
