@@ -122,6 +122,13 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
   const handleAddBlockBelow = () => {
     try {
       if (!editor || editor.isDestroyed || !hoveredElement) return;
+
+      // Prevent spamming '/' lines if current line is already an unselected '/' line
+      if (hoveredElement.textContent?.trim() === "/") {
+        editor.chain().focus().run();
+        return;
+      }
+
       const domPos = editor.view.posAtDOM(hoveredElement, 0);
       const resolvedPos = editor.state.doc.resolve(domPos);
       const posBelow = resolvedPos.after(1);
@@ -129,10 +136,12 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
       editor
         .chain()
         .focus()
-        .insertContentAt(posBelow, { type: "paragraph" })
+        .insertContentAt(posBelow, {
+          type: "paragraph",
+          content: [{ type: "text", text: "/" }],
+        })
+        .setTextSelection(posBelow + 2)
         .run();
-
-      onOpenSlashMenu();
     } catch {
       // Safe fallback
     }
