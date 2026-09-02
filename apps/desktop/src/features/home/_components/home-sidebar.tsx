@@ -19,12 +19,13 @@ import { useFolderTree, FolderTreeItem } from "@features/workspace";
 
 interface HomeSidebarProps {
   selectedView: string;
+  allTags?: string[];
   onSelectView: (view: string) => void;
   onCreateNote?: (folderPath: string) => void;
   onOpenTemplates?: () => void;
 }
 
-export function HomeSidebar({ selectedView, onSelectView, onCreateNote, onOpenTemplates }: HomeSidebarProps) {
+export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreateNote, onOpenTemplates }: HomeSidebarProps) {
   const { folders, toggleExpand, createSubfolder, addFolder, renameFolder } = useFolderTree();
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -222,6 +223,41 @@ export function HomeSidebar({ selectedView, onSelectView, onCreateNote, onOpenTe
             </SidebarMenu>
           </div>
         </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* Tags Group */}
+        <SidebarGroup>
+          <div className="group-data-[collapsible=icon]:hidden space-y-1">
+            <div className="flex items-center justify-between px-2 py-1">
+              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize p-0">
+                Tags
+              </SidebarGroupLabel>
+            </div>
+            
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {allTags.length === 0 ? (
+                  <div className="px-2 py-1 text-[10px] text-txt-muted italic">No tags yet</div>
+                ) : (
+                  allTags.map((tag) => (
+                    <SidebarMenuItem key={tag}>
+                      <SidebarMenuButton
+                        isActive={selectedView === `tag:${tag}`}
+                        onClick={() => onSelectView(`tag:${tag}`)}
+                        className="text-xs font-normal"
+                      >
+                        <span className="text-txt-muted">#</span>
+                        <span>{tag}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </div>
+        </SidebarGroup>
+
       </SidebarContent>
 
       {/* Sidebar Footer */}

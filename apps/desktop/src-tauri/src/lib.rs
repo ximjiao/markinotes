@@ -20,6 +20,7 @@ pub fn run() {
             workspace_init,
             note_list,
             note_create,
+            note_get_all_tags,
             note_read,
             note_update,
             note_delete,

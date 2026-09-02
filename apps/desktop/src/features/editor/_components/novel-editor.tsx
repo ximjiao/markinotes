@@ -53,6 +53,7 @@ import {
   Combine,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { exportDocument } from "../_lib/export-engine";
 import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
@@ -72,8 +75,10 @@ import { NotionBlockSideHandle } from "./notion-block-side-handle";
 interface NovelEditorProps {
   initialTitle?: string;
   initialContent?: string;
+  initialTags?: string[];
+  allWorkspaceTags?: string[];
   onBack?: () => void;
-  onSave?: (title: string, content: string) => void;
+  onSave?: (title: string, content: string, tags: string[]) => void;
   noteId?: string;
   workspacePath?: string | null;
 }
@@ -293,12 +298,15 @@ const defaultExtensions = [
 export function NovelEditor({
   initialTitle = "Getting Started with Markidown",
   initialContent = "# Getting Started with Markidown\n\nWelcome to Markidown! Click anywhere and start typing. Fast, local-first markdown note taking.\n\nStart editing this note...",
+  initialTags = [],
+  allWorkspaceTags = [],
   onBack,
   onSave,
   noteId,
   workspacePath,
 }: NovelEditorProps) {
   const [title, setTitle] = useState(initialTitle);
+  const [tags, setTags] = useState<string[]>(initialTags);
   const [isTitleCustom, setIsTitleCustom] = useState(false);
   const [content, setContent] = useState(initialContent);
   const [wordCount, setWordCount] = useState(0);
@@ -307,6 +315,8 @@ export function NovelEditor({
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [newTagInput, setNewTagInput] = useState("");
 
   const handleInsertSummary = (summaryMarkdown: string) => {
     if (editorInstance) {
@@ -319,6 +329,7 @@ export function NovelEditor({
   // Refs so the debounced timer always reads the latest values
   const titleRef = useRef(title);
   const contentRef = useRef(content);
+  const tagsRef = useRef(tags);
   const onSaveRef = useRef(onSave);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -326,6 +337,7 @@ export function NovelEditor({
   // Keep refs in sync with state
   useEffect(() => { titleRef.current = title; }, [title]);
   useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { tagsRef.current = tags; }, [tags]);
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
   const performSave = useCallback(() => {
@@ -333,7 +345,7 @@ export function NovelEditor({
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     setSaveCountdown(null);
     setSaveStatus("saving");
-    onSaveRef.current?.(titleRef.current, contentRef.current);
+    onSaveRef.current?.(titleRef.current, contentRef.current, tagsRef.current);
     setSaveStatus("saved");
   }, []);
 
@@ -448,6 +460,95 @@ export function NovelEditor({
           placeholder="Untitled document"
           className="text-xs font-semibold text-txt-primary bg-transparent outline-none border border-transparent hover:border-border focus:border-txt-brand rounded px-2 py-1 w-40 min-w-0 transition-colors shrink-0"
         />
+
+        {/* Tags Popover Editor */}
+        <Popover open={isEditingTags} onOpenChange={setIsEditingTags}>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-1 shrink-0 ml-1 px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors">
+              {tags.length === 0 ? (
+                <span className="text-[10px] text-txt-muted flex items-center gap-0.5 border border-dashed border-transparent hover:border-border rounded px-1">
+                  <Plus className="h-2.5 w-2.5" /> Add Tag
+                </span>
+              ) : (
+                <>
+                  {tags.slice(0, 2).map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-4 rounded-sm font-normal text-txt-secondary border-border">
+                      #{tag}
+                    </Badge>
+                  ))}
+                  {tags.length > 2 && (
+                    <span className="text-[10px] text-txt-muted font-medium px-0.5">+{tags.length - 2}</span>
+                  )}
+                </>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-2.5 space-y-2 bg-popover border-border shadow-md rounded-lg">
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0.5 rounded font-normal flex items-center gap-1 bg-accent/50 text-txt-secondary border-border hover:bg-accent transition-colors">
+                    #{tag}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setTags(tags.filter(t => t !== tag));
+                        scheduleAutoSave();
+                      }}
+                      className="hover:text-destructive transition-colors focus:outline-none"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <input
+              autoFocus
+              placeholder="Type tag & press enter..."
+              className="text-xs px-2 py-1.5 w-full bg-background border border-border rounded-md outline-none focus:border-txt-brand text-txt-primary transition-colors shadow-sm"
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (newTagInput && !tags.includes(newTagInput)) {
+                    setTags([...tags, newTagInput]);
+                    scheduleAutoSave();
+                  }
+                  setNewTagInput("");
+                }
+              }}
+            />
+            {(() => {
+              const availableTags = allWorkspaceTags.filter(t => !tags.includes(t) && t.includes(newTagInput));
+              if (availableTags.length === 0) return null;
+              return (
+                <div className="pt-2">
+                  <div className="text-[10px] text-txt-muted mb-1.5 font-medium px-0.5">Existing Tags</div>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {availableTags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-accent hover:text-txt-primary transition-colors text-txt-secondary font-normal"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setTags([...tags, tag]);
+                          scheduleAutoSave();
+                          setNewTagInput("");
+                        }}
+                      >
+                        #{tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </PopoverContent>
+        </Popover>
 
         <Separator orientation="vertical" className="h-4 shrink-0" />
 

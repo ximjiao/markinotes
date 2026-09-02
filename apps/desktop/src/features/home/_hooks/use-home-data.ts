@@ -11,6 +11,7 @@ export function useHomeData() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [notes, setNotes] = useState<NoteCardData[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("recents");
 
   // Load config on mount
@@ -36,6 +37,8 @@ export function useHomeData() {
     try {
       const data = await noteIpc.list(path);
       setNotes(data);
+      const tags = await noteIpc.getAllTags(path);
+      setAllTags(tags);
       setWorkspace(prev => prev ? { ...prev, totalNotes: data.length } : null);
     } catch (e) {
       console.error("Failed to load notes:", e);
@@ -143,6 +146,10 @@ export function useHomeData() {
     if (selectedFolder === "starred") return !!note.isStarred;
     if (selectedFolder === "settings") return false;
     if (selectedFolder === "drafts") return note.path.startsWith(`${workspace?.path}/Drafts`);
+    if (selectedFolder.startsWith("tag:")) {
+      const tag = selectedFolder.split(":")[1];
+      return note.tags?.includes(tag);
+    }
 
     // Match by folder path prefix (recursively find folder)
     let foundFolder: any = null;
@@ -170,6 +177,7 @@ export function useHomeData() {
     viewMode,
     setViewMode,
     notes: filteredNotes,
+    allTags,
     selectedFolder,
     setSelectedFolder,
     createNote,

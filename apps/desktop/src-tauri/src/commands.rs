@@ -85,6 +85,40 @@ pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
 }
 
 #[tauri::command]
+pub fn note_get_all_tags(workspace_path: String) -> Result<Vec<String>, String> {
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare("SELECT tags FROM notes WHERE tags IS NOT NULL AND tags != ''")
+        .map_err(|e| e.to_string())?;
+
+    let tag_iter = stmt
+        .query_map([], |row| {
+            let tags_str: String = row.get(0)?;
+            Ok(tags_str)
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut all_tags = std::collections::HashSet::new();
+    for tags_str in tag_iter {
+        if let Ok(s) = tags_str {
+            for tag in s.split(',') {
+                let t = tag.trim();
+                if !t.is_empty() {
+                    all_tags.insert(t.to_string());
+                }
+            }
+        }
+    }
+
+    let mut sorted_tags: Vec<String> = all_tags.into_iter().collect();
+    sorted_tags.sort();
+
+    Ok(sorted_tags)
+}
+
+#[tauri::command]
 pub fn note_create(workspace_path: String, folder_path: String, title: String) -> Result<NoteCardData, String> {
     // Ensure folder exists
     fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;

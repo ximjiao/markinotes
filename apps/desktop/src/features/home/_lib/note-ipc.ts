@@ -17,6 +17,14 @@ export const noteIpc = {
     return stored ? JSON.parse(stored) : [];
   },
 
+  getAllTags: async (workspacePath: string): Promise<string[]> => {
+    if (isTauri()) {
+      return invoke("note_get_all_tags", { workspacePath });
+    }
+    // Web fallback
+    return [];
+  },
+
   create: async (workspacePath: string, folderPath: string, title: string): Promise<NoteCardData> => {
     if (isTauri()) {
       return invoke("note_create", { workspacePath, folderPath, title });

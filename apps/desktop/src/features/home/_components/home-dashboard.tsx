@@ -34,6 +34,7 @@ export function HomeDashboard() {
     readNoteContent,
     loadNotes,
     moveNote,
+    allTags,
   } = useHomeData();
 
   const [activeNoteRef, setActiveNoteRef] = useState<{id: string, path: string, title: string} | null>(null);
@@ -97,9 +98,11 @@ export function HomeDashboard() {
           workspacePath={workspace?.path}
           initialTitle={note?.title || "Untitled"}
           initialContent={activeNoteContent || `# ${note?.title || "Untitled"}\n\n`}
+          initialTags={(note as any)?.tags || []}
+          allWorkspaceTags={allTags}
           onBack={closeNote}
-          onSave={(title, content) => {
-            if (note) updateNote(note.path, title, content, (note as any).tags);
+          onSave={(title, content, tags) => {
+            if (note) updateNote(note.path, title, content, tags);
           }}
         />
       </div>
@@ -191,9 +194,10 @@ export function HomeDashboard() {
     }
   };
 
-  const currentFolderName =
-    getSelectedFolder()?.name ||
-    (selectedFolder === "recents" ? "Recents" : selectedFolder === "starred" ? "Starred" : selectedFolder === "drafts" ? "Drafts" : selectedFolder);
+  const currentFolderName = selectedFolder.startsWith("tag:")
+    ? `#${selectedFolder.split(":")[1]}`
+    : getSelectedFolder()?.name ||
+      (selectedFolder === "recents" ? "Recents" : selectedFolder === "starred" ? "Starred" : selectedFolder === "drafts" ? "Drafts" : selectedFolder);
 
   // ─── Standard Dashboard ───
   return (
@@ -201,6 +205,7 @@ export function HomeDashboard() {
       sidebar={
         <HomeSidebar
           selectedView={selectedFolder}
+          allTags={allTags}
           onSelectView={(v) => {
             setSelectedFolder(v);
             setActiveNoteRef(null);
