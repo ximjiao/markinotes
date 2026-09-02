@@ -11,12 +11,14 @@ interface HomeHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onNewNote: () => void;
+  onOpenTemplates: () => void;
 }
 
 export function HomeHeader({
   searchQuery,
   onSearchChange,
   onNewNote,
+  onOpenTemplates,
 }: HomeHeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-border bg-background px-4 py-2.5 h-12 gap-4">
@@ -42,7 +44,7 @@ export function HomeHeader({
       {/* 3. Right Side: Action Buttons */}
       <div className="flex items-center gap-2 shrink-0">
 
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hidden sm:flex">
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hidden sm:flex" onClick={onOpenTemplates}>
           <Sparkles className="h-3.5 w-3.5 text-txt-brand" />
           Templates
         </Button>

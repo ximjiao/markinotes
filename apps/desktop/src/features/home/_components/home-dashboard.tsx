@@ -11,6 +11,8 @@ import { AppShell } from "@/components/shared";
 import { NovelEditor } from "@features/editor";
 import { SettingsView } from "../../settings/_components/settings-view";
 import { MoveNoteDialog } from "./move-note-dialog";
+import { TemplateDialog } from "./template-dialog";
+import type { NoteTemplate } from "../_lib/templates-data";
 import { Button } from "@/components/ui/button";
 
 export function HomeDashboard() {
@@ -38,6 +40,7 @@ export function HomeDashboard() {
   const [activeNoteContent, setActiveNoteContent] = useState<string>("");
   const [contentLoading, setContentLoading] = useState(false);
   const [movingNoteId, setMovingNoteId] = useState<string | null>(null);
+  const [isTemplateDialogOpen, setTemplateDialogOpen] = useState(false);
 
   // Fallback to activeNoteRef if not in the current filtered list
   const activeNote = activeNoteRef ? (notes.find((n) => n.id === activeNoteRef.id) ?? activeNoteRef) : undefined;
@@ -150,11 +153,11 @@ export function HomeDashboard() {
 
   const handleNewNote = async () => {
     let folderPath = workspace.folders[0]?.path || workspace.path;
-    if (selectedFolder !== "recents" && selectedFolder !== "starred") {
+    if (selectedFolder !== "recents" && selectedFolder !== "starred" && selectedFolder !== "templates") {
       const folder = getSelectedFolder();
       if (folder) folderPath = folder.path;
     } else {
-      // Fallback for Recents/Starred: Place in 'Drafts' at the root of the workspace
+      // Fallback for Recents/Starred/Templates: Place in 'Drafts' at the root of the workspace
       folderPath = `${workspace.path}/Drafts`;
     }
     const newNote = await createNote(folderPath, "Untitled Note");
@@ -162,6 +165,27 @@ export function HomeDashboard() {
       // We trigger refreshWorkspace so the Drafts folder shows up in the sidebar if it was just created
       refreshWorkspace();
       openNote(newNote.id, newNote.path, newNote.title);
+    }
+  };
+
+  const handleUseTemplate = async (template: NoteTemplate) => {
+    // Generate actual content with variables replaced
+    const content = template.content.replace(/{{date}}/g, new Date().toLocaleDateString(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }));
+    
+    // Always create templates in Drafts by default, or the current selected folder
+    let folderPath = `${workspace.path}/Drafts`;
+    const newNote = await createNote(folderPath, `Untitled ${template.title}`);
+    if (newNote) {
+      await updateNote(newNote.path, `Untitled ${template.title}`, content, []);
+      refreshWorkspace();
+      // Load notes again to reflect the update before opening
+      await loadNotes();
+      openNote(newNote.id, newNote.path, `Untitled ${template.title}`);
     }
   };
 
@@ -183,6 +207,7 @@ export function HomeDashboard() {
             const newNote = await createNote(folderPath, "Untitled Note");
             if (newNote) openNote(newNote.id, newNote.path, newNote.title);
           }}
+          onOpenTemplates={() => setTemplateDialogOpen(true)}
         />
       }
       header={
@@ -190,6 +215,7 @@ export function HomeDashboard() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onNewNote={handleNewNote}
+          onOpenTemplates={() => setTemplateDialogOpen(true)}
         />
       }
     >
@@ -235,6 +261,12 @@ export function HomeDashboard() {
           }}
         />
       </div>
+
+      <TemplateDialog 
+        isOpen={isTemplateDialogOpen} 
+        onClose={() => setTemplateDialogOpen(false)} 
+        onSelectTemplate={handleUseTemplate} 
+      />
 
       {movingNoteId && movingNote && (
         <MoveNoteDialog

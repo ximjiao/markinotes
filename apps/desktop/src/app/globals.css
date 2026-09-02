@@ -280,7 +280,7 @@
 .ProseMirror ul[data-type="taskList"] li>label {
   flex-shrink: 0;
   user-select: none;
-  margin-top: 0.2rem;
+  margin-top: 0.1rem;
   cursor: pointer;
 }
 

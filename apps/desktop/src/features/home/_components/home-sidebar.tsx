@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings, Check, X, FileText } from "lucide-react";
+import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings, Check, X, FileText, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,9 +21,10 @@ interface HomeSidebarProps {
   selectedView: string;
   onSelectView: (view: string) => void;
   onCreateNote?: (folderPath: string) => void;
+  onOpenTemplates?: () => void;
 }
 
-export function HomeSidebar({ selectedView, onSelectView, onCreateNote }: HomeSidebarProps) {
+export function HomeSidebar({ selectedView, onSelectView, onCreateNote, onOpenTemplates }: HomeSidebarProps) {
   const { folders, toggleExpand, createSubfolder, addFolder, renameFolder } = useFolderTree();
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -46,7 +47,6 @@ export function HomeSidebar({ selectedView, onSelectView, onCreateNote }: HomeSi
     { id: "organize", label: "Organize", icon: Sparkles },
     { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "starred", label: "Starred", icon: Star },
-    { id: "templates", label: "My Templates", icon: Bookmark },
   ];
 
   return (
@@ -87,7 +87,13 @@ export function HomeSidebar({ selectedView, onSelectView, onCreateNote }: HomeSi
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       isActive={active}
-                      onClick={() => onSelectView(item.id)}
+                      onClick={() => {
+                        if (item.id === "templates") {
+                          onOpenTemplates?.();
+                        } else {
+                          onSelectView(item.id);
+                        }
+                      }}
                       tooltip={item.label}
                       className="text-xs font-normal"
                     >
@@ -116,7 +122,7 @@ export function HomeSidebar({ selectedView, onSelectView, onCreateNote }: HomeSi
                 className="text-txt-muted hover:text-txt-primary transition-colors"
                 title="New Folder"
               >
-                <FolderPlus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
 

@@ -3,6 +3,7 @@
 import React from "react";
 import { NoteCard } from "./note-card";
 import type { NoteCardData, ViewMode } from "../_types/home.types";
+import { formatRelativeTime } from "@/lib/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
     <ScrollArea className="flex-1 h-full w-full">
       <div className="p-6">
         {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
             {notes.map((note) => (
               <NoteCard
                 key={note.id}
@@ -88,7 +89,7 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                       </div>
                     </TableCell>
                     <TableCell className="text-right text-xs text-txt-muted whitespace-nowrap">
-                      {note.updatedAt}
+                      {formatRelativeTime(note.updatedAt)}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="pr-4">
                       <div className="flex justify-end">
