@@ -199,3 +199,38 @@ pub fn note_move(workspace_path: String, note_path: String, new_folder_path: Str
     Ok(new_path_str)
 }
 
+#[tauri::command]
+pub async fn note_summarize_stream(
+    workspace_path: String,
+    note_id: String,
+    model: Option<String>,
+    on_chunk: tauri::ipc::Channel<String>,
+) -> Result<(), String> {
+    // Ambil API key otomatis dari .env atau environment variable
+    let api_key = crate::ai::get_gemini_api_key(Some(&workspace_path))?;
+
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let (path, title): (String, String) = conn
+        .query_row(
+            "SELECT path, title FROM notes WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| format!("Catatan dengan ID '{note_id}' tidak ditemukan: {e}"))?;
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Gagal membaca file catatan di '{path}': {e}"))?;
+
+    // 1. Ekstrak kata terbanyak (descending) dengan stopwords filter
+    let pointers = crate::ai::extract_top_word_pointers(&content, 15);
+
+    // 2. Susun prompt dengan pointers frekuensi kata + konten asli catatan
+    let prompt = crate::ai::build_summarize_prompt(&title, &content, &pointers);
+
+    // 3. Streaming respons dari Gemini API via channel
+    crate::ai::stream_gemini_summary(&api_key, model.as_deref(), &prompt, on_chunk).await
+}
+
+

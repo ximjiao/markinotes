@@ -1,5 +1,5 @@
 use rusqlite::{Connection, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub fn get_db_path(workspace_path: &str) -> PathBuf {
     let mut path = PathBuf::from(workspace_path);
