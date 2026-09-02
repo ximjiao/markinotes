@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -70,6 +71,121 @@
     --text-secondary: #a3a3a3;
     --text-muted: #737373;
     --text-brand: #c084fc;
+  }
+
+  .high-contrast {
+    /* Increase border visibility */
+    --border: 240 5.9% 87%;
+    --sidebar-border: 240 5.9% 87%;
+
+    /* Make muted text darker (light mode) or lighter (dark mode) */
+    --text-muted: #525252;
+    --muted-foreground: 240 3.8% 20%;
+  }
+
+  .dark.high-contrast {
+    --border: 240 3.7% 40%;
+    --sidebar-border: 240 3.7% 40%;
+    --text-muted: #d4d4d4;
+    --muted-foreground: 240 5% 85%;
+  }
+
+  /* Accent Colors */
+  [data-accent="blue"] {
+    --primary: 221.2 83.2% 53.3%;
+    --ring: 221.2 83.2% 53.3%;
+    --sidebar-primary: 221.2 83.2% 53.3%;
+    --text-brand: #2563eb;
+  }
+  .dark[data-accent="blue"] {
+    --primary: 217.2 91.2% 59.8%;
+    --ring: 217.2 91.2% 59.8%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
+    --text-brand: #3b82f6;
+  }
+
+  [data-accent="green"] {
+    --primary: 142.1 76.2% 36.3%;
+    --ring: 142.1 76.2% 36.3%;
+    --sidebar-primary: 142.1 76.2% 36.3%;
+    --text-brand: #16a34a;
+  }
+  .dark[data-accent="green"] {
+    --primary: 142.1 70.6% 45.3%;
+    --ring: 142.1 70.6% 45.3%;
+    --sidebar-primary: 142.1 70.6% 45.3%;
+    --text-brand: #22c55e;
+  }
+  
+  [data-accent="yellow"] {
+    --primary: 47.9 95.8% 53.1%;
+    --ring: 47.9 95.8% 53.1%;
+    --sidebar-primary: 47.9 95.8% 53.1%;
+    --text-brand: #eab308;
+    --primary-foreground: 240 5.9% 10%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+  }
+  .dark[data-accent="yellow"] {
+    --primary: 47.9 95.8% 53.1%;
+    --ring: 47.9 95.8% 53.1%;
+    --sidebar-primary: 47.9 95.8% 53.1%;
+    --text-brand: #eab308;
+    --primary-foreground: 240 5.9% 10%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+  }
+  
+  [data-accent="pink"] {
+    --primary: 330 81% 60%;
+    --ring: 330 81% 60%;
+    --sidebar-primary: 330 81% 60%;
+    --text-brand: #ec4899;
+  }
+  .dark[data-accent="pink"] {
+    --primary: 330 81% 60%;
+    --ring: 330 81% 60%;
+    --sidebar-primary: 330 81% 60%;
+    --text-brand: #ec4899;
+  }
+
+  [data-accent="orange"] {
+    --primary: 24.6 95% 53.1%;
+    --ring: 24.6 95% 53.1%;
+    --sidebar-primary: 24.6 95% 53.1%;
+    --text-brand: #f97316;
+  }
+  .dark[data-accent="orange"] {
+    --primary: 24.6 95% 53.1%;
+    --ring: 24.6 95% 53.1%;
+    --sidebar-primary: 24.6 95% 53.1%;
+    --text-brand: #f97316;
+  }
+  
+  [data-accent="purple"] {
+    --primary: 271.5 81.3% 55.9%;
+    --ring: 271.5 81.3% 55.9%;
+    --sidebar-primary: 271.5 81.3% 55.9%;
+    --text-brand: #9333ea;
+  }
+  .dark[data-accent="purple"] {
+    --primary: 270 91% 65%;
+    --ring: 270 91% 65%;
+    --sidebar-primary: 270 91% 65%;
+    --text-brand: #a855f7;
+  }
+
+  [data-accent="white"] {
+    --primary: 240 5.9% 10%;
+    --ring: 240 5.9% 10%;
+    --sidebar-primary: 240 5.9% 10%;
+    --text-brand: #171717;
+  }
+  .dark[data-accent="white"] {
+    --primary: 0 0% 98%;
+    --ring: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --text-brand: #fafafa;
+    --primary-foreground: 240 5.9% 10%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
   }
 }
 
@@ -161,14 +277,14 @@
   margin-bottom: 0.25rem;
 }
 
-.ProseMirror ul[data-type="taskList"] li > label {
+.ProseMirror ul[data-type="taskList"] li>label {
   flex-shrink: 0;
   user-select: none;
   margin-top: 0.2rem;
   cursor: pointer;
 }
 
-.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+.ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
   cursor: pointer;
   accent-color: #9333ea;
   width: 1rem;
@@ -176,7 +292,7 @@
   border-radius: 0.25rem;
 }
 
-.ProseMirror ul[data-type="taskList"] li > div {
+.ProseMirror ul[data-type="taskList"] li>div {
   flex: 1 1 0%;
   min-width: 0;
 }
@@ -233,8 +349,8 @@
   background-color: transparent;
 }
 
-.ProseMirror td > p,
-.ProseMirror th > p {
+.ProseMirror td>p,
+.ProseMirror th>p {
   margin: 0 !important;
   min-height: 1.25rem;
 }
@@ -249,10 +365,14 @@
   z-index: 2;
   position: absolute;
   content: "";
-  left: 0; right: 0; top: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   background: rgba(147, 51, 234, 0.15);
   pointer-events: none;
 }
+
 .ProseMirror .column-resize-handle {
   position: absolute;
   right: -2px;
@@ -281,4 +401,47 @@
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   overflow-x: auto;
+}
+
+/* ─── Custom Titlebar / Drag Region ─── */
+
+/* Make the whole app body not draggable by default */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Re-enable text selection in content areas */
+.prose,
+p,
+input,
+textarea,
+[contenteditable],
+.allow-select {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* The drag region — marks elements as draggable for the native window */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+  cursor: default;
+}
+
+/* Interactive elements inside drag region must NOT be draggable */
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] [role="button"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Traffic lights clearance on macOS — 72px wide, 38px tall */
+.titlebar-traffic-lights {
+  height: 38px;
+  padding-top: 12px;
+  padding-left: 72px;
+  /* leave room for macOS traffic lights */
 }

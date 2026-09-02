@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   EditorRoot,
   EditorContent,
@@ -299,21 +299,61 @@ export function NovelEditor({
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving">("saved");
+  const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
 
-  // Debounced auto-save
-  useEffect(() => {
-    if (saveStatus !== "dirty") return;
-    
-    setSaveStatus("saving");
-    const handler = setTimeout(() => {
-      onSave?.(title, content);
-      setSaveStatus("saved");
-    }, 1000);
-    
-    return () => clearTimeout(handler);
-  }, [title, content, saveStatus, onSave]);
+  // Refs so the debounced timer always reads the latest values
+  const titleRef = useRef(title);
+  const contentRef = useRef(content);
+  const onSaveRef = useRef(onSave);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Keep refs in sync with state
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
+  const performSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    setSaveCountdown(null);
+    setSaveStatus("saving");
+    onSaveRef.current?.(titleRef.current, contentRef.current);
+    setSaveStatus("saved");
+  }, []);
+
+  /** Call this whenever content or title changes — starts/resets 3s countdown */
+  const scheduleAutoSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    
+    setSaveStatus("dirty");
+    setSaveCountdown(3); // Start at 3 seconds
+
+    countdownTimerRef.current = setInterval(() => {
+      setSaveCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    saveTimerRef.current = setTimeout(() => {
+      performSave();
+    }, 3000);
+  }, [performSave]);
+
+  // Ensure we save when component unmounts if there are pending changes
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        performSave();
+      }
+    };
+  }, [performSave]);
 
   // Mass Auto-Sweeper for all unused '/' paragraphs in document
   useEffect(() => {
@@ -389,7 +429,7 @@ export function NovelEditor({
           onChange={(e) => {
             setTitle(e.target.value);
             setIsTitleCustom(true);
-            setSaveStatus("dirty");
+            scheduleAutoSave();
           }}
           placeholder="Untitled document"
           className="text-xs font-semibold text-txt-primary bg-transparent outline-none border border-transparent hover:border-border focus:border-txt-brand rounded px-2 py-1 w-40 min-w-0 transition-colors shrink-0"
@@ -463,9 +503,9 @@ export function NovelEditor({
             <Button
               variant={
                 editorInstance?.isActive("bulletList") ||
-                editorInstance?.isActive("orderedList") ||
-                editorInstance?.isActive("taskList") ||
-                editorInstance?.isActive("blockquote")
+                  editorInstance?.isActive("orderedList") ||
+                  editorInstance?.isActive("taskList") ||
+                  editorInstance?.isActive("blockquote")
                   ? "secondary"
                   : "ghost"
               }
@@ -487,7 +527,7 @@ export function NovelEditor({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
-            <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted uppercase">Tipe List</div>
+            <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Tipe List</div>
             <DropdownMenuItem
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editorInstance?.chain().focus().toggleBulletList().run()}
@@ -534,7 +574,7 @@ export function NovelEditor({
               <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run()} className="cursor-pointer text-xs">Sisipkan Tabel 3x3</DropdownMenuItem>
             ) : (
               <>
-                <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted uppercase">Kontrol Tabel</div>
+                <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Kontrol Tabel</div>
                 <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowAfter().run()} className="cursor-pointer text-xs">+ Tambah Baris di Bawah</DropdownMenuItem>
                 <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowBefore().run()} className="cursor-pointer text-xs">+ Tambah Baris di Atas</DropdownMenuItem>
                 <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addColumnAfter().run()} className="cursor-pointer text-xs">+ Tambah Kolom Kanan</DropdownMenuItem>
@@ -565,7 +605,7 @@ export function NovelEditor({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted uppercase tracking-wider">Export Document</div>
+            <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">Export Document</div>
             <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-red-500" /> Export to PDF</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport("docx")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-blue-500" /> Export to Word (.docx)</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExport("md")} className="cursor-pointer text-xs"><FileCode className="mr-2 h-4 w-4 text-purple-500" /> Export to Markdown (.md)</DropdownMenuItem>
@@ -606,7 +646,6 @@ export function NovelEditor({
               }}
               onUpdate={({ editor }) => {
                 if (!editorInstance) setEditorInstance(editor);
-                setSaveStatus("dirty");
                 const text = editor.getText();
                 setCharCount(text.length);
                 setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
@@ -614,13 +653,12 @@ export function NovelEditor({
                 // Auto-sync document title if not explicitly edited
                 if (!isTitleCustom) {
                   const firstLine = text.split("\n")[0]?.trim();
-                  if (firstLine) {
-                    setTitle(firstLine.slice(0, 50));
-                  }
+                  if (firstLine) setTitle(firstLine.slice(0, 50));
                 }
 
                 const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
                 setContent(md);
+                scheduleAutoSave();
               }}
             >
               {/* Notion Slash Commands Popup */}
@@ -777,7 +815,7 @@ export function NovelEditor({
       </div>
 
       {/* 4. Footer Bar */}
-      <EditorFooter saveStatus={saveStatus} wordCount={wordCount} charCount={charCount} />
+      <EditorFooter saveStatus={saveStatus} wordCount={wordCount} charCount={charCount} saveCountdown={saveCountdown} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ export function WorkspaceTree() {
 
   return (
     <div className="flex flex-col gap-1 p-2 text-txt-primary">
-      <span className="text-xs font-semibold text-txt-muted uppercase tracking-wider">
+      <span className="text-xs font-semibold text-txt-muted capitalize">
         Workspace
       </span>
       {folders.length === 0 ? (

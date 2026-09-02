@@ -9,9 +9,10 @@ interface EditorFooterProps {
   saveStatus: SaveStatus;
   wordCount: number;
   charCount: number;
+  saveCountdown?: number | null;
 }
 
-export function EditorFooter({ saveStatus, wordCount, charCount }: EditorFooterProps) {
+export function EditorFooter({ saveStatus, wordCount, charCount, saveCountdown }: EditorFooterProps) {
   const readTimeMin = Math.max(1, Math.ceil(wordCount / 200));
 
   return (
@@ -39,7 +40,7 @@ export function EditorFooter({ saveStatus, wordCount, charCount }: EditorFooterP
         )}
         {saveStatus === "dirty" && (
           <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 font-normal text-txt-muted border-border">
-            Unsaved changes
+            Unsaved changes {saveCountdown !== null ? `(saving in ${saveCountdown}s)` : ""}
           </Badge>
         )}
         {saveStatus === "error" && (

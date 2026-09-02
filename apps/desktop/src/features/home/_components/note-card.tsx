@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Star, MoreHorizontal, FileText, Folder, Trash2, Edit3, Share2 } from "lucide-react";
+import { Star, MoreHorizontal, FileText, Folder, Trash2, Edit3, Share2, FileEdit, FolderOutput } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,21 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { NoteCardData } from "../_types/home.types";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 
 interface NoteCardProps {
   note: NoteCardData;
   onOpen?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleStar?: (id: string) => void;
+  onMove?: (id: string) => void;
 }
 
-export function NoteCard({ note, onOpen, onDelete, onToggleStar }: NoteCardProps) {
+export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove }: NoteCardProps) {
   return (
     <Card
       onClick={() => onOpen?.(note.id)}
@@ -53,15 +55,25 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar }: NoteCardProps
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onOpen?.(note.id)}>
-                <Edit3 className="mr-2 h-3.5 w-3.5" /> Open Note
+            <DropdownMenuContent align="end" className="w-40 border-border bg-popover shadow-xl rounded-xl">
+              <DropdownMenuItem onClick={() => onOpen?.(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
+                <FileEdit className="h-4 w-4" /> Open Note
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Share2 className="mr-2 h-3.5 w-3.5" /> Share
+              
+              {onMove && (
+                <DropdownMenuItem onClick={() => onMove(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
+                  <FolderOutput className="h-4 w-4" /> Move
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem className="cursor-pointer gap-2 px-3 py-2 text-xs">
+                <Share2 className="h-4 w-4" /> Share
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete?.(note.id)}>
-                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+              
+              <DropdownMenuSeparator className="bg-border" />
+              
+              <DropdownMenuItem className="cursor-pointer gap-2 px-3 py-2 text-xs text-destructive focus:text-destructive" onClick={() => onDelete?.(note.id)}>
+                <Trash2 className="h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -87,7 +99,7 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar }: NoteCardProps
             </Badge>
           ))}
         </div>
-        <span className="shrink-0">{note.updatedAt}</span>
+        <span className="shrink-0">Edited {formatRelativeTime(note.updatedAt)}</span>
       </CardFooter>
     </Card>
   );

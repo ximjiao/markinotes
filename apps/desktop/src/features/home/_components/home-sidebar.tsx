@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings } from "lucide-react";
+import React, { useState } from "react";
+import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings, Check, X, FileText } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,17 +20,29 @@ import { useFolderTree, FolderTreeItem } from "@features/workspace";
 interface HomeSidebarProps {
   selectedView: string;
   onSelectView: (view: string) => void;
+  onCreateNote?: (folderPath: string) => void;
 }
 
-export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
-  const { folders, toggleExpand, createSubfolder } = useFolderTree();
+export function HomeSidebar({ selectedView, onSelectView, onCreateNote }: HomeSidebarProps) {
+  const { folders, toggleExpand, createSubfolder, addFolder, renameFolder } = useFolderTree();
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newFolderName.trim()) {
+      await addFolder(newFolderName.trim());
+      setNewFolderName("");
+      setIsCreatingFolder(false);
+    }
+  };
 
   const navItems = [
     { id: "recents", label: "Recents", icon: Clock },
-    { id: "shared", label: "Shared with me", icon: Share2 },
   ];
 
   const spaceItems = [
+    { id: "drafts", label: "Drafts", icon: FileText },
     { id: "organize", label: "Organize", icon: Sparkles },
     { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "starred", label: "Starred", icon: Star },
@@ -40,36 +52,30 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
       <SidebarContent className="px-1 py-2 group-data-[collapsible=icon]:px-0">
-        {/* Main Quick Nav Group */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = selectedView === item.id;
-                return (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      isActive={active}
-                      onClick={() => onSelectView(item.id)}
-                      tooltip={item.label}
-                      className="text-xs font-medium"
-                    >
-                      <Icon className="h-4 w-4 text-txt-brand" />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-        <SidebarSeparator />
 
         {/* Space Group */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted uppercase tracking-wider">
+          <SidebarMenu>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = selectedView === item.id;
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={active}
+                    onClick={() => onSelectView(item.id)}
+                    tooltip={item.label}
+                    className="text-xs font-medium"
+                  >
+                    <Icon className="h-4 w-4 text-txt-brand" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+          <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize">
             My Space
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -102,25 +108,41 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
           {/* A. Uncollapsed View: Full inline folder tree */}
           <div className="group-data-[collapsible=icon]:hidden space-y-1">
             <div className="flex items-center justify-between px-2 py-1">
-              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted uppercase tracking-wider p-0">
+              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize p-0">
                 Folders
               </SidebarGroupLabel>
               <button
-                onClick={() => {
-                  const name = prompt("Enter root folder name:");
-                  if (name && name.trim()) {
-                    createSubfolder("f-1", name.trim());
-                  }
-                }}
+                onClick={() => setIsCreatingFolder(true)}
                 className="text-txt-muted hover:text-txt-primary transition-colors"
                 title="New Folder"
               >
                 <FolderPlus className="h-3.5 w-3.5" />
               </button>
             </div>
+
+            {isCreatingFolder && (
+              <form onSubmit={handleCreateFolder} className="px-2 py-1 mb-2">
+                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-background border border-border rounded-md shadow-sm">
+                  <Folder className="h-3.5 w-3.5 text-txt-muted shrink-0" />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onBlur={() => setIsCreatingFolder(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setIsCreatingFolder(false);
+                    }}
+                    placeholder="Folder name..."
+                    className="flex-1 bg-transparent text-xs text-txt-primary border-none focus:outline-none focus:ring-0 min-w-0"
+                  />
+                </div>
+              </form>
+            )}
+
             <SidebarGroupContent>
               <SidebarMenu>
-                {folders.map((folder) => (
+                {folders.filter(f => f.name !== "Drafts").map((folder) => (
                   <FolderTreeItem
                     key={folder.id}
                     folder={folder}
@@ -128,9 +150,12 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
                     onSelect={onSelectView}
                     onToggleExpand={toggleExpand}
                     onCreateSubfolder={createSubfolder}
+                    onCreateNote={onCreateNote}
+                    onRenameFolder={renameFolder}
                   />
                 ))}
               </SidebarMenu>
+
             </SidebarGroupContent>
           </div>
 
@@ -155,14 +180,14 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
                     className="w-64 p-3 bg-popover border-border shadow-xl rounded-lg z-50 space-y-2"
                   >
                     <div className="flex items-center justify-between px-1 pb-1.5 border-b border-border">
-                      <span className="text-xs font-semibold text-txt-muted uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-txt-muted capitalize">
                         Workspace Folders
                       </span>
                       <button
-                        onClick={() => {
-                          const name = prompt("Enter root folder name:");
+                        onClick={async () => {
+                          const name = prompt("Enter folder name:");
                           if (name && name.trim()) {
-                            createSubfolder("f-1", name.trim());
+                            await addFolder(name.trim());
                           }
                         }}
                         className="text-txt-muted hover:text-txt-primary transition-colors"
@@ -207,15 +232,7 @@ export function HomeSidebar({ selectedView, onSelectView }: HomeSidebarProps) {
               <span>Settings</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-            <SidebarMenuButton
-              tooltip="Help Center"
-              className="text-xs text-txt-secondary group-data-[collapsible=icon]:mx-auto"
-            >
-              <HelpCircle className="h-4 w-4" />
-              <span>Help Center</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

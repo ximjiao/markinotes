@@ -22,7 +22,10 @@ pub fn run() {
             note_read,
             note_update,
             note_delete,
-            note_toggle_star
+            note_toggle_star,
+            note_move,
+            reveal_in_finder,
+            folder_rename
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

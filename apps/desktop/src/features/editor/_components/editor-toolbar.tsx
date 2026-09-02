@@ -255,7 +255,7 @@ export function EditorToolbar({ editor, doc }: EditorToolbarProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted uppercase tracking-wider">
+          <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">
             Export Document
           </div>
           <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs">

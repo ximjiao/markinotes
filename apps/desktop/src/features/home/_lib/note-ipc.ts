@@ -49,14 +49,15 @@ export const noteIpc = {
     // Web fallback
     // We just mock the update returning a new object and saving content
     localStorage.setItem(`marki_content_${notePath}`, content);
-    return {
-      id: "mock",
-      path: notePath,
-      title,
-      excerpt: content.substring(0, 100),
-      updatedAt: "Just now",
-      tags,
-    };
+    return {} as NoteCardData;
+  },
+
+  move: async (workspacePath: string, notePath: string, newFolderPath: string): Promise<string> => {
+    if (isTauri()) {
+      return invoke("note_move", { workspacePath, notePath, newFolderPath });
+    }
+    // Web fallback
+    return notePath;
   },
 
   delete: async (workspacePath: string, notePath: string): Promise<void> => {

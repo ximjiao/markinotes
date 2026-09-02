@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isTauri } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
+import { invoke } from "@tauri-apps/api/core";
 
 interface OnboardingViewProps {
   onSelectFolder: () => void;
@@ -40,12 +41,10 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     // Initial default folders
     const defaultFolders = [
-      { id: crypto.randomUUID(), name: "Personal", path: `${rootPath}/Personal`, noteCount: 0 },
-      { id: crypto.randomUUID(), name: "Work", path: `${rootPath}/Work`, noteCount: 0 },
-      { id: crypto.randomUUID(), name: "Archive", path: `${rootPath}/Archive`, noteCount: 0 },
+      { id: crypto.randomUUID(), name: "Getting Started", path: `${rootPath}/Getting Started`, noteCount: 1 },
     ];
     
     workspaceConfig.set({
@@ -55,8 +54,31 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
       setupDone: true,
     });
     
-    // In Tauri, we'd also call `invoke("workspace_init", { rootPath, folders })` here.
-    // For now we'll do it later in the data hook or directly.
+    if (isTauri()) {
+      try {
+        await invoke("workspace_init", { rootPath, folders: defaultFolders });
+        
+        // Create sample note
+        const sampleNote: any = await invoke("note_create", { 
+          workspacePath: rootPath, 
+          folderPath: `${rootPath}/Getting Started`, 
+          title: "Welcome to Markidown!" 
+        });
+        
+        const sampleContent = `# Welcome to Markidown!\n\nThis is your first note. Feel free to edit it or create a new one.\n\n- Hit \`/\` to see slash commands.\n- Use the sidebar to organize your thoughts.`;
+        
+        await invoke("note_update", {
+          workspacePath: rootPath,
+          notePath: sampleNote.path,
+          title: "Welcome to Markidown!",
+          content: sampleContent,
+          tags: ["getting-started"]
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
     onSelectFolder();
   };
 
@@ -125,9 +147,7 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
                 <div className="p-3 bg-muted/30 rounded-md border border-border/50 font-mono text-[11px] text-txt-secondary">
                   <div className="text-txt-primary font-semibold mb-1">📁 {workspaceName}</div>
                   <div className="ml-4 pl-2 border-l border-border/60">
-                    <div>├── 📁 Personal</div>
-                    <div>├── 📁 Work</div>
-                    <div>└── 📁 Archive</div>
+                    <div>└── 📁 Getting Started</div>
                   </div>
                 </div>
               </div>

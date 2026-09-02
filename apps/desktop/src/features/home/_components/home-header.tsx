@@ -10,27 +10,23 @@ import type { ViewMode } from "../_types/home.types";
 interface HomeHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
   onNewNote: () => void;
 }
 
 export function HomeHeader({
   searchQuery,
   onSearchChange,
-  viewMode,
-  onViewModeChange,
   onNewNote,
 }: HomeHeaderProps) {
   return (
-    <header className="relative flex items-center justify-between border-b border-border bg-background px-4 py-2.5 h-12">
+    <header className="flex items-center justify-between border-b border-border bg-background px-4 py-2.5 h-12 gap-4">
       {/* 1. Left Side: Sidebar Trigger Button */}
-      <div className="flex items-center gap-2 z-10">
+      <div className="flex items-center shrink-0">
         <SidebarTrigger className="h-8 w-8 text-txt-secondary hover:text-txt-primary shrink-0" />
       </div>
 
-      {/* 2. Center Side: Search Bar Fixed to Overall Window Viewport */}
-      <div className="fixed left-1/2 -translate-x-1/2 top-2 z-20 w-full max-w-md px-4 pointer-events-auto">
+      {/* 2. Center Side: Search Bar */}
+      <div className="flex-1 w-full max-w-md mx-auto">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-txt-muted" />
           <Input
@@ -43,26 +39,8 @@ export function HomeHeader({
         </div>
       </div>
 
-      {/* 3. Right Side: View Switcher & Action Buttons */}
-      <div className="flex items-center gap-2 z-10">
-        <div className="flex items-center border border-border rounded-lg p-0.5 bg-accent/30">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => onViewModeChange("grid")}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={viewMode === "list" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => onViewModeChange("list")}
-          >
-            <List className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+      {/* 3. Right Side: Action Buttons */}
+      <div className="flex items-center gap-2 shrink-0">
 
         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 hidden sm:flex">
           <Sparkles className="h-3.5 w-3.5 text-txt-brand" />

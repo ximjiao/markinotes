@@ -6,8 +6,44 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[tauri::command]
-pub fn workspace_init(root_path: String) -> Result<(), String> {
+pub fn reveal_in_finder(path: String) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn folder_rename(workspace_path: String, old_path: String, new_path: String) -> Result<(), String> {
+    std::fs::rename(&old_path, &new_path).map_err(|e| e.to_string())?;
+
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    // Update the path of all notes in this folder or its subfolders
+    conn.execute(
+        "UPDATE notes SET path = ?1 || SUBSTR(path, LENGTH(?2) + 1) WHERE path LIKE ?3",
+        params![new_path, old_path, format!("{}%", old_path)],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+pub struct FolderInfo {
+    path: String,
+}
+
+#[tauri::command]
+pub fn workspace_init(root_path: String, folders: Vec<FolderInfo>) -> Result<(), String> {
     init_db(&root_path).map_err(|e| e.to_string())?;
+    
+    // Create default folders
+    for folder in folders {
+        let _ = fs::create_dir_all(&folder.path);
+    }
     Ok(())
 }
 
@@ -68,7 +104,7 @@ pub fn note_create(workspace_path: String, folder_path: String, title: String) -
     
     // Group name is the last part of folder_path
     let group_name = PathBuf::from(&folder_path).file_name().unwrap_or_default().to_string_lossy().to_string();
-    let updated_at = "Just now".to_string(); // In a real app, use chrono
+    let updated_at = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
         "INSERT INTO notes (id, path, title, excerpt, group_name, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -99,7 +135,7 @@ pub fn note_update(workspace_path: String, note_path: String, title: String, con
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
     
-    let updated_at = "Just now".to_string();
+    let updated_at = chrono::Utc::now().to_rfc3339();
     let tags_str = tags.join(",");
     let excerpt = content.chars().take(100).collect::<String>();
     
@@ -139,3 +175,27 @@ pub fn note_toggle_star(workspace_path: String, note_path: String, starred: bool
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn note_move(workspace_path: String, note_path: String, new_folder_path: String) -> Result<String, String> {
+    let file_name = PathBuf::from(&note_path).file_name().unwrap_or_default().to_string_lossy().to_string();
+    let mut new_path_buf = PathBuf::from(&new_folder_path);
+    new_path_buf.push(&file_name);
+    let new_path_str = new_path_buf.to_string_lossy().to_string();
+
+    std::fs::rename(&note_path, &new_path_str).map_err(|e| e.to_string())?;
+
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let group_name = PathBuf::from(&new_folder_path).file_name().unwrap_or_default().to_string_lossy().to_string();
+    let updated_at = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "UPDATE notes SET path = ?1, group_name = ?2, updated_at = ?3 WHERE path = ?4",
+        params![new_path_str, group_name, updated_at, note_path],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(new_path_str)
+}
+
