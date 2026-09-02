@@ -1,7 +1,7 @@
 "use client";
 
 import type { NoteCardData } from "../_types/home.types";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export const isTauri = () => {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -84,5 +84,29 @@ export const noteIpc = {
         updatedAt: "Just now",
         isStarred: starred
     };
+  },
+
+  summarizeStream: async (
+    workspacePath: string,
+    noteId: string,
+    onChunk: (chunk: string) => void,
+    model?: string
+  ): Promise<void> => {
+    if (isTauri()) {
+      const channel = new Channel<string>();
+      channel.onmessage = onChunk;
+      return invoke("note_summarize_stream", {
+        workspacePath,
+        noteId,
+        model: model || null,
+        onChunk: channel,
+      });
+    }
+    // Web fallback mock
+    const mockText = "Ringkasan Catatan (Web Preview):\n- Catatan berhasil diproses dengan pointer frekuensi kata.\n- Mode streaming Gemini AI aktif.";
+    for (const char of mockText) {
+      await new Promise((r) => setTimeout(r, 25));
+      onChunk(char);
+    }
   }
 };

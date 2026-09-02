@@ -8,17 +8,27 @@ import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { SlashCommandMenu } from "./slash-command-menu";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { EditorFooter } from "./editor-footer";
+import { AiSummaryDialog } from "./ai-summary-dialog";
 import type { NoteDocument } from "../_types/editor.types";
 
 interface TiptapEditorProps {
   initialContent?: string;
   initialTitle?: string;
   onSave?: (markdown: string, doc: NoteDocument) => void;
+  noteId?: string;
+  workspacePath?: string | null;
 }
 
-export function TiptapEditor({ initialContent, initialTitle = "Getting Started with Markidown", onSave }: TiptapEditorProps) {
+export function TiptapEditor({
+  initialContent,
+  initialTitle = "Getting Started with Markidown",
+  onSave,
+  noteId,
+  workspacePath,
+}: TiptapEditorProps) {
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
   const [noteTitle, setNoteTitle] = useState(initialTitle);
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
 
   const { editor, frontmatter, saveStatus, wordCount, charCount } = useTiptapEditor({
     initialContent,
@@ -86,7 +96,27 @@ export function TiptapEditor({ initialContent, initialTitle = "Getting Started w
       </div>
 
       {/* 3. Footer Bar */}
-      <EditorFooter saveStatus={saveStatus} wordCount={wordCount} charCount={charCount} />
+      <EditorFooter
+        saveStatus={saveStatus}
+        wordCount={wordCount}
+        charCount={charCount}
+        onSummarize={() => setIsAiDialogOpen(true)}
+      />
+
+      {/* 4. AI Summary Dialog */}
+      <AiSummaryDialog
+        isOpen={isAiDialogOpen}
+        onClose={() => setIsAiDialogOpen(false)}
+        noteId={noteId}
+        workspacePath={workspacePath}
+        noteTitle={noteTitle}
+        onInsertSummary={(summary) => {
+          if (editor) {
+            editor.commands.focus("end");
+            editor.commands.insertContent(`\n\n## 🤖 Summary\n\n${summary}\n\n`);
+          }
+        }}
+      />
     </div>
   );
 }

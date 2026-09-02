@@ -66,6 +66,7 @@ import {
 import { exportDocument } from "../_lib/export-engine";
 import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
+import { AiSummaryDialog } from "./ai-summary-dialog";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 
 interface NovelEditorProps {
@@ -73,6 +74,8 @@ interface NovelEditorProps {
   initialContent?: string;
   onBack?: () => void;
   onSave?: (title: string, content: string) => void;
+  noteId?: string;
+  workspacePath?: string | null;
 }
 
 interface CustomSlashItem {
@@ -292,6 +295,8 @@ export function NovelEditor({
   initialContent = "# Getting Started with Markidown\n\nWelcome to Markidown! Click anywhere and start typing. Fast, local-first markdown note taking.\n\nStart editing this note...",
   onBack,
   onSave,
+  noteId,
+  workspacePath,
 }: NovelEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [isTitleCustom, setIsTitleCustom] = useState(false);
@@ -301,6 +306,15 @@ export function NovelEditor({
   const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving">("saved");
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+
+  const handleInsertSummary = (summaryMarkdown: string) => {
+    if (editorInstance) {
+      editorInstance.commands.focus("end");
+      editorInstance.commands.insertContent(`\n\n## 🤖 Summary\n\n${summaryMarkdown}\n\n`);
+      scheduleAutoSave();
+    }
+  };
 
   // Refs so the debounced timer always reads the latest values
   const titleRef = useRef(title);
@@ -815,7 +829,23 @@ export function NovelEditor({
       </div>
 
       {/* 4. Footer Bar */}
-      <EditorFooter saveStatus={saveStatus} wordCount={wordCount} charCount={charCount} saveCountdown={saveCountdown} />
+      <EditorFooter
+        saveStatus={saveStatus}
+        wordCount={wordCount}
+        charCount={charCount}
+        saveCountdown={saveCountdown}
+        onSummarize={() => setIsAiDialogOpen(true)}
+      />
+
+      {/* 5. AI Summary Dialog */}
+      <AiSummaryDialog
+        isOpen={isAiDialogOpen}
+        onClose={() => setIsAiDialogOpen(false)}
+        noteId={noteId}
+        workspacePath={workspacePath}
+        noteTitle={title}
+        onInsertSummary={handleInsertSummary}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 mod db;
 mod models;
 mod commands;
+mod ai;
 
 use commands::*;
 
@@ -25,7 +26,8 @@ pub fn run() {
             note_toggle_star,
             note_move,
             reveal_in_finder,
-            folder_rename
+            folder_rename,
+            note_summarize_stream
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

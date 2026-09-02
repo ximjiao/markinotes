@@ -90,6 +90,8 @@ export function HomeDashboard() {
     return (
       <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden">
         <NovelEditor
+          noteId={note?.id}
+          workspacePath={workspace?.path}
           initialTitle={note?.title || "Untitled"}
           initialContent={activeNoteContent || `# ${note?.title || "Untitled"}\n\n`}
           onBack={closeNote}
