@@ -18,6 +18,7 @@ import { exportDocument } from "@features/editor/_lib/export-engine";
 
 import { AIOrganizeDialog } from "./ai-organize-dialog";
 import { Sparkles } from "lucide-react";
+import { noteIpc } from "../_lib/note-ipc";
 
 export interface AIOrganizeResponse {
   [noteId: string]: string; // Maps note ID to destination folder path

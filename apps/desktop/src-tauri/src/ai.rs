@@ -284,7 +284,7 @@ pub async fn organize_drafts(
     drafts_json: &str,
     folders_json: &str,
 ) -> Result<String, String> {
-    let model_name = model.unwrap_or("gemini-1.5-flash");
+    let model_name = model.unwrap_or("gemini-3.6-flash");
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
         model_name, api_key
