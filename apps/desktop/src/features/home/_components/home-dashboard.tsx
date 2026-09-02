@@ -14,6 +14,14 @@ import { MoveNoteDialog } from "./move-note-dialog";
 import { TemplateDialog } from "./template-dialog";
 import type { NoteTemplate } from "../_lib/templates-data";
 import { Button } from "@/components/ui/button";
+import { exportDocument } from "@features/editor/_lib/export-engine";
+
+import { AIOrganizeDialog } from "./ai-organize-dialog";
+import { Sparkles } from "lucide-react";
+
+export interface AIOrganizeResponse {
+  [noteId: string]: string; // Maps note ID to destination folder path
+}
 
 export function HomeDashboard() {
   const {
@@ -42,6 +50,13 @@ export function HomeDashboard() {
   const [contentLoading, setContentLoading] = useState(false);
   const [movingNoteId, setMovingNoteId] = useState<string | null>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = useState(false);
+  
+  // AI Organize state
+  const [aiDialogState, setAiDialogState] = useState<{ isOpen: boolean; isLoading: boolean; suggestions: AIOrganizeResponse }>({
+    isOpen: false,
+    isLoading: false,
+    suggestions: {}
+  });
 
   // Fallback to activeNoteRef if not in the current filtered list
   const activeNote = activeNoteRef ? (notes.find((n) => n.id === activeNoteRef.id) ?? activeNoteRef) : undefined;
@@ -194,6 +209,38 @@ export function HomeDashboard() {
     }
   };
 
+  const handleOrganizeAI = async () => {
+    if (notes.length === 0 || !workspace) return;
+    setAiDialogState({ isOpen: true, isLoading: true, suggestions: {} });
+    try {
+      const draftTitles = notes.map(n => ({ id: n.id, title: n.title }));
+      const availableFolders = workspace?.folders?.map(f => ({ id: f.id, name: f.name, path: f.path })) || [];
+      
+      const suggestionsStr = await noteIpc.organizeDrafts(
+        workspace.path,
+        JSON.stringify(draftTitles),
+        JSON.stringify(availableFolders)
+      );
+      
+      const suggestions: AIOrganizeResponse = JSON.parse(suggestionsStr);
+      setAiDialogState({ isOpen: true, isLoading: false, suggestions });
+    } catch (error: any) {
+      console.error(error);
+      setAiDialogState({ isOpen: false, isLoading: false, suggestions: {} });
+      alert(error.toString() || "Failed to get suggestions.");
+    }
+  };
+
+  const handleConfirmOrganize = async (approvedMoves: AIOrganizeResponse) => {
+    for (const [noteId, newPath] of Object.entries(approvedMoves)) {
+      const note = notes.find(n => n.id === noteId);
+      if (note) {
+        await moveNote(note.path, newPath);
+      }
+    }
+    refreshWorkspace();
+  };
+
   const currentFolderName = selectedFolder.startsWith("tag:")
     ? `#${selectedFolder.split(":")[1]}`
     : getSelectedFolder()?.name ||
@@ -233,7 +280,14 @@ export function HomeDashboard() {
             <span className="text-xs text-txt-muted">{notes.length} documents</span>
           </div>
           
-          <div className="flex items-center border border-border rounded-lg p-0.5 bg-accent/30">
+          <div className="flex items-center gap-2">
+            {selectedFolder === "drafts" && notes.length > 0 && (
+              <Button onClick={handleOrganizeAI} variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                Organize with AI
+              </Button>
+            )}
+            <div className="flex items-center border border-border rounded-lg p-0.5 bg-accent/30">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="sm"
@@ -251,6 +305,7 @@ export function HomeDashboard() {
               <List className="h-3.5 w-3.5" />
             </Button>
           </div>
+          </div>
         </div>
 
         <NoteGrid
@@ -265,6 +320,19 @@ export function HomeDashboard() {
           onToggleStar={async (id) => {
             const note = notes.find(n => n.id === id);
             if (note) await toggleStar(note.path, !note.isStarred);
+          }}
+          onExport={async (id) => {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+              const content = await readNoteContent(note.path);
+              const doc: any = {
+                id: note.id,
+                path: note.path,
+                content: content || "",
+                frontmatter: { title: note.title }
+              };
+              exportDocument(doc, "", "md");
+            }
           }}
         />
       </div>
@@ -287,6 +355,15 @@ export function HomeDashboard() {
           }}
         />
       )}
+
+      <AIOrganizeDialog
+        isOpen={aiDialogState.isOpen}
+        onClose={() => setAiDialogState(prev => ({ ...prev, isOpen: false }))}
+        isLoading={aiDialogState.isLoading}
+        suggestions={aiDialogState.suggestions}
+        draftTitles={notes.map(n => ({ id: n.id, title: n.title }))}
+        onConfirm={handleConfirmOrganize}
+      />
     </AppShell>
   );
 }

@@ -45,8 +45,6 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
 
   const spaceItems = [
     { id: "drafts", label: "Drafts", icon: FileText },
-    { id: "organize", label: "Organize", icon: Sparkles },
-    { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "starred", label: "Starred", icon: Star },
   ];
 

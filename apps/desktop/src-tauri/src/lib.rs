@@ -28,7 +28,8 @@ pub fn run() {
             note_move,
             reveal_in_finder,
             folder_rename,
-            note_summarize_stream
+            note_summarize_stream,
+            note_organize_drafts
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

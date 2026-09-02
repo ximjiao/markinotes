@@ -116,5 +116,21 @@ export const noteIpc = {
       await new Promise((r) => setTimeout(r, 25));
       onChunk(char);
     }
+  },
+
+  organizeDrafts: async (
+    workspacePath: string,
+    draftsJson: string,
+    foldersJson: string
+  ): Promise<string> => {
+    if (isTauri()) {
+      return invoke("note_organize_drafts", {
+        workspacePath,
+        draftsJson,
+        foldersJson
+      });
+    }
+    // Web fallback mock
+    return "{}";
   }
 };

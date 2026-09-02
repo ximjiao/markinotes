@@ -18,9 +18,10 @@ interface NoteGridProps {
   onDelete?: (id: string) => void;
   onToggleStar?: (id: string) => void;
   onMove?: (id: string) => void;
+  onExport?: (id: string) => void;
 }
 
-export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, onMove }: NoteGridProps) {
+export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, onMove, onExport }: NoteGridProps) {
   if (notes.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-12">
@@ -45,6 +46,7 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                 onDelete={onDelete}
                 onToggleStar={onToggleStar}
                 onMove={onMove}
+                onExport={onExport}
               />
             ))}
           </div>
@@ -108,6 +110,12 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                             <DropdownMenuItem onClick={() => onMove(note.id)}>
                               <FolderOutput className="mr-2 h-4 w-4" />
                               Move
+                            </DropdownMenuItem>
+                          )}
+                          {onExport && (
+                            <DropdownMenuItem onClick={() => onExport(note.id)}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Export
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem onClick={() => onToggleStar?.(note.id)}>

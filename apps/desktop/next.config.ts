@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   // Tauri loads the exported app from disk in production; keep asset URLs relative.
   assetPrefix: "./",
   transpilePackages: ["@markidown/shared-types"],
+  env: {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  },
 };
 
 export default nextConfig;

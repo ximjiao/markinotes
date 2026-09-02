@@ -21,9 +21,10 @@ interface NoteCardProps {
   onDelete?: (id: string) => void;
   onToggleStar?: (id: string) => void;
   onMove?: (id: string) => void;
+  onExport?: (id: string) => void;
 }
 
-export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove }: NoteCardProps) {
+export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExport }: NoteCardProps) {
   return (
     <Card
       onClick={() => onOpen?.(note.id)}
@@ -63,6 +64,12 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove }: NoteC
               {onMove && (
                 <DropdownMenuItem onClick={() => onMove(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
                   <FolderOutput className="h-4 w-4" /> Move
+                </DropdownMenuItem>
+              )}
+
+              {onExport && (
+                <DropdownMenuItem onClick={() => onExport(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
+                  <FileText className="h-4 w-4" /> Export
                 </DropdownMenuItem>
               )}
 

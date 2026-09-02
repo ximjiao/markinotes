@@ -267,4 +267,16 @@ pub async fn note_summarize_stream(
     crate::ai::stream_gemini_summary(&api_key, model.as_deref(), &prompt, on_chunk).await
 }
 
-
+#[tauri::command]
+pub async fn note_organize_drafts(
+    workspace_path: String,
+    drafts_json: String,
+    folders_json: String,
+) -> Result<String, String> {
+    // Read API key
+    let api_key = crate::ai::get_gemini_api_key(Some(&workspace_path))?;
+    let env_model = std::env::var("GEMINI_MODEL").ok();
+    
+    // Call AI to get suggestions
+    crate::ai::organize_drafts(&api_key, env_model.as_deref(), &drafts_json, &folders_json).await
+}

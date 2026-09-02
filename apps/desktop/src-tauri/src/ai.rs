@@ -276,3 +276,89 @@ mod tests {
         assert!(words.contains(&"database"));
     }
 }
+
+/// Call Gemini API to organize drafts based on titles
+pub async fn organize_drafts(
+    api_key: &str,
+    model: Option<&str>,
+    drafts_json: &str,
+    folders_json: &str,
+) -> Result<String, String> {
+    let model_name = model.unwrap_or("gemini-1.5-flash");
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+        model_name, api_key
+    );
+
+    let prompt = format!(
+        "You are an AI assistant that helps organize markdown notes.\n\
+        I have a list of drafts (titles and IDs) and a list of available folders (names, IDs, and paths).\n\
+        Your task is to assign each draft to the most appropriate folder based on its title.\n\
+        If no folder is appropriate, you can suggest it stays in \"Drafts\" (just omit it from the response).\n\
+        \n\
+        Drafts:\n\
+        {}\n\
+        \n\
+        Available Folders:\n\
+        {}\n\
+        \n\
+        Return a raw JSON object (no markdown formatting, no backticks, just the JSON string) mapping the draft ID as key to the destination folder path as value. For example:\n\
+        {{\n\
+          \"draft-123\": \"/Users/name/Documents/Space/ProjectX\",\n\
+          \"draft-456\": \"/Users/name/Documents/Space/Personal\"\n\
+        }}",
+        drafts_json, folders_json
+    );
+
+    let client = reqwest::Client::new();
+    let body = GeminiRequest {
+        contents: vec![GeminiContent {
+            parts: vec![GeminiPart {
+                text: prompt,
+            }],
+        }],
+        generation_config: GeminiGenerationConfig { temperature: 0.1 },
+    };
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Gagal menghubungi Gemini API: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_body = response.text().await.unwrap_or_default();
+        return Err(format!("Gemini API error (HTTP {status}): {error_body}"));
+    }
+
+    #[derive(Deserialize)]
+    struct GeminiResponse {
+        candidates: Option<Vec<GeminiCandidate>>,
+    }
+
+    let parsed_res: GeminiResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Gagal parsing response Gemini: {e}"))?;
+
+    if let Some(candidates) = parsed_res.candidates {
+        if let Some(first) = candidates.into_iter().next() {
+            if let Some(content) = first.content {
+                if let Some(parts) = content.parts {
+                    if let Some(first_part) = parts.into_iter().next() {
+                        if let Some(text) = first_part.text {
+                            // Clean up potential markdown formatting (```json ... ```)
+                            let clean_text = text.replace("```json", "").replace("```", "").trim().to_string();
+                            return Ok(clean_text);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err("Gemini tidak mengembalikan teks yang valid".to_string())
+}
