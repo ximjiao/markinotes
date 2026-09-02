@@ -8,6 +8,8 @@ export interface WorkspaceConfig {
   folders: LocalFolderNode[];
   autoSaveMs: number;
   setupDone: boolean;
+  geminiApiKey?: string;
+  geminiModel?: string;
 }
 
 const STORAGE_KEY = "marki_workspace";
@@ -18,6 +20,8 @@ const DEFAULT_CONFIG: WorkspaceConfig = {
   folders: [],
   autoSaveMs: 1000,
   setupDone: false,
+  geminiApiKey: "",
+  geminiModel: "",
 };
 
 export const workspaceConfig = {

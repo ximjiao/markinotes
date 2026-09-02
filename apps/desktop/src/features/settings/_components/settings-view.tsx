@@ -480,6 +480,38 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
         </div>
       </section>
 
+      {/* ─── AI Configuration ─── */}
+      <section>
+        <SectionHeader>AI Configuration</SectionHeader>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <SettingRow 
+            label="Gemini API Key" 
+            description="Leave empty to use the default built-in key."
+          >
+            <Input 
+              type="password"
+              placeholder="AIzaSy..." 
+              className="w-[200px] h-8 text-xs" 
+              value={config.geminiApiKey || ""}
+              onChange={(e) => workspaceConfig.set({ geminiApiKey: e.target.value })}
+            />
+          </SettingRow>
+          <SettingRow 
+            label="Custom Model" 
+            description="e.g. gemini-1.5-pro (Optional)"
+            noBorder
+          >
+            <Input 
+              type="text"
+              placeholder="gemini-pro" 
+              className="w-[200px] h-8 text-xs" 
+              value={config.geminiModel || ""}
+              onChange={(e) => workspaceConfig.set({ geminiModel: e.target.value })}
+            />
+          </SettingRow>
+        </div>
+      </section>
+
       {/* ─── Danger Zone ─── */}
       <section>
         <SectionHeader>Danger Zone</SectionHeader>

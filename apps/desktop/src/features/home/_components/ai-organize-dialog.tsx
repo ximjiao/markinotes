@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Folder, Loader2 } from "lucide-react";
+import { Sparkles, Folder, FolderPlus, Loader2 } from "lucide-react";
 import { AIOrganizeResponse } from "./home-dashboard";
 
 interface AIOrganizeDialogProps {
@@ -26,7 +26,9 @@ export function AIOrganizeDialog({
   // We can let the user uncheck some suggestions if they want, but for simplicity, we just show them and confirm all.
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const hasSuggestions = Object.keys(suggestions).length > 0;
+  const hasMoves = Object.keys(suggestions.moves || {}).length > 0;
+  const hasCreates = Object.keys(suggestions.creates || {}).length > 0;
+  const hasSuggestions = hasMoves || hasCreates;
 
   const handleConfirm = async () => {
     setIsProcessing(true);
@@ -52,28 +54,51 @@ export function AIOrganizeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 max-h-[300px] overflow-y-auto">
+        <div className="py-4 max-h-[300px] overflow-y-auto pr-2 space-y-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-8 text-txt-muted gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-txt-brand" />
               <span className="text-sm">Thinking...</span>
             </div>
           ) : hasSuggestions ? (
-            <div className="space-y-3">
-              {Object.entries(suggestions).map(([noteId, folderPath]) => {
-                const note = draftTitles.find(n => n.id === noteId);
-                const folderName = folderPath.split("/").pop();
-                return (
-                  <div key={noteId} className="flex flex-col gap-1 text-sm p-3 rounded-lg border border-border bg-background">
-                    <div className="font-semibold text-txt-primary truncate">{note?.title || "Unknown Draft"}</div>
-                    <div className="flex items-center gap-1.5 text-xs text-txt-secondary">
-                      <Folder className="h-3.5 w-3.5" />
-                      Move to: <span className="font-medium">{folderName}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              {hasCreates && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-txt-muted uppercase tracking-wider">New Folders</h4>
+                  {Object.entries(suggestions.creates!).map(([noteId, folderName]) => {
+                    const note = draftTitles.find(n => n.id === noteId);
+                    return (
+                      <div key={noteId} className="flex flex-col gap-1 text-sm p-3 rounded-lg border border-brand/30 bg-brand/5">
+                        <div className="font-semibold text-txt-primary truncate">{note?.title || "Unknown Draft"}</div>
+                        <div className="flex items-center gap-1.5 text-xs text-brand">
+                          <FolderPlus className="h-3.5 w-3.5" />
+                          Create & Move to: <span className="font-medium">{folderName}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {hasMoves && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-txt-muted uppercase tracking-wider mt-4">Existing Folders</h4>
+                  {Object.entries(suggestions.moves!).map(([noteId, folderPath]) => {
+                    const note = draftTitles.find(n => n.id === noteId);
+                    const folderName = folderPath.split("/").pop();
+                    return (
+                      <div key={noteId} className="flex flex-col gap-1 text-sm p-3 rounded-lg border border-border bg-background">
+                        <div className="font-semibold text-txt-primary truncate">{note?.title || "Unknown Draft"}</div>
+                        <div className="flex items-center gap-1.5 text-xs text-txt-secondary">
+                          <Folder className="h-3.5 w-3.5" />
+                          Move to: <span className="font-medium">{folderName}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           ) : null}
         </div>
 

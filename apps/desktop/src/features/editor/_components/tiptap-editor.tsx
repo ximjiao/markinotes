@@ -58,12 +58,17 @@ export function TiptapEditor({
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background text-txt-primary overflow-y-auto">
+    <div className="flex flex-col h-full w-full bg-background text-txt-primary">
       {/* 1. Top Docs Formatting Toolbar with Ellipsis Export Button */}
-      <EditorToolbar editor={editor} doc={currentDoc} />
+      <EditorToolbar 
+        editor={editor} 
+        doc={currentDoc} 
+        saveStatus={saveStatus}
+        onSummarize={() => setIsAiDialogOpen(true)}
+      />
 
       {/* 2. Main Writing Canvas Area (Outer Scrollable Container) */}
-      <div className="relative flex-1 px-16 py-10 max-w-4xl mx-auto w-full">
+      <div className="relative flex-1 px-16 py-10 max-w-4xl mx-auto w-full overflow-y-auto">
         {/* Inline Editable Page Title H1 */}
         <input
           type="text"
@@ -97,10 +102,8 @@ export function TiptapEditor({
 
       {/* 3. Footer Bar */}
       <EditorFooter
-        saveStatus={saveStatus}
         wordCount={wordCount}
         charCount={charCount}
-        onSummarize={() => setIsAiDialogOpen(true)}
       />
 
       {/* 4. AI Summary Dialog */}

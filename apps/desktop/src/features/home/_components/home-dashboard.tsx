@@ -21,7 +21,8 @@ import { Sparkles } from "lucide-react";
 import { noteIpc } from "../_lib/note-ipc";
 
 export interface AIOrganizeResponse {
-  [noteId: string]: string; // Maps note ID to destination folder path
+  moves?: { [noteId: string]: string };
+  creates?: { [noteId: string]: string };
 }
 
 export function HomeDashboard() {
@@ -217,10 +218,13 @@ export function HomeDashboard() {
       const draftTitles = notes.map(n => ({ id: n.id, title: n.title }));
       const availableFolders = workspace?.folders?.map(f => ({ id: f.id, name: f.name, path: f.path })) || [];
       
+      const config = workspaceConfig.get();
       const suggestionsStr = await noteIpc.organizeDrafts(
         workspace.path,
         JSON.stringify(draftTitles),
-        JSON.stringify(availableFolders)
+        JSON.stringify(availableFolders),
+        config.geminiApiKey,
+        config.geminiModel
       );
       
       const suggestions: AIOrganizeResponse = JSON.parse(suggestionsStr);
@@ -233,12 +237,62 @@ export function HomeDashboard() {
   };
 
   const handleConfirmOrganize = async (approvedMoves: AIOrganizeResponse) => {
-    for (const [noteId, newPath] of Object.entries(approvedMoves)) {
-      const note = notes.find(n => n.id === noteId);
-      if (note) {
-        await moveNote(note.path, newPath);
+    // 1. Process creations
+    if (approvedMoves.creates && isTauri()) {
+      const config = workspaceConfig.get();
+      const newFolders = [...(config.folders || [])];
+      let hasNewFolders = false;
+
+      // Unique new folder names to avoid creating duplicates if AI suggests same name for multiple drafts
+      const uniqueNewNames = Array.from(new Set(Object.values(approvedMoves.creates)));
+      
+      for (const folderName of uniqueNewNames) {
+        const sanitized = folderName.trim().replace(/\//g, "-");
+        if (!sanitized) continue;
+        const newPath = `${workspace.path}/${sanitized}`;
+        
+        // Add to config
+        newFolders.push({
+          id: crypto.randomUUID(),
+          name: sanitized,
+          path: newPath,
+          noteCount: 0,
+        });
+        hasNewFolders = true;
+      }
+
+      if (hasNewFolders) {
+        workspaceConfig.set({ folders: newFolders });
+        try {
+          await invoke("workspace_init", { rootPath: workspace.path, folders: newFolders });
+        } catch (e) {
+          console.error("Failed to create new folders on disk:", e);
+        }
       }
     }
+
+    // 2. Process moves
+    if (approvedMoves.moves) {
+      for (const [noteId, newPath] of Object.entries(approvedMoves.moves)) {
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          await moveNote(note.path, newPath);
+        }
+      }
+    }
+    
+    // 3. Process moves into newly created folders
+    if (approvedMoves.creates) {
+      for (const [noteId, newFolderName] of Object.entries(approvedMoves.creates)) {
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          const sanitized = newFolderName.trim().replace(/\//g, "-");
+          const newPath = `${workspace.path}/${sanitized}`;
+          await moveNote(note.path, newPath);
+        }
+      }
+    }
+
     refreshWorkspace();
   };
 

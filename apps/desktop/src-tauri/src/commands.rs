@@ -238,10 +238,16 @@ pub async fn note_summarize_stream(
     workspace_path: String,
     note_id: String,
     model: Option<String>,
+    custom_api_key: Option<String>,
+    custom_model: Option<String>,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
-    // Ambil API key otomatis dari .env atau environment variable
-    let api_key = crate::ai::get_gemini_api_key(Some(&workspace_path))?;
+    // Ambil API key otomatis dari config UI atau .env
+    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
+        Some(k) => k,
+        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
+    };
+    let resolved_model = custom_model.filter(|m| !m.is_empty()).or(model);
 
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
@@ -264,7 +270,7 @@ pub async fn note_summarize_stream(
     let prompt = crate::ai::build_summarize_prompt(&title, &content, &pointers);
 
     // 3. Streaming respons dari Gemini API via channel
-    crate::ai::stream_gemini_summary(&api_key, model.as_deref(), &prompt, on_chunk).await
+    crate::ai::stream_gemini_summary(&api_key, resolved_model.as_deref(), &prompt, on_chunk).await
 }
 
 #[tauri::command]
@@ -272,10 +278,15 @@ pub async fn note_organize_drafts(
     workspace_path: String,
     drafts_json: String,
     folders_json: String,
+    custom_api_key: Option<String>,
+    custom_model: Option<String>,
 ) -> Result<String, String> {
     // Read API key
-    let api_key = crate::ai::get_gemini_api_key(Some(&workspace_path))?;
-    let env_model = std::env::var("GEMINI_MODEL").ok();
+    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
+        Some(k) => k,
+        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
+    };
+    let env_model = custom_model.filter(|m| !m.is_empty()).or_else(|| std::env::var("GEMINI_MODEL").ok());
     
     // Call AI to get suggestions
     crate::ai::organize_drafts(&api_key, env_model.as_deref(), &drafts_json, &folders_json).await

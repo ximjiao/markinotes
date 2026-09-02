@@ -294,7 +294,7 @@ pub async fn organize_drafts(
         "You are an AI assistant that helps organize markdown notes.\n\
         I have a list of drafts (titles and IDs) and a list of available folders (names, IDs, and paths).\n\
         Your task is to assign each draft to the most appropriate folder based on its title.\n\
-        If no folder is appropriate, you can suggest it stays in \"Drafts\" (just omit it from the response).\n\
+        If no available folder is appropriate, you must suggest a completely new folder name for it.\n\
         \n\
         Drafts:\n\
         {}\n\
@@ -302,10 +302,13 @@ pub async fn organize_drafts(
         Available Folders:\n\
         {}\n\
         \n\
-        Return a raw JSON object (no markdown formatting, no backticks, just the JSON string) mapping the draft ID as key to the destination folder path as value. For example:\n\
+        Return a raw JSON object (no markdown formatting, no backticks, just the JSON string) with two keys: `moves` and `creates`.\n\
+        - `moves`: map the draft ID to the destination folder path (for existing folders).\n\
+        - `creates`: map the draft ID to a new suggested folder name (for folders that do not exist yet).\n\
+        For example:\n\
         {{\n\
-          \"draft-123\": \"/Users/name/Documents/Space/ProjectX\",\n\
-          \"draft-456\": \"/Users/name/Documents/Space/Personal\"\n\
+          \"moves\": {{ \"draft-123\": \"/Users/name/Documents/Space/ProjectX\" }},\n\
+          \"creates\": {{ \"draft-456\": \"Personal\" }}\n\
         }}",
         drafts_json, folders_json
     );

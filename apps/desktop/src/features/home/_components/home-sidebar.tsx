@@ -232,7 +232,7 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
                 Tags
               </SidebarGroupLabel>
             </div>
-            
+
             <SidebarGroupContent>
               <SidebarMenu>
                 {allTags.length === 0 ? (

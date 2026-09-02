@@ -95,10 +95,11 @@ export const noteIpc = {
   },
 
   summarizeStream: async (
-    workspacePath: string,
-    noteId: string,
+    workspacePath: string, 
+    noteId: string, 
     onChunk: (chunk: string) => void,
-    model?: string
+    customApiKey?: string,
+    customModel?: string
   ): Promise<void> => {
     if (isTauri()) {
       const channel = new Channel<string>();
@@ -106,13 +107,15 @@ export const noteIpc = {
       return invoke("note_summarize_stream", {
         workspacePath,
         noteId,
-        model: model || null,
         onChunk: channel,
+        customApiKey,
+        customModel
       });
     }
+
     // Web fallback mock
-    const mockText = "Ringkasan Catatan (Web Preview):\n- Catatan berhasil diproses dengan pointer frekuensi kata.\n- Mode streaming Gemini AI aktif.";
-    for (const char of mockText) {
+    for (let i = 0; i < 20; i++) {
+      const char = i % 2 === 0 ? " word" : ".";
       await new Promise((r) => setTimeout(r, 25));
       onChunk(char);
     }
@@ -121,13 +124,17 @@ export const noteIpc = {
   organizeDrafts: async (
     workspacePath: string,
     draftsJson: string,
-    foldersJson: string
+    foldersJson: string,
+    customApiKey?: string,
+    customModel?: string
   ): Promise<string> => {
     if (isTauri()) {
       return invoke("note_organize_drafts", {
         workspacePath,
         draftsJson,
-        foldersJson
+        foldersJson,
+        customApiKey,
+        customModel
       });
     }
     // Web fallback mock
