@@ -11,6 +11,7 @@ interface NotionBlockSideHandleProps {
 
 export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSideHandleProps) {
   const [topPos, setTopPos] = useState<number | null>(null);
+  const [leftPos, setLeftPos] = useState<number>(-40);
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [dropIndicatorTop, setDropIndicatorTop] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -21,16 +22,23 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
     const editorDom = editor.view.dom;
 
+    const BLOCK_SELECTOR = "p, h1, h2, h3, h4, li, blockquote, pre, [data-type='taskItem'], [data-type='imageBlock'], [data-node-view-wrapper], .image-block-node-view, .tableWrapper, table";
+
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) return;
       try {
         const target = e.target as HTMLElement;
-        const blockNode = target.closest("p, h1, h2, h3, h4, li, blockquote, pre") as HTMLElement | null;
+        const blockNode = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
         if (blockNode && editorDom.contains(blockNode)) {
+          // If hovered element is inside a table, lock handle to the whole table
+          const tableParent = blockNode.closest(".tableWrapper, table") as HTMLElement | null;
+          const actualBlock = tableParent || blockNode;
+
           const editorRect = editorDom.getBoundingClientRect();
-          const blockRect = blockNode.getBoundingClientRect();
+          const blockRect = actualBlock.getBoundingClientRect();
           setTopPos(blockRect.top - editorRect.top + 4);
-          setHoveredElement(blockNode);
+          setLeftPos(blockRect.left - editorRect.left - 40);
+          setHoveredElement(actualBlock);
         }
       } catch {
         // Safe fallback
@@ -49,9 +57,12 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
     const sourceNodeElem = hoveredElement;
     const editorDom = editor.view.dom;
-    const editorRect = editorDom.getBoundingClientRect();
+    const scrollContainer = editorDom.closest(".overflow-y-auto") as HTMLElement | null;
 
     let targetBlockElem: HTMLElement | null = null;
+    let animFrameId: number | null = null;
+    let currentY = startEvent.clientY;
+    let currentX = startEvent.clientX;
 
     setDragPreview({
       x: startEvent.clientX + 10,
@@ -59,7 +70,48 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
       text: sourceNodeElem.textContent || "Block",
     });
 
+    const BLOCK_SELECTOR = "p, h1, h2, h3, h4, li, blockquote, pre, [data-type='taskItem'], [data-type='imageBlock'], [data-node-view-wrapper], .image-block-node-view, .tableWrapper, table";
+
+    const performAutoScroll = () => {
+      if (!scrollContainer) return;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const topThreshold = containerRect.top + 80;
+      const bottomThreshold = containerRect.bottom - 80;
+
+      let scrolled = false;
+      if (currentY < topThreshold) {
+        const speed = Math.max(3, (topThreshold - currentY) / 3);
+        scrollContainer.scrollTop -= speed;
+        scrolled = true;
+      } else if (currentY > bottomThreshold) {
+        const speed = Math.max(3, (currentY - bottomThreshold) / 3);
+        scrollContainer.scrollTop += speed;
+        scrolled = true;
+      }
+
+      if (scrolled) {
+        try {
+          const editorRectCurrent = editorDom.getBoundingClientRect();
+          const targetX = Math.max(editorRectCurrent.left + 40, Math.min(editorRectCurrent.right - 40, currentX));
+          const elemBelow = document.elementFromPoint(targetX, currentY) as HTMLElement | null;
+          const targetBlock = elemBelow?.closest(BLOCK_SELECTOR) as HTMLElement | null;
+
+          if (targetBlock && editorDom.contains(targetBlock) && targetBlock !== sourceNodeElem) {
+            const blockRect = targetBlock.getBoundingClientRect();
+            setDropIndicatorTop(blockRect.bottom - editorRectCurrent.top);
+            targetBlockElem = targetBlock;
+          }
+        } catch {
+          // Safe fallback
+        }
+
+        animFrameId = requestAnimationFrame(performAutoScroll);
+      }
+    };
+
     const onPointerMove = (e: PointerEvent) => {
+      currentY = e.clientY;
+      currentX = e.clientX;
       try {
         setDragPreview({
           x: e.clientX + 10,
@@ -67,20 +119,26 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
           text: sourceNodeElem.textContent || "Block",
         });
 
-        const elemBelow = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-        const targetBlock = elemBelow?.closest("p, h1, h2, h3, h4, li, blockquote, pre") as HTMLElement | null;
+        const editorRectCurrent = editorDom.getBoundingClientRect();
+        const targetX = Math.max(editorRectCurrent.left + 40, Math.min(editorRectCurrent.right - 40, e.clientX));
+        const elemBelow = document.elementFromPoint(targetX, e.clientY) as HTMLElement | null;
+        const targetBlock = elemBelow?.closest(BLOCK_SELECTOR) as HTMLElement | null;
 
         if (targetBlock && editorDom.contains(targetBlock) && targetBlock !== sourceNodeElem) {
           const blockRect = targetBlock.getBoundingClientRect();
-          setDropIndicatorTop(blockRect.bottom - editorRect.top);
+          setDropIndicatorTop(blockRect.bottom - editorRectCurrent.top);
           targetBlockElem = targetBlock;
         }
+
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+        animFrameId = requestAnimationFrame(performAutoScroll);
       } catch {
         // Safe fallback
       }
     };
 
     const onPointerUp = () => {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       setDropIndicatorTop(null);
@@ -97,20 +155,58 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
           const sourceStartPos = sourceResolved.before(1);
           const sourceEndPos = sourceResolved.after(1);
-          const targetStartPos = targetResolved.after(1);
 
           const nodeToMove = editor.state.doc.nodeAt(sourceStartPos);
-          if (nodeToMove && sourceStartPos !== targetStartPos) {
-            const nodeSize = sourceEndPos - sourceStartPos;
-            const insertPos = sourceStartPos < targetStartPos ? Math.max(0, targetStartPos - nodeSize) : targetStartPos;
+          if (nodeToMove) {
+            const isTaskItem =
+              targetBlockElem.getAttribute("data-type") === "taskItem" ||
+              !!targetBlockElem.closest("[data-type='taskItem']");
+            const isListItem =
+              targetBlockElem.tagName.toLowerCase() === "li" ||
+              !!targetBlockElem.closest("li");
 
+            let finalNode = nodeToMove;
+            let targetDepth = 1;
+
+            if (isListItem || isTaskItem) {
+              // If dragging any non-list element (Image, Heading, CodeBlock, Table, Paragraph, etc.) into a list or checklist, preserve original node type & split container
+              if (nodeToMove.type.name !== "listItem" && nodeToMove.type.name !== "taskItem") {
+                const tr = editor.state.tr;
+                tr.delete(sourceStartPos, sourceEndPos);
+                const rawSplitPos = targetResolved.after(targetResolved.depth);
+                const mappedSplitPos = tr.mapping.map(rawSplitPos);
+                try {
+                  tr.split(mappedSplitPos);
+                } catch {}
+                const mappedInsertPos = tr.mapping.map(mappedSplitPos);
+                tr.insert(mappedInsertPos, nodeToMove);
+                editor.view.dispatch(tr);
+                return;
+              }
+              targetDepth = targetResolved.depth > 1 ? targetResolved.depth : 1;
+            }
+
+            // If dragging a listItem/taskItem out to a non-list area, unwrap to paragraph
+            if ((nodeToMove.type.name === "listItem" || nodeToMove.type.name === "taskItem") && !isListItem && !isTaskItem) {
+              if (editor.schema.nodes.paragraph) {
+                finalNode = nodeToMove.firstChild || nodeToMove;
+              }
+            }
+
+            const rawTargetPos = targetResolved.after(targetDepth);
             const tr = editor.state.tr;
             tr.delete(sourceStartPos, sourceEndPos);
-            tr.insert(insertPos, nodeToMove);
-            editor.view.dispatch(tr);
+            const mappedTargetPos = tr.mapping.map(rawTargetPos);
+
+            try {
+              tr.insert(mappedTargetPos, finalNode);
+              editor.view.dispatch(tr);
+            } catch (err) {
+              console.error("Drag transaction insert failed:", err);
+            }
           }
-        } catch {
-          // Safe fallback
+        } catch (err) {
+          console.error("Drag handler error:", err);
         }
       }
     };
@@ -171,8 +267,8 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
       {/* Notion Side Handle (+ and :: Grip) */}
       <div
-        className="absolute -left-10 flex items-center gap-0.5 transition-all duration-100 z-20 opacity-60 hover:opacity-100 select-none"
-        style={{ top: `${topPos}px` }}
+        className="absolute flex items-center gap-0.5 transition-all duration-100 z-20 opacity-60 hover:opacity-100 select-none"
+        style={{ top: `${topPos}px`, left: `${leftPos}px` }}
       >
         {/* Plus Button */}
         <button

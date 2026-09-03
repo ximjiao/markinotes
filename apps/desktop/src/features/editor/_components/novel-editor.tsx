@@ -25,6 +25,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
+import { Mark, mergeAttributes } from "@tiptap/core";
 import { CustomImageExtension } from "./custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 
@@ -59,6 +60,14 @@ import {
   AlertCircle,
   Sparkles,
   Image as ImageIcon,
+  Copy,
+  CopyPlus,
+  Maximize2,
+  Minimize2,
+  FolderOutput,
+  Tag,
+  Paintbrush,
+  Eraser,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -67,10 +76,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { exportDocument } from "../_lib/export-engine";
 import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
@@ -234,6 +246,133 @@ const CustomTable = Table.configure({
   cellMinWidth: 50,
 });
 
+const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-background-color") || element.style.backgroundColor || null,
+        renderHTML: (attributes) => {
+          if (!attributes.backgroundColor) return {};
+          return {
+            style: `background-color: ${attributes.backgroundColor}`,
+            "data-background-color": attributes.backgroundColor,
+          };
+        },
+      },
+    };
+  },
+});
+
+const CustomTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-background-color") || element.style.backgroundColor || null,
+        renderHTML: (attributes) => {
+          if (!attributes.backgroundColor) return {};
+          return {
+            style: `background-color: ${attributes.backgroundColor}`,
+            "data-background-color": attributes.backgroundColor,
+          };
+        },
+      },
+    };
+  },
+});
+
+const TextStyle = Mark.create({
+  name: "textStyle",
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "span",
+        getAttrs: (element) => {
+          const hasStyles = (element as HTMLElement).hasAttribute("style");
+          if (!hasStyles) return false;
+          return {};
+        },
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+});
+
+const TextColor = Mark.create({
+  name: "textColor",
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (element) => (element as HTMLElement).style.color || element.getAttribute("data-color") || null,
+        renderHTML: (attributes) => {
+          if (!attributes.color) return {};
+          return {
+            style: `color: ${attributes.color}`,
+            "data-color": attributes.color,
+          };
+        },
+      },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "span",
+        getAttrs: (element) => {
+          const hasColor = (element as HTMLElement).style.color || (element as HTMLElement).hasAttribute("data-color");
+          if (!hasColor) return false;
+          return {};
+        },
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+});
+
+const TABLE_TEXT_COLORS = [
+  { label: "Default", value: "inherit" },
+  { label: "Gray", value: "#9ca3af" },
+  { label: "Brown", value: "#b45309" },
+  { label: "Orange", value: "#f97316" },
+  { label: "Yellow", value: "#eab308" },
+  { label: "Green", value: "#22c55e" },
+  { label: "Blue", value: "#3b82f6" },
+  { label: "Purple", value: "#a855f7" },
+  { label: "Pink", value: "#ec4899" },
+  { label: "Red", value: "#ef4444" },
+];
+
+const TABLE_BG_COLORS = [
+  { label: "Default", value: "transparent" },
+  { label: "Gray", value: "rgba(156, 163, 175, 0.2)" },
+  { label: "Brown", value: "rgba(180, 83, 9, 0.2)" },
+  { label: "Orange", value: "rgba(249, 115, 22, 0.2)" },
+  { label: "Yellow", value: "rgba(234, 179, 8, 0.2)" },
+  { label: "Green", value: "rgba(34, 197, 94, 0.2)" },
+  { label: "Blue", value: "rgba(59, 130, 246, 0.2)" },
+  { label: "Purple", value: "rgba(168, 85, 247, 0.2)" },
+  { label: "Pink", value: "rgba(236, 72, 153, 0.2)" },
+  { label: "Red", value: "rgba(239, 68, 68, 0.2)" },
+];
+
 const defaultExtensions = [
   // 1. StarterKit prioritized first for input rules (1., -, *, >, ```)
   StarterKit.configure({
@@ -293,13 +432,15 @@ const defaultExtensions = [
     },
   }),
 
-  // 3. TaskList, Table, Links, Images, SlashCommand & Markdown
+  // 3. TaskList, Table, Links, Images, SlashCommand, Color & Markdown
   TaskList,
   TaskItem.configure({ nested: true }),
   CustomTable,
   TableRow,
-  TableCell,
-  TableHeader,
+  CustomTableCell,
+  CustomTableHeader,
+  TextStyle,
+  TextColor,
   Link.configure({ openOnClick: false }),
   CustomImageExtension,
   slashCommand,
@@ -334,6 +475,11 @@ export function NovelEditor({
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [fontStyle, setFontStyle] = useState<"default" | "serif" | "mono">("default");
+  const [isSmallText, setIsSmallText] = useState(false);
+  const [isFullWidth, setIsFullWidth] = useState(false);
 
   useEffect(() => {
     const handleOpenImageDialog = () => setIsImageDialogOpen(true);
@@ -487,70 +633,121 @@ export function NovelEditor({
         {/* Tags Popover Editor */}
         <Popover open={isEditingTags} onOpenChange={setIsEditingTags}>
           <PopoverTrigger asChild>
-            <button className="flex items-center gap-1 shrink-0 ml-1 px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors">
-              {tags.length === 0 ? (
-                <span className="text-[10px] text-txt-muted flex items-center gap-0.5 border border-dashed border-transparent hover:border-border rounded px-1">
-                  <Plus className="h-2.5 w-2.5" /> Add Tag
-                </span>
-              ) : (
-                <>
-                  {tags.slice(0, 2).map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-4 rounded-sm font-normal text-txt-secondary border-border">
-                      #{tag}
-                    </Badge>
-                  ))}
-                  {tags.length > 2 && (
-                    <span className="text-[10px] text-txt-muted font-medium px-0.5">+{tags.length - 2}</span>
-                  )}
-                </>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs font-medium gap-1.5 text-txt-secondary hover:text-txt-primary shrink-0 ml-0.5"
+              title="Manage document tags"
+            >
+              <Tag className="h-3.5 w-3.5 text-txt-brand" />
+              <span>Tags</span>
+              {tags.length > 0 && (
+                <Badge variant="secondary" className="h-4 px-1 text-[10px] font-semibold bg-accent border border-border">
+                  {tags.length}
+                </Badge>
               )}
-            </button>
+            </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-2.5 space-y-2 bg-popover border-border shadow-md rounded-lg">
+          <PopoverContent align="start" className="w-64 p-3 bg-popover border border-border shadow-xl rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-xs font-semibold text-txt-primary flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-txt-brand" /> Tags
+              </span>
+              <span className="text-[10px] text-txt-muted font-normal">{tags.length} selected</span>
+            </div>
+
+            {/* Current Active Tags with Remove X & Click-to-Rename */}
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-accent/30 rounded-lg border border-border/40">
                 {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0.5 rounded font-normal flex items-center gap-1 bg-accent/50 text-txt-secondary border-border hover:bg-accent transition-colors">
-                    #{tag}
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="text-[10px] px-2 py-0.5 rounded font-normal flex items-center gap-1.5 bg-background text-txt-primary border border-border/60 shadow-xs"
+                  >
+                    {editingTag === tag ? (
+                      <input
+                        autoFocus
+                        className="w-16 bg-transparent outline-none border-b border-txt-brand text-[10px] font-semibold text-txt-primary"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                        onBlur={() => {
+                          if (editingValue.trim() && editingValue.trim() !== tag) {
+                            setTags(tags.map((t) => (t === tag ? editingValue.trim() : t)));
+                            scheduleAutoSave();
+                          }
+                          setEditingTag(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editingValue.trim()) {
+                            e.preventDefault();
+                            setTags(tags.map((t) => (t === tag ? editingValue.trim() : t)));
+                            scheduleAutoSave();
+                            setEditingTag(null);
+                          }
+                          if (e.key === "Escape") {
+                            setEditingTag(null);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => {
+                          setEditingTag(tag);
+                          setEditingValue(tag);
+                        }}
+                        className="cursor-pointer hover:underline hover:text-txt-brand transition-colors"
+                        title="Click to rename tag"
+                      >
+                        #{tag}
+                      </span>
+                    )}
+
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        setTags(tags.filter(t => t !== tag));
+                        setTags(tags.filter((t) => t !== tag));
                         scheduleAutoSave();
                       }}
-                      className="hover:text-destructive transition-colors focus:outline-none"
+                      className="hover:text-destructive transition-colors focus:outline-none cursor-pointer"
+                      title="Remove tag"
                     >
-                      <X className="h-2.5 w-2.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   </Badge>
                 ))}
               </div>
             )}
+
+            {/* New Tag Input */}
             <input
               autoFocus
-              placeholder="Type tag & press enter..."
-              className="text-xs px-2 py-1.5 w-full bg-background border border-border rounded-md outline-none focus:border-txt-brand text-txt-primary transition-colors shadow-sm"
+              placeholder="Type tag & press Enter..."
+              className="text-xs px-2.5 py-1.5 w-full bg-background border border-border rounded-lg outline-none focus:border-txt-brand text-txt-primary transition-colors"
               value={newTagInput}
               onChange={(e) => setNewTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && newTagInput.trim()) {
                   e.preventDefault();
-                  if (newTagInput && !tags.includes(newTagInput)) {
-                    setTags([...tags, newTagInput]);
+                  if (!tags.includes(newTagInput.trim())) {
+                    setTags([...tags, newTagInput.trim()]);
                     scheduleAutoSave();
                   }
                   setNewTagInput("");
                 }
               }}
             />
+
+            {/* Existing Workspace Tags to pick from */}
             {(() => {
               const availableTags = allWorkspaceTags.filter(t => !tags.includes(t) && t.includes(newTagInput));
               if (availableTags.length === 0) return null;
               return (
-                <div className="pt-2">
-                  <div className="text-[10px] text-txt-muted mb-1.5 font-medium px-0.5">Existing Tags</div>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                <div className="pt-1">
+                  <div className="text-[10px] text-txt-muted mb-1.5 font-medium px-0.5">Workspace Tags</div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
                     {availableTags.map(tag => (
                       <Badge
                         key={tag}
@@ -563,7 +760,7 @@ export function NovelEditor({
                           setNewTagInput("");
                         }}
                       >
-                        #{tag}
+                        +#{tag}
                       </Badge>
                     ))}
                   </div>
@@ -581,7 +778,7 @@ export function NovelEditor({
           size="icon"
           className="h-7 w-7 shrink-0"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editorInstance?.chain().focus().undo().run()}
+          onClick={() => editorInstance?.chain().focus().undo().scrollIntoView().run()}
           disabled={!editorInstance?.can().undo()}
           title="Undo"
         >
@@ -592,7 +789,7 @@ export function NovelEditor({
           size="icon"
           className="h-7 w-7 shrink-0"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editorInstance?.chain().focus().redo().run()}
+          onClick={() => editorInstance?.chain().focus().redo().scrollIntoView().run()}
           disabled={!editorInstance?.can().redo()}
           title="Redo"
         >
@@ -779,25 +976,132 @@ export function NovelEditor({
 
         <Separator orientation="vertical" className="h-4 shrink-0 mx-0.5" />
 
-        {/* Right: Export Menu */}
+        {/* Right: Notion-Style 3-Dots Page Options Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-txt-secondary hover:text-txt-primary">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">Export Document</div>
-            <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-red-500" /> Export to PDF</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("docx")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-blue-500" /> Export to Word (.docx)</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("md")} className="cursor-pointer text-xs"><FileCode className="mr-2 h-4 w-4 text-purple-500" /> Export to Markdown (.md)</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-64 p-2 bg-popover border border-border shadow-2xl rounded-xl space-y-1">
+            {/* 1. Font Style Selector */}
+            <div className="grid grid-cols-3 gap-1 p-1 bg-accent/40 rounded-lg text-center select-none mb-1">
+              <button
+                type="button"
+                onClick={() => setFontStyle("default")}
+                className={cn(
+                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
+                  fontStyle === "default" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
+                )}
+              >
+                <span className="text-sm font-sans font-semibold">Ag</span>
+                <span className="text-[9px]">Default</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFontStyle("serif")}
+                className={cn(
+                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
+                  fontStyle === "serif" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
+                )}
+              >
+                <span className="text-sm font-serif font-semibold">Ag</span>
+                <span className="text-[9px]">Serif</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFontStyle("mono")}
+                className={cn(
+                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
+                  fontStyle === "mono" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
+                )}
+              >
+                <span className="text-sm font-mono font-semibold">Ag</span>
+                <span className="text-[9px]">Mono</span>
+              </button>
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {/* 2. Actions */}
+            <DropdownMenuItem
+              onClick={() => {
+                if (editorInstance) {
+                  navigator.clipboard.writeText(editorInstance.getText());
+                }
+              }}
+              className="text-xs cursor-pointer gap-2 py-1.5"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy page contents
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => {
+                handleExport("md");
+              }}
+              className="text-xs cursor-pointer gap-2 py-1.5"
+            >
+              <CopyPlus className="h-3.5 w-3.5" /> Duplicate as Markdown
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={onBack}
+              className="text-xs cursor-pointer gap-2 py-1.5 text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Move to Trash
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* 3. Canvas Layout Switches */}
+            <div
+              onClick={() => setIsSmallText(!isSmallText)}
+              className="flex items-center justify-between px-2 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-md cursor-pointer select-none transition-colors"
+            >
+              <span className="flex items-center gap-2 text-xs">
+                <span className="text-[10px] font-bold border border-current rounded px-0.5">A↓</span> Small text
+              </span>
+              <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
+            </div>
+
+            <div
+              onClick={() => setIsFullWidth(!isFullWidth)}
+              className="flex items-center justify-between px-2 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-md cursor-pointer select-none transition-colors"
+            >
+              <span className="flex items-center gap-2 text-xs">
+                <Maximize2 className="h-3.5 w-3.5" /> Full width
+              </span>
+              <Switch checked={isFullWidth} onCheckedChange={setIsFullWidth} className="scale-75" />
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {/* 4. Export Menu Sub-Header */}
+            <div className="px-2 py-0.5 text-[11px] font-semibold text-txt-muted capitalize">Export</div>
+            <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs py-1">
+              <FileType className="mr-2 h-3.5 w-3.5 text-red-500" /> Export to PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("docx")} className="cursor-pointer text-xs py-1">
+              <FileType className="mr-2 h-3.5 w-3.5 text-blue-500" /> Export to Word (.docx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("md")} className="cursor-pointer text-xs py-1">
+              <FileCode className="mr-2 h-3.5 w-3.5 text-purple-500" /> Export to Markdown (.md)
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* 5. Page Info Footer */}
+            <div className="px-2.5 py-1.5 text-[10px] text-txt-muted space-y-0.5 select-none bg-accent/30 rounded-lg">
+              <div className="font-semibold text-txt-secondary">{wordCount} words ({charCount} characters)</div>
+              <div>Last edited Today</div>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* 3. Pure 100% Canvas Writing Space (Scrollable Area) */}
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="px-16 py-10 max-w-4xl mx-auto w-full">
+        <div className={cn("py-10 mx-auto w-full transition-all duration-200", isFullWidth ? "max-w-none px-24" : "max-w-4xl px-16")}>
         {/* Dedicated Relative Wrapper for Editor Canvas & Side Handle Alignment */}
         <div className="relative w-full">
           {/* Notion Block Side Handle (+ and :: Grip) */}
@@ -815,10 +1119,28 @@ export function NovelEditor({
             <EditorContent
               initialContent={initialContent as any}
               extensions={defaultExtensions}
-              className="prose dark:prose-invert max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:border-none text-txt-primary text-base leading-relaxed min-h-[500px]"
+              className={cn(
+                "prose dark:prose-invert max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:border-none text-txt-primary min-h-[500px]",
+                fontStyle === "serif" ? "font-serif" : fontStyle === "mono" ? "font-mono" : "font-sans",
+                isSmallText ? "text-sm leading-relaxed" : "text-base leading-relaxed"
+              )}
               editorProps={{
                 handleDOMEvents: {
-                  keydown: (_view: unknown, event: KeyboardEvent) => handleCommandNavigation(event),
+                  keydown: (_view: unknown, event: KeyboardEvent) => {
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+                      event.preventDefault();
+                      if (event.shiftKey) {
+                        editorInstance?.chain().focus().redo().scrollIntoView().run();
+                      } else {
+                        editorInstance?.chain().focus().undo().scrollIntoView().run();
+                      }
+                      return true;
+                    }
+                    if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(event.key)) {
+                      return handleCommandNavigation(event);
+                    }
+                    return false;
+                  },
                 },
               }}
               onCreate={({ editor }) => {
@@ -886,86 +1208,155 @@ export function NovelEditor({
                 tippyOptions={{ maxWidth: "none" }}
                 className="flex items-center gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-xl backdrop-blur-sm z-50 text-txt-primary w-fit"
               >
-                {editorInstance?.isActive("table") && (
+                {(editorInstance?.isActive("table") ||
+                  editorInstance?.isActive("tableCell") ||
+                  editorInstance?.isActive("tableHeader")) && (
                   <>
-                    {/* +Col */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().addColumnAfter().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
-                        title="Tambah Kolom"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Col</span>
-                      </Button>
-                    </EditorBubbleItem>
+                    {/* Compact Notion-Style Table Menu Popover */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
+                          title="Menu Aksi Tabel"
+                        >
+                          <TableIcon className="h-3.5 w-3.5" />
+                          <span>Table</span>
+                          <ChevronDown className="h-3 w-3 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
 
-                    {/* +Row */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().addRowAfter().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
-                        title="Tambah Baris"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Row</span>
-                      </Button>
-                    </EditorBubbleItem>
+                      <PopoverContent align="start" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs space-y-0.5">
+                        {/* 1. Header Cell Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().toggleHeaderCell().run()}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Heading1 className="h-3.5 w-3.5 text-txt-brand" />
+                            <span>Header cell</span>
+                          </div>
+                          <span className="text-[10px] text-txt-muted font-mono">Toggle</span>
+                        </button>
 
-                    <Separator orientation="vertical" className="h-4 mx-0.5" />
+                        {/* 2. Color Submenu Popover */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Paintbrush className="h-3.5 w-3.5 text-purple-400" />
+                                <span>Color</span>
+                              </div>
+                              <span className="text-txt-muted text-xs">›</span>
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent side="right" align="start" className="w-56 p-2 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs">
+                            <div className="font-semibold text-txt-muted px-1 pb-1 text-[11px]">Text color</div>
+                            <div className="grid grid-cols-5 gap-1 pb-2">
+                              {TABLE_TEXT_COLORS.map((c) => (
+                                <button
+                                  key={c.label}
+                                  type="button"
+                                  onClick={() => {
+                                    if (c.value === "inherit") editorInstance?.chain().focus().unsetMark("textColor").run();
+                                    else editorInstance?.chain().focus().setMark("textColor", { color: c.value }).run();
+                                  }}
+                                  className="h-6 w-full rounded flex items-center justify-center font-bold text-xs border border-border/40 hover:scale-110 hover:border-txt-brand bg-accent/20 cursor-pointer"
+                                  style={{ color: c.value === "inherit" ? undefined : c.value }}
+                                  title={c.label}
+                                >
+                                  A
+                                </button>
+                              ))}
+                            </div>
+                            <Separator className="my-1" />
+                            <div className="font-semibold text-txt-muted px-1 py-1 text-[11px]">Background color</div>
+                            <div className="grid grid-cols-5 gap-1">
+                              {TABLE_BG_COLORS.map((c) => (
+                                <button
+                                  key={c.label}
+                                  type="button"
+                                  onClick={() => {
+                                    editorInstance
+                                      ?.chain()
+                                      .focus()
+                                      .setCellAttribute("backgroundColor", c.value === "transparent" ? null : c.value)
+                                      .run();
+                                  }}
+                                  className="h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center"
+                                  style={{ backgroundColor: c.value }}
+                                  title={c.label}
+                                >
+                                  {c.value === "transparent" && <span className="text-[10px] text-txt-muted">∅</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
 
-                    {/* Merge/Split */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().mergeOrSplit().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-purple-400 hover:bg-accent gap-1 cursor-pointer"
-                        title="Merge / Split Sel"
-                      >
-                        <Combine className="h-3.5 w-3.5" />
-                      </Button>
-                    </EditorBubbleItem>
+                        <Separator className="my-1" />
 
-                    {/* Delete Row */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteRow().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-amber-400 hover:text-amber-500 hover:bg-amber-500/10 gap-1 cursor-pointer"
-                        title="Hapus Baris"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Row</span>
-                      </Button>
-                    </EditorBubbleItem>
+                        {/* 3. Insert Row / Col */}
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().addColumnAfter().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5 text-txt-brand" /> Insert column
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().addRowAfter().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5 text-txt-brand" /> Insert row
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().mergeOrSplit().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                        >
+                          <Combine className="h-3.5 w-3.5 text-purple-400" /> Merge / Split cells
+                        </button>
 
-                    {/* Delete Col */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteColumn().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-amber-400 hover:text-amber-500 hover:bg-amber-500/10 gap-1 cursor-pointer"
-                        title="Hapus Kolom"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Col</span>
-                      </Button>
-                    </EditorBubbleItem>
+                        <Separator className="my-1" />
 
-                    {/* Delete Table */}
-                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteTable().run()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] font-medium text-red-400 hover:text-red-500 hover:bg-red-500/10 gap-1 cursor-pointer"
-                        title="Hapus Seluruh Tabel"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Table</span>
-                      </Button>
-                    </EditorBubbleItem>
+                        {/* 4. Clear & Delete Actions */}
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().deleteRange(editorInstance.state.selection).run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-muted hover:text-txt-primary cursor-pointer transition-colors"
+                        >
+                          <Eraser className="h-3.5 w-3.5" /> Clear contents
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().deleteRow().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete row
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().deleteColumn().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete column
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editorInstance?.chain().focus().deleteTable().run()}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 text-red-500 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete table
+                        </button>
+                      </PopoverContent>
+                    </Popover>
 
                     <Separator orientation="vertical" className="h-4 mx-0.5" />
                   </>
@@ -997,12 +1388,6 @@ export function NovelEditor({
         </div>
         </div>
       </div>
-
-      {/* 4. Footer Bar */}
-      <EditorFooter
-        wordCount={wordCount}
-        charCount={charCount}
-      />
 
       {/* 5. AI Summary Dialog */}
       <AiSummaryDialog

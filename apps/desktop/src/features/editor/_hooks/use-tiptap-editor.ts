@@ -49,7 +49,7 @@ export function useTiptapEditor({
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Table.configure({ resizable: false }),
+      Table.configure({ resizable: true, lastColumnResizable: true, cellMinWidth: 80 }),
       TableRow,
       TableCell,
       TableHeader,
