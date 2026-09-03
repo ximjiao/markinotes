@@ -58,14 +58,21 @@ pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
 
     let note_iter = stmt
         .query_map([], |row| {
+            let path_str: String = row.get(1)?;
             let tags_str: Option<String> = row.get(7)?;
             let tags = tags_str.map(|s| s.split(',').map(|t| t.to_string()).collect());
 
+            // Read live excerpt directly from file content to guarantee 600 chars length for all notes
+            let excerpt = match fs::read_to_string(&path_str) {
+                Ok(content) => content.chars().take(600).collect::<String>(),
+                Err(_) => row.get::<_, String>(3).unwrap_or_default(),
+            };
+
             Ok(NoteCardData {
                 id: row.get(0)?,
-                path: row.get(1)?,
+                path: path_str,
                 title: row.get(2)?,
-                excerpt: row.get(3)?,
+                excerpt,
                 group_name: row.get(4)?,
                 updated_at: row.get(5)?,
                 is_starred: row.get::<_, i32>(6)? == 1,
@@ -171,7 +178,7 @@ pub fn note_update(workspace_path: String, note_path: String, title: String, con
     
     let updated_at = chrono::Utc::now().to_rfc3339();
     let tags_str = tags.join(",");
-    let excerpt = content.chars().take(100).collect::<String>();
+    let excerpt = content.chars().take(600).collect::<String>();
     
     conn.execute(
         "UPDATE notes SET title = ?1, excerpt = ?2, tags = ?3, updated_at = ?4 WHERE path = ?5",

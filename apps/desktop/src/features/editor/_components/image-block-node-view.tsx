@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 export function ImageBlockNodeView(props: NodeViewProps) {
-  const { node, updateAttributes, deleteNode } = props;
+  const { editor, node, updateAttributes, deleteNode } = props;
   const { src, width = "100%", align = "center", alt } = node.attrs;
   const [isPopoverOpen, setIsPopoverOpen] = useState(!src);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +95,9 @@ export function ImageBlockNodeView(props: NodeViewProps) {
             onInsertImage={(newSrc) => {
               updateAttributes({ src: newSrc });
               setIsPopoverOpen(false);
+              if (editor) {
+                editor.commands.focus();
+              }
             }}
           />
         </div>
@@ -233,6 +236,9 @@ export function ImageBlockNodeView(props: NodeViewProps) {
             onInsertImage={(newSrc) => {
               updateAttributes({ src: newSrc });
               setIsPopoverOpen(false);
+              if (editor) {
+                editor.commands.focus();
+              }
             }}
           />
         </div>

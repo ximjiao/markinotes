@@ -87,18 +87,21 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
         </div>
       </CardHeader>
 
-      {/* Main Content Preview Block */}
-      <CardContent className="p-4 pt-1 flex-1 flex flex-col justify-start gap-2 overflow-hidden">
+      {/* Main Content Preview Block with Fade-Out Gradient */}
+      <CardContent className="relative p-4 pt-1 flex-1 flex flex-col justify-start gap-2 overflow-hidden">
         <CardTitle className="text-sm font-semibold text-txt-primary line-clamp-2 leading-tight group-hover:text-txt-brand transition-colors shrink-0">
           {note.title}
         </CardTitle>
-        <p className="text-xs text-txt-secondary line-clamp-6 leading-relaxed font-normal overflow-hidden">
+        <p className="text-xs text-txt-secondary leading-relaxed font-normal overflow-hidden">
           {stripMarkdown(note.excerpt)}
         </p>
+
+        {/* Bottom Fade Gradient Mask */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card via-card/85 to-transparent pointer-events-none" />
       </CardContent>
 
       {/* Footer Meta: Tags & Timestamp */}
-      <CardFooter className="p-4 pt-0 flex items-center justify-between text-[11px] text-txt-muted  mt-2">
+      <CardFooter className="p-4 pt-1 flex items-center justify-between text-[11px] text-txt-muted z-10 bg-card">
         <div className="flex items-center gap-1 overflow-hidden max-w-[70%]">
           {note.tags?.map((tag) => (
             <Badge key={tag} variant="secondary" className="px-1.5 py-0 text-[10px] font-normal text-txt-secondary">

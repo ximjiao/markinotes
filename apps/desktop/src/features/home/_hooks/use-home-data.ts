@@ -89,7 +89,7 @@ export function useHomeData() {
       // Optimistic update - don't reload list to avoid focus loss
       setNotes(prev => prev.map(n =>
         n.path === notePath
-          ? { ...n, title, excerpt: stripMarkdown(content).substring(0, 120) }
+          ? { ...n, title, excerpt: stripMarkdown(content).substring(0, 600) }
           : n
       ));
     } catch (e) {
