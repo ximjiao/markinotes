@@ -15,7 +15,7 @@ import { Markdown } from "tiptap-markdown";
 import { useState, useEffect } from "react";
 import type { NoteFrontmatter } from "../_types/editor.types";
 
-export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "dirty" | "streaming" | "saving" | "saved" | "error";
 
 interface UseTiptapEditorOptions {
   initialContent?: string;

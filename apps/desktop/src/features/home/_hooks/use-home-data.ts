@@ -84,7 +84,7 @@ export function useHomeData() {
   const updateNote = async (notePath: string, title: string, content: string, tags?: string[]) => {
     if (!workspace?.path) return;
     try {
-      await noteIpc.update(workspace.path, notePath, title, content, tags);
+      await noteIpc.saveStream(workspace.path, notePath, title, content, tags);
       // Optimistic update - don't reload list to avoid focus loss
       setNotes(prev => prev.map(n =>
         n.path === notePath
@@ -92,7 +92,7 @@ export function useHomeData() {
           : n
       ));
     } catch (e) {
-      console.error("Failed to update note:", e);
+      console.error("Failed to stream save note:", e);
     }
   };
 
@@ -107,10 +107,25 @@ export function useHomeData() {
     }
   };
 
+  /** Read full content of a note from disk via buffer */
+  const readNoteBuffered = async (notePath: string) => {
+    try {
+      return await noteIpc.readBuffered(notePath);
+    } catch (e) {
+      console.error("Failed to read buffered note:", e);
+      return {
+        content: "",
+        sizeBytes: 0,
+        lineCount: 0,
+      };
+    }
+  };
+
   /** Read full content of a note from disk */
   const readNoteContent = async (notePath: string): Promise<string> => {
     try {
-      return await noteIpc.read(notePath);
+      const res = await readNoteBuffered(notePath);
+      return res.content;
     } catch (e) {
       console.error("Failed to read note:", e);
       return "";
@@ -186,6 +201,7 @@ export function useHomeData() {
     updateNote,
     moveNote,
     readNoteContent,
+    readNoteBuffered,
     loadNotes,
   };
 }

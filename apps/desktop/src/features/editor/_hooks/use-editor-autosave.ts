@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "dirty" | "streaming" | "saving" | "saved" | "error";
 
 export function useEditorAutosave() {
   const [saveStatus] = useState<SaveStatus>("idle");

@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { PrettifiedSummary } from "./ai-summary-panel";
 
 interface AiSummaryDialogProps {
   isOpen: boolean;
@@ -156,12 +157,7 @@ export function AiSummaryDialog({
             )}
 
             {summary && (
-              <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans text-txt-primary">
-                {summary}
-                {status === "streaming" && (
-                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-500 animate-pulse align-middle" />
-                )}
-              </div>
+              <PrettifiedSummary content={summary} isStreaming={status === "streaming"} />
             )}
           </ScrollArea>
         </div>

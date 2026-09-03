@@ -1,6 +1,7 @@
 use crate::db::{get_db_path, init_db};
 use crate::models::NoteCardData;
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -157,9 +158,33 @@ pub fn note_create(workspace_path: String, folder_path: String, title: String) -
     })
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct BufferedNoteReadResult {
+    pub content: String,
+    pub size_bytes: usize,
+    pub line_count: usize,
+}
+
 #[tauri::command]
 pub fn note_read(note_path: String) -> Result<String, String> {
     fs::read_to_string(&note_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn note_read_buffered(note_path: String) -> Result<BufferedNoteReadResult, String> {
+    use std::io::Read;
+    let file = std::fs::File::open(&note_path).map_err(|e| format!("Gagal membuka file: {e}"))?;
+    let mut reader = std::io::BufReader::with_capacity(64 * 1024, file);
+    let mut content = String::new();
+    reader.read_to_string(&mut content).map_err(|e| format!("Gagal membaca buffer file: {e}"))?;
+    let size_bytes = content.len();
+    let line_count = content.lines().count();
+
+    Ok(BufferedNoteReadResult {
+        content,
+        size_bytes,
+        line_count,
+    })
 }
 
 #[tauri::command]
@@ -179,6 +204,54 @@ pub fn note_update(workspace_path: String, note_path: String, title: String, con
     ).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn note_save_stream(
+    workspace_path: String,
+    note_path: String,
+    title: String,
+    content: String,
+    tags: Vec<String>,
+) -> Result<usize, String> {
+    use std::io::Write;
+    let path = std::path::Path::new(&note_path);
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+    let temp_path = parent.join(format!(".tmp_stream_{}.marki", Uuid::new_v4()));
+
+    // Stream write through buffer chunks
+    {
+        let file = std::fs::File::create(&temp_path)
+            .map_err(|e| format!("Gagal inisialisasi temp file untuk stream write: {e}"))?;
+        let mut writer = std::io::BufWriter::with_capacity(64 * 1024, file);
+
+        let bytes = content.as_bytes();
+        let chunk_size = 16 * 1024; // 16KB stream chunk
+        for chunk in bytes.chunks(chunk_size) {
+            writer.write_all(chunk).map_err(|e| format!("Gagal menulis stream chunk: {e}"))?;
+        }
+        writer.flush().map_err(|e| format!("Gagal flush stream buffer: {e}"))?;
+    }
+
+    // Atomic rename to target file path
+    std::fs::rename(&temp_path, &note_path).map_err(|e| {
+        let _ = std::fs::remove_file(&temp_path);
+        format!("Gagal swap atomic file stream: {e}")
+    })?;
+
+    // SQLite update
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let updated_at = chrono::Utc::now().to_rfc3339();
+    let tags_str = tags.join(",");
+    let excerpt = content.chars().take(100).collect::<String>();
+
+    conn.execute(
+        "UPDATE notes SET title = ?1, excerpt = ?2, tags = ?3, updated_at = ?4 WHERE path = ?5",
+        params![title, excerpt, tags_str, updated_at, note_path],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(content.len())
 }
 
 #[tauri::command]

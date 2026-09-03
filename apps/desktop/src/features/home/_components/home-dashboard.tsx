@@ -18,7 +18,9 @@ import { exportDocument } from "@features/editor/_lib/export-engine";
 
 import { AIOrganizeDialog } from "./ai-organize-dialog";
 import { Sparkles } from "lucide-react";
-import { noteIpc } from "../_lib/note-ipc";
+import { noteIpc, isTauri } from "../_lib/note-ipc";
+import { workspaceConfig } from "../../workspace/_lib/workspace-config";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface AIOrganizeResponse {
   moves?: { [noteId: string]: string };
@@ -42,6 +44,7 @@ export function HomeDashboard() {
     toggleStar,
     updateNote,
     readNoteContent,
+    readNoteBuffered,
     loadNotes,
     moveNote,
     allTags,
@@ -50,6 +53,7 @@ export function HomeDashboard() {
   const [activeNoteRef, setActiveNoteRef] = useState<{id: string, path: string, title: string} | null>(null);
   const [activeNoteContent, setActiveNoteContent] = useState<string>("");
   const [contentLoading, setContentLoading] = useState(false);
+  const [bufferInfo, setBufferInfo] = useState<{ sizeBytes: number; lineCount: number } | null>(null);
   const [movingNoteId, setMovingNoteId] = useState<string | null>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = useState(false);
   
@@ -64,19 +68,29 @@ export function HomeDashboard() {
   const activeNote = activeNoteRef ? (notes.find((n) => n.id === activeNoteRef.id) ?? activeNoteRef) : undefined;
   const movingNote = movingNoteId ? notes.find((n) => n.id === movingNoteId) : undefined;
 
-  // Load full .md content when a note is opened
+  // Load full .md content with buffer info when a note is opened
   useEffect(() => {
     if (!activeNoteRef) {
       setActiveNoteContent("");
+      setBufferInfo(null);
       return;
     }
     
     setContentLoading(true);
-    readNoteContent(activeNoteRef.path)
-      .then((content) => {
-        setActiveNoteContent(content || `# ${activeNoteRef.title}\n\n`);
+    readNoteBuffered(activeNoteRef.path)
+      .then((res) => {
+        setBufferInfo({ sizeBytes: res.sizeBytes, lineCount: res.lineCount });
+        setActiveNoteContent(res.content || `# ${activeNoteRef.title}\n\n`);
       })
-      .finally(() => setContentLoading(false));
+      .catch(() => {
+        setActiveNoteContent(`# ${activeNoteRef.title}\n\n`);
+      })
+      .finally(() => {
+        // Smooth transition buffer display
+        setTimeout(() => {
+          setContentLoading(false);
+        }, 120);
+      });
   }, [activeNoteRef?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openNote = (id: string, fallbackPath?: string, fallbackTitle?: string) => {
@@ -91,6 +105,7 @@ export function HomeDashboard() {
   const closeNote = () => {
     setActiveNoteRef(null);
     setActiveNoteContent("");
+    setBufferInfo(null);
     // Refresh note list to pick up any title/excerpt changes saved to SQLite
     loadNotes();
   };
@@ -126,11 +141,59 @@ export function HomeDashboard() {
     );
   }
 
-  // Show loading spinner while content loads
+  // Show rich buffered loader screen while content loads
   if (activeNoteRef && contentLoading) {
+    const note = activeNote;
+    const formattedSize = bufferInfo
+      ? (bufferInfo.sizeBytes > 1024 ? `${(bufferInfo.sizeBytes / 1024).toFixed(1)} KB` : `${bufferInfo.sizeBytes} B`)
+      : "Reading disk...";
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-        <div className="text-sm text-txt-muted animate-pulse">Opening note…</div>
+      <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden animate-in fade-in duration-200">
+        {/* Top buffering progress bar */}
+        <div className="h-1 w-full bg-secondary overflow-hidden">
+          <div className="h-full bg-linear-to-r from-primary/50 via-primary to-purple-500 animate-pulse w-3/4 rounded-r" />
+        </div>
+
+        {/* Minimal header skeleton */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-border/60 bg-surface/40 backdrop-blur-xs">
+          <div className="flex items-center gap-3">
+            <div className="h-7 w-7 rounded-md bg-secondary/80 animate-pulse" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-txt-primary truncate max-w-[200px]">
+                {note?.title || activeNoteRef.title}
+              </span>
+              <span className="text-[10px] text-txt-muted flex items-center gap-1.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500 animate-ping" />
+                Buffering markdown • {formattedSize}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-16 rounded-full bg-secondary/80 animate-pulse" />
+            <div className="h-6 w-20 rounded-full bg-secondary/80 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Document Body Skeleton Shimmer */}
+        <div className="flex-1 overflow-hidden p-8 max-w-3xl mx-auto w-full flex flex-col gap-6">
+          <div className="h-9 w-3/5 rounded-lg bg-secondary/70 animate-pulse" />
+          <div className="flex flex-col gap-2.5 pt-2">
+            <div className="h-4 w-full rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-11/12 rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-4/5 rounded bg-secondary/40 animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-2.5 pt-4">
+            <div className="h-6 w-2/5 rounded bg-secondary/60 animate-pulse" />
+            <div className="h-4 w-full rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-5/6 rounded bg-secondary/50 animate-pulse" />
+          </div>
+          <div className="h-32 w-full rounded-xl bg-secondary/30 border border-border/40 p-4 flex flex-col gap-2">
+            <div className="h-3 w-1/4 rounded bg-secondary/60 animate-pulse" />
+            <div className="h-3 w-2/3 rounded bg-secondary/40 animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-secondary/40 animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }

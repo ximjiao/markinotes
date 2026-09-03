@@ -1,5 +1,6 @@
 packages:
   - apps/*
   - packages/*
-allowBuilds:
-  core-js: set this to true or false
+onlyBuiltDependencies:
+  - core-js
+

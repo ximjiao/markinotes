@@ -265,6 +265,11 @@ export function EditorToolbar({
             <CheckCircle2 className="h-3.5 w-3.5" /> Saved
           </div>
         )}
+        {saveStatus === "streaming" && (
+          <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-sky-600 dark:text-sky-400 bg-sky-500/10 rounded-full border border-sky-500/30 animate-pulse">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" /> Streaming...
+          </div>
+        )}
         {saveStatus === "saving" && (
           <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-amber-600 bg-amber-500/10 rounded-full border border-amber-600/30">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...
