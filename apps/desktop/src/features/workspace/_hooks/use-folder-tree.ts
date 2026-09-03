@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { LocalFolderNode } from "../_types/folder.types";
 import { workspaceConfig } from "../_lib/workspace-config";
 import { isTauri } from "../../home/_lib/note-ipc";
@@ -11,6 +11,16 @@ export function useFolderTree() {
     return workspaceConfig.get().folders || [];
   });
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleWorkspaceUpdate = () => {
+      setFolders(workspaceConfig.get().folders || []);
+    };
+    window.addEventListener("workspace-updated", handleWorkspaceUpdate);
+    return () => {
+      window.removeEventListener("workspace-updated", handleWorkspaceUpdate);
+    };
+  }, []);
 
   const toggleExpand = (folderId: string) => {
     const updateRecursive = (nodes: LocalFolderNode[]): LocalFolderNode[] =>

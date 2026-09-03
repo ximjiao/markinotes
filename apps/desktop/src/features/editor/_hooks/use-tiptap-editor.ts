@@ -10,7 +10,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
-import { Image } from "@tiptap/extension-image";
+import { CustomImageExtension } from "../_components/custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 import { useState, useEffect } from "react";
 import type { NoteFrontmatter } from "../_types/editor.types";
@@ -54,7 +54,7 @@ export function useTiptapEditor({
       TableCell,
       TableHeader,
       Link.configure({ openOnClick: false }),
-      Image,
+      CustomImageExtension,
       Markdown.configure({
         html: false,
         transformPastedText: true,

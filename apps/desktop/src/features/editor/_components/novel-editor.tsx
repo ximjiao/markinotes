@@ -25,7 +25,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
-import { Image } from "@tiptap/extension-image";
+import { CustomImageExtension } from "./custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 
 import {
@@ -58,6 +58,7 @@ import {
   Loader2,
   AlertCircle,
   Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,7 @@ import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
+import { ImageDialog } from "./image-dialog";
 
 interface NovelEditorProps {
   initialTitle?: string;
@@ -175,6 +177,16 @@ const rawSlashItems: CustomSlashItem[] = [
     searchTerms: ["table", "grid"],
     command: ({ editor, range }: any) => {
       editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run();
+    },
+  },
+  {
+    title: "Image",
+    description: "Unggah gambar atau tautan URL",
+    icon: <ImageIcon className="h-4 w-4" />,
+    badge: "img",
+    searchTerms: ["image", "photo", "picture", "upload", "img"],
+    command: ({ editor, range }: any) => {
+      editor.chain().focus().deleteRange(range).setImage({ src: "" }).run();
     },
   },
   {
@@ -289,7 +301,7 @@ const defaultExtensions = [
   TableCell,
   TableHeader,
   Link.configure({ openOnClick: false }),
-  Image,
+  CustomImageExtension,
   slashCommand,
   GlobalDragHandle,
   Markdown.configure({
@@ -319,8 +331,15 @@ export function NovelEditor({
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
+
+  useEffect(() => {
+    const handleOpenImageDialog = () => setIsImageDialogOpen(true);
+    window.addEventListener("open-image-dialog", handleOpenImageDialog);
+    return () => window.removeEventListener("open-image-dialog", handleOpenImageDialog);
+  }, []);
 
   const handleInsertSummary = (summaryMarkdown: string) => {
     if (editorInstance) {
@@ -707,6 +726,17 @@ export function NovelEditor({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editorInstance?.chain().focus().setImage({ src: "" }).run()}
+          title="Insert Image"
+        >
+          <ImageIcon className="h-3.5 w-3.5" />
+        </Button>
+
         <Separator orientation="vertical" className="h-4 shrink-0" />
 
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Formatting">
@@ -982,6 +1012,18 @@ export function NovelEditor({
         workspacePath={workspacePath}
         noteTitle={title}
         onInsertSummary={handleInsertSummary}
+      />
+
+      {/* 6. Image Dialog */}
+      <ImageDialog
+        isOpen={isImageDialogOpen}
+        onClose={() => setIsImageDialogOpen(false)}
+        onInsertImage={(src) => {
+          if (editorInstance) {
+            editorInstance.chain().focus().setImage({ src }).run();
+            scheduleAutoSave();
+          }
+        }}
       />
     </div>
   );

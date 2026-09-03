@@ -177,11 +177,16 @@ export function HomeDashboard() {
 
   const handleNewNote = async () => {
     let folderPath = workspace.folders[0]?.path || workspace.path;
-    if (selectedFolder !== "recents" && selectedFolder !== "starred" && selectedFolder !== "templates") {
+    if (
+      selectedFolder !== "recents" && 
+      selectedFolder !== "starred" && 
+      selectedFolder !== "templates" &&
+      selectedFolder !== "drafts"
+    ) {
       const folder = getSelectedFolder();
       if (folder) folderPath = folder.path;
     } else {
-      // Fallback for Recents/Starred/Templates: Place in 'Drafts' at the root of the workspace
+      // Fallback for Recents/Starred/Templates/Drafts: Place in 'Drafts' at the root of the workspace
       folderPath = `${workspace.path}/Drafts`;
     }
     const newNote = await createNote(folderPath, "Untitled Note");
@@ -296,6 +301,9 @@ export function HomeDashboard() {
     }
 
     refreshWorkspace();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("workspace-updated"));
+    }
   };
 
   const currentFolderName = selectedFolder.startsWith("tag:")

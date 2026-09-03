@@ -26,6 +26,7 @@ import {
   Loader2,
   AlertCircle,
   Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -47,6 +48,7 @@ interface EditorToolbarProps {
   saveCountdown?: number | null;
   onSummarize?: () => void;
   isSummarizing?: boolean;
+  onOpenImageDialog?: () => void;
 }
 
 export function EditorToolbar({ 
@@ -56,6 +58,7 @@ export function EditorToolbar({
   saveCountdown,
   onSummarize,
   isSummarizing = false,
+  onOpenImageDialog,
 }: EditorToolbarProps) {
   const [, setTick] = useState(0);
 
@@ -262,6 +265,16 @@ export function EditorToolbar({
           title="Insert Table"
         >
           <TableIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onOpenImageDialog}
+          title="Insert Image"
+        >
+          <ImageIcon className="h-3.5 w-3.5" />
         </Button>
 
         <Separator orientation="vertical" className="h-4 mx-1" />

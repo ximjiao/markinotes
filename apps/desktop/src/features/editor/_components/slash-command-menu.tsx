@@ -2,16 +2,17 @@
 
 import React, { useEffect } from "react";
 import type { Editor } from "@tiptap/react";
-import { Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Code, Table, Quote, Minus } from "lucide-react";
+import { Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Code, Table, Quote, Minus, Image as ImageIcon } from "lucide-react";
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 
 interface SlashCommandMenuProps {
   editor: Editor | null;
   isOpen: boolean;
   onClose: () => void;
+  onOpenImageDialog?: () => void;
 }
 
-export function SlashCommandMenu({ editor, isOpen, onClose }: SlashCommandMenuProps) {
+export function SlashCommandMenu({ editor, isOpen, onClose, onOpenImageDialog }: SlashCommandMenuProps) {
   useEffect(() => {
     if (!editor) return;
 
@@ -61,6 +62,14 @@ export function SlashCommandMenu({ editor, isOpen, onClose }: SlashCommandMenuPr
       description: "Small section heading",
       icon: Heading3,
       action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+    },
+    {
+      title: "Image",
+      description: "Upload local file or embed image link",
+      icon: ImageIcon,
+      action: () => {
+        onOpenImageDialog?.();
+      },
     },
     {
       title: "Bullet List",

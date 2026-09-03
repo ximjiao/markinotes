@@ -29,12 +29,12 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
     <Card
       onClick={() => onOpen?.(note.id)}
       className={cn(
-        "group relative flex flex-col justify-between h-64 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/40 bg-card border-border overflow-hidden",
+        "group relative flex flex-col justify-between aspect-[4/5] cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/40 bg-card border-border overflow-hidden",
         note.coverColor
       )}
     >
       {/* Header Info: Folder/Group badge & Options */}
-      <CardHeader className="p-4 pb-2 space-y-0 flex-row items-center justify-between">
+      <CardHeader className="p-4 pb-2 space-y-0 flex-row items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5 text-xs text-txt-secondary font-medium">
           <Folder className="h-3.5 w-3.5 text-txt-brand" />
           <span>{note.groupName || "In Space"}</span>
@@ -88,11 +88,11 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
       </CardHeader>
 
       {/* Main Content Preview Block */}
-      <CardContent className="p-4 pt-1 flex-1 flex flex-col justify-start gap-2">
-        <CardTitle className="text-sm font-semibold text-txt-primary line-clamp-2 leading-tight group-hover:text-txt-brand transition-colors">
+      <CardContent className="p-4 pt-1 flex-1 flex flex-col justify-start gap-2 overflow-hidden">
+        <CardTitle className="text-sm font-semibold text-txt-primary line-clamp-2 leading-tight group-hover:text-txt-brand transition-colors shrink-0">
           {note.title}
         </CardTitle>
-        <p className="text-xs text-txt-secondary line-clamp-4 leading-relaxed font-normal">
+        <p className="text-xs text-txt-secondary line-clamp-6 leading-relaxed font-normal overflow-hidden">
           {stripMarkdown(note.excerpt)}
         </p>
       </CardContent>

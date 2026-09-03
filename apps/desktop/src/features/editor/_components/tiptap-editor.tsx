@@ -9,6 +9,7 @@ import { SlashCommandMenu } from "./slash-command-menu";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { EditorFooter } from "./editor-footer";
 import { AiSummaryDialog } from "./ai-summary-dialog";
+import { ImageDialog } from "./image-dialog";
 import type { NoteDocument } from "../_types/editor.types";
 
 interface TiptapEditorProps {
@@ -29,6 +30,7 @@ export function TiptapEditor({
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
   const [noteTitle, setNoteTitle] = useState(initialTitle);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
 
   const { editor, frontmatter, saveStatus, wordCount, charCount } = useTiptapEditor({
     initialContent,
@@ -65,6 +67,7 @@ export function TiptapEditor({
         doc={currentDoc} 
         saveStatus={saveStatus}
         onSummarize={() => setIsAiDialogOpen(true)}
+        onOpenImageDialog={() => setIsImageDialogOpen(true)}
       />
 
       {/* 2. Main Writing Canvas Area (Outer Scrollable Container) */}
@@ -89,6 +92,7 @@ export function TiptapEditor({
           editor={editor}
           isOpen={isSlashMenuOpen}
           onClose={() => setIsSlashMenuOpen(false)}
+          onOpenImageDialog={() => setIsImageDialogOpen(true)}
         />
 
         {/* Tiptap Canvas without blue focus box */}
@@ -117,6 +121,17 @@ export function TiptapEditor({
           if (editor) {
             editor.commands.focus("end");
             editor.commands.insertContent(`\n\n## 🤖 Summary\n\n${summary}\n\n`);
+          }
+        }}
+      />
+
+      {/* 5. Image Upload & Embed Dialog */}
+      <ImageDialog
+        isOpen={isImageDialogOpen}
+        onClose={() => setIsImageDialogOpen(false)}
+        onInsertImage={(src) => {
+          if (editor) {
+            editor.chain().focus().setImage({ src }).run();
           }
         }}
       />
