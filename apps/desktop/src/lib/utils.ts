@@ -43,3 +43,22 @@ export function formatRelativeTime(dateString: string): string {
     year: "numeric",
   });
 }
+
+export function stripMarkdown(markdown: string): string {
+  if (!markdown) return "";
+  return markdown
+    .replace(/^---\s*[\s\S]*?---\s*/, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/~~(.*?)~~/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^\s*>\s+/gm, "")
+    .replace(/^\s*([-*+]\s+|\[[ xX]\]\s+|\d+\.\s+)/gm, "")
+    .replace(/^\s*[-*_]{3,}\s*$/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}

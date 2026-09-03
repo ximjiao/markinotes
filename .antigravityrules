@@ -2,3 +2,15 @@
 - Do not edit files inside /dist or .tauri build artifacts directly.
 - In Ask mode: provide short explanation and code blocks only.
 - In Agent mode: apply diffs directly and format using standard prettier.
+
+# Codebase Memory
+
+When working on this project, always use the `codebase-memory-mcp` tools as the primary source for understanding the existing codebase.
+
+Before making changes or answering questions about the architecture, dependencies, components, functions, or relationships between files:
+1. Search the Codebase Memory graph first.
+2. Use the graph to identify relevant files and relationships.
+3. Then inspect the actual source files when necessary.
+4. Do not assume the project structure from memory when Codebase Memory can provide the information.
+
+Keep Codebase Memory in sync by indexing the repository when significant structural changes occur.

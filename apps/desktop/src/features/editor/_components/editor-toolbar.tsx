@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Undo,
@@ -57,6 +57,28 @@ export function EditorToolbar({
   onSummarize,
   isSummarizing = false,
 }: EditorToolbarProps) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const handleUpdate = () => {
+      setTick((t) => t + 1);
+    };
+
+    editor.on("transaction", handleUpdate);
+    editor.on("selectionUpdate", handleUpdate);
+
+    return () => {
+      try {
+        editor.off("transaction", handleUpdate);
+        editor.off("selectionUpdate", handleUpdate);
+      } catch {
+        // Safe unmount
+      }
+    };
+  }, [editor]);
+
   if (!editor) return null;
 
   const handleExport = (type: ExportType) => {

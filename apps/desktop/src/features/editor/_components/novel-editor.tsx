@@ -54,6 +54,10 @@ import {
   Plus,
   Trash2,
   X,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -433,7 +437,7 @@ export function NovelEditor({
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background text-txt-primary overflow-y-auto">
+    <div className="flex flex-col h-full w-full bg-background text-txt-primary overflow-hidden">
       {/* 1. Header Navigation Bar (Google Docs Style Editable Title Input) */}
       {/* Combined Header + Toolbar */}
       <div className="px-3 py-1.5 border-b border-border bg-background flex items-center gap-2 shrink-0 select-none overflow-x-auto">
@@ -712,6 +716,39 @@ export function NovelEditor({
         {/* Spacer */}
         <div className="flex-1" />
 
+        {/* Right: Save Status & AI Actions (Sebelah kiri dari More icon) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Save Status Indicator */}
+          {saveStatus === "saved" && (
+            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-emerald-600 border-emerald-600/30 bg-emerald-500/10">
+              <CheckCircle2 className="h-3 w-3" /> Saved
+            </Badge>
+          )}
+          {saveStatus === "saving" && (
+            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-amber-600 border-amber-600/30 bg-amber-500/10">
+              <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+            </Badge>
+          )}
+          {saveStatus === "dirty" && (
+            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-txt-muted border-border">
+              Unsaved {saveCountdown !== null ? `(${saveCountdown}s)` : ""}
+            </Badge>
+          )}
+
+          {/* Summarize with AI Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAiDialogOpen(true)}
+            className="h-6 px-2 text-[10px] gap-1.5 font-medium text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300 transition-colors shadow-xs rounded-full"
+          >
+            <Sparkles className="h-3 w-3 text-purple-500" />
+            Summarize with AI
+          </Button>
+        </div>
+
+        <Separator orientation="vertical" className="h-4 shrink-0 mx-0.5" />
+
         {/* Right: Export Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -728,8 +765,9 @@ export function NovelEditor({
         </DropdownMenu>
       </div>
 
-      {/* 3. Pure 100% Canvas Writing Space */}
-      <div className="flex-1 px-16 py-10 max-w-4xl mx-auto w-full">
+      {/* 3. Pure 100% Canvas Writing Space (Scrollable Area) */}
+      <div className="flex-1 overflow-y-auto w-full">
+        <div className="px-16 py-10 max-w-4xl mx-auto w-full">
         {/* Dedicated Relative Wrapper for Editor Canvas & Side Handle Alignment */}
         <div className="relative w-full">
           {/* Notion Block Side Handle (+ and :: Grip) */}
@@ -927,15 +965,13 @@ export function NovelEditor({
             </EditorContent>
           </EditorRoot>
         </div>
+        </div>
       </div>
 
       {/* 4. Footer Bar */}
       <EditorFooter
-        saveStatus={saveStatus}
         wordCount={wordCount}
         charCount={charCount}
-        saveCountdown={saveCountdown}
-        onSummarize={() => setIsAiDialogOpen(true)}
       />
 
       {/* 5. AI Summary Dialog */}

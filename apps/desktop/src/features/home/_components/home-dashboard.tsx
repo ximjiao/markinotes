@@ -18,7 +18,9 @@ import { exportDocument } from "@features/editor/_lib/export-engine";
 
 import { AIOrganizeDialog } from "./ai-organize-dialog";
 import { Sparkles } from "lucide-react";
-import { noteIpc } from "../_lib/note-ipc";
+import { noteIpc, isTauri } from "../_lib/note-ipc";
+import { workspaceConfig } from "@features/workspace/_lib/workspace-config";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface AIOrganizeResponse {
   moves?: { [noteId: string]: string };

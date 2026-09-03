@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { NoteCardData, ViewMode, WorkspaceFolderInfo } from "../_types/home.types";
 import { noteIpc } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
+import { stripMarkdown } from "@/lib/utils";
 
 export function useHomeData() {
   const [workspace, setWorkspace] = useState<WorkspaceFolderInfo | null>(null);
@@ -88,7 +89,7 @@ export function useHomeData() {
       // Optimistic update - don't reload list to avoid focus loss
       setNotes(prev => prev.map(n =>
         n.path === notePath
-          ? { ...n, title, excerpt: content.replace(/^#\s+[^\n]+\n+/, "").substring(0, 120) }
+          ? { ...n, title, excerpt: stripMarkdown(content).substring(0, 120) }
           : n
       ));
     } catch (e) {

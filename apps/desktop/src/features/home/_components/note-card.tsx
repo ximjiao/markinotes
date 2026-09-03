@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { NoteCardData } from "../_types/home.types";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime, stripMarkdown } from "@/lib/utils";
 
 interface NoteCardProps {
   note: NoteCardData;
@@ -93,7 +93,7 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
           {note.title}
         </CardTitle>
         <p className="text-xs text-txt-secondary line-clamp-4 leading-relaxed font-normal">
-          {note.excerpt}
+          {stripMarkdown(note.excerpt)}
         </p>
       </CardContent>
 
