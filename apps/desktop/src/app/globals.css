@@ -368,6 +368,7 @@
   font-weight: 600;
   text-align: left;
   color: var(--text-primary);
+  background-color: hsl(var(--accent) / 0.6);
 }
 
 .ProseMirror .selectedCell:after {

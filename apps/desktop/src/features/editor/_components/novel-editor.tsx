@@ -68,6 +68,7 @@ import {
   Tag,
   Paintbrush,
   Eraser,
+  TableProperties,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -261,6 +262,19 @@ const CustomTableCell = TableCell.extend({
           };
         },
       },
+      colwidth: {
+        default: null,
+        parseHTML: (element) => {
+          const colwidth = element.getAttribute("colwidth");
+          return colwidth ? colwidth.split(",").map((item) => parseInt(item, 10)) : null;
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.colwidth) return {};
+          return {
+            colwidth: attributes.colwidth.join(","),
+          };
+        },
+      },
     };
   },
 });
@@ -277,6 +291,19 @@ const CustomTableHeader = TableHeader.extend({
           return {
             style: `background-color: ${attributes.backgroundColor}`,
             "data-background-color": attributes.backgroundColor,
+          };
+        },
+      },
+      colwidth: {
+        default: null,
+        parseHTML: (element) => {
+          const colwidth = element.getAttribute("colwidth");
+          return colwidth ? colwidth.split(",").map((item) => parseInt(item, 10)) : null;
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.colwidth) return {};
+          return {
+            colwidth: attributes.colwidth.join(","),
           };
         },
       },
@@ -446,7 +473,7 @@ const defaultExtensions = [
   slashCommand,
   GlobalDragHandle,
   Markdown.configure({
-    html: false,
+    html: true,
     transformPastedText: true,
     transformCopiedText: true,
   }),
@@ -549,6 +576,46 @@ export function NovelEditor({
       }
     };
   }, [performSave]);
+
+  // Check if current selection is inside a table or CellSelection (even across multi-cell column highlighting)
+  const isTableActive = useCallback(() => {
+    if (!editorInstance || editorInstance.isDestroyed) return false;
+    try {
+      const { selection } = editorInstance.state;
+      if (!selection) return false;
+
+      // 1. Check CellSelection (multi-cell/column selection)
+      if (
+        (selection as any).$headCell ||
+        (selection as any).$anchorCell ||
+        selection.constructor.name === "CellSelection"
+      ) {
+        return true;
+      }
+
+      // 2. Standard isActive checks
+      if (
+        editorInstance.isActive("table") ||
+        editorInstance.isActive("tableCell") ||
+        editorInstance.isActive("tableHeader") ||
+        editorInstance.isActive("tableRow")
+      ) {
+        return true;
+      }
+
+      // 3. Document depth ancestor lookup
+      const { $from } = selection;
+      for (let d = $from.depth; d > 0; d--) {
+        const typeName = $from.node(d).type.name;
+        if (["table", "tableRow", "tableCell", "tableHeader"].includes(typeName)) {
+          return true;
+        }
+      }
+    } catch {
+      // Safe fallback
+    }
+    return false;
+  }, [editorInstance]);
 
   // Mass Auto-Sweeper for all unused '/' paragraphs in document
   useEffect(() => {
@@ -1208,9 +1275,7 @@ export function NovelEditor({
                 tippyOptions={{ maxWidth: "none" }}
                 className="flex items-center gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-xl backdrop-blur-sm z-50 text-txt-primary w-fit"
               >
-                {(editorInstance?.isActive("table") ||
-                  editorInstance?.isActive("tableCell") ||
-                  editorInstance?.isActive("tableHeader")) && (
+                {isTableActive() && (
                   <>
                     {/* Compact Notion-Style Table Menu Popover */}
                     <Popover>
@@ -1228,18 +1293,21 @@ export function NovelEditor({
                       </PopoverTrigger>
 
                       <PopoverContent align="start" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs space-y-0.5">
-                        {/* 1. Header Cell Toggle */}
-                        <button
-                          type="button"
+                        {/* 1. Header Cell Switch Toggle */}
+                        <div
                           onClick={() => editorInstance?.chain().focus().toggleHeaderCell().run()}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer select-none transition-colors"
                         >
                           <div className="flex items-center gap-2">
-                            <Heading1 className="h-3.5 w-3.5 text-txt-brand" />
-                            <span>Header cell</span>
+                            <TableProperties className="h-3.5 w-3.5 text-txt-brand" />
+                            <span>Header</span>
                           </div>
-                          <span className="text-[10px] text-txt-muted font-mono">Toggle</span>
-                        </button>
+                          <Switch
+                            checked={editorInstance?.isActive("tableHeader") ?? false}
+                            onCheckedChange={() => editorInstance?.chain().focus().toggleHeaderCell().run()}
+                            className="scale-75 pointer-events-none"
+                          />
+                        </div>
 
                         {/* 2. Color Submenu Popover */}
                         <Popover>

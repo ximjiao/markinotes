@@ -56,7 +56,7 @@ export function useTiptapEditor({
       Link.configure({ openOnClick: false }),
       CustomImageExtension,
       Markdown.configure({
-        html: false,
+        html: true,
         transformPastedText: true,
         transformCopiedText: true,
       }),
