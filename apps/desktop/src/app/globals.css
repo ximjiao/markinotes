@@ -254,6 +254,38 @@
   line-height: 1.6;
 }
 
+/* Notion-Style Rich Hyperlink Styling */
+.ProseMirror a,
+.prose a {
+  color: #3b82f6 !important;
+  text-decoration: underline !important;
+  text-decoration-color: rgba(59, 130, 246, 0.45) !important;
+  text-underline-offset: 3px !important;
+  text-decoration-thickness: 1.5px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.dark .ProseMirror a,
+.dark .prose a {
+  color: #60a5fa !important;
+  text-decoration-color: rgba(96, 165, 250, 0.45) !important;
+}
+
+.ProseMirror a:hover,
+.prose a:hover {
+  color: #2563eb !important;
+  text-decoration-color: #2563eb !important;
+  text-decoration-thickness: 2px !important;
+}
+
+.dark .ProseMirror a:hover,
+.dark .prose a:hover {
+  color: #93c5fd !important;
+  text-decoration-color: #93c5fd !important;
+}
+
 /* Numbered List (1.) & Bullet List (-) Styling Fix */
 .ProseMirror ol {
   list-style-type: decimal !important;
@@ -293,7 +325,7 @@
 
 .ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
   cursor: pointer;
-  accent-color: #9333ea;
+  accent-color: hsl(var(--primary));
   width: 1rem;
   height: 1rem;
   border-radius: 0.25rem;
@@ -315,13 +347,13 @@
 
 /* Blockquote Styling */
 .ProseMirror blockquote {
-  border-left: 4px solid #9333ea;
+  border-left: 4px solid hsl(var(--primary));
   padding-left: 1rem;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   font-style: italic;
   color: var(--text-secondary);
-  background: rgba(147, 51, 234, 0.05);
+  background: hsl(var(--primary) / 0.08);
   border-radius: 0 0.375rem 0.375rem 0;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
@@ -568,16 +600,148 @@
   opacity: 1;
 }
 
-/* Code Block Styling */
+/* ─── VS Code Style Syntax Highlighting (hljs) ─── */
 .ProseMirror pre {
-  background: #1e1e2e;
-  color: #cdd6f4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 0.875rem 1.125rem;
+  border-radius: 0.625rem;
+  margin-top: 0.875rem;
+  margin-bottom: 0.875rem;
   overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+:root:not(.dark) .ProseMirror pre {
+  background: #f8fafc;
+  color: #1e293b;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ProseMirror pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+/* Keywords & Storage: Blue / Purple */
+.ProseMirror pre .hljs-keyword,
+.ProseMirror pre .hljs-operator,
+.ProseMirror pre .hljs-meta .hljs-keyword {
+  color: #569cd6;
+  font-weight: 500;
+}
+
+/* Functions & Methods: Yellow */
+.ProseMirror pre .hljs-title.hljs-function,
+.ProseMirror pre .hljs-title.function_,
+.ProseMirror pre .hljs-function {
+  color: #dcdcaa;
+}
+
+/* Strings & Characters: Orange-brown */
+.ProseMirror pre .hljs-string,
+.ProseMirror pre .hljs-regexp {
+  color: #ce9178;
+}
+
+/* Comments: Green Italic */
+.ProseMirror pre .hljs-comment,
+.ProseMirror pre .hljs-quote {
+  color: #6a9955;
+  font-style: italic;
+}
+
+/* Numbers, Booleans, Literals: Light Green */
+.ProseMirror pre .hljs-number,
+.ProseMirror pre .hljs-literal {
+  color: #b5cea8;
+}
+
+/* Types, Classes, Built-ins: Teal */
+.ProseMirror pre .hljs-type,
+.ProseMirror pre .hljs-title.hljs-class,
+.ProseMirror pre .hljs-title.class_,
+.ProseMirror pre .hljs-built_in {
+  color: #4ec9b0;
+}
+
+/* Variables, Properties, Params: Light Blue */
+.ProseMirror pre .hljs-variable,
+.ProseMirror pre .hljs-variable.hljs-language,
+.ProseMirror pre .hljs-property,
+.ProseMirror pre .hljs-attr,
+.ProseMirror pre .hljs-params {
+  color: #9cdcfe;
+}
+
+/* Tags in HTML/XML/JSX: Blue */
+.ProseMirror pre .hljs-tag,
+.ProseMirror pre .hljs-name {
+  color: #569cd6;
+}
+
+/* Tag attributes: Light Blue */
+.ProseMirror pre .hljs-tag .hljs-attr {
+  color: #9cdcfe;
+}
+
+/* Punctuation & Meta: Gray */
+.ProseMirror pre .hljs-punctuation,
+.ProseMirror pre .hljs-meta {
+  color: #858585;
+}
+
+/* Embedded Expressions / Template Strings */
+.ProseMirror pre .hljs-subst {
+  color: #d4d4d4;
+}
+
+/* ─── VS Code Light Mode Tokens ─── */
+:root:not(.dark) .ProseMirror pre .hljs-keyword,
+:root:not(.dark) .ProseMirror pre .hljs-operator {
+  color: #0000ff;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-title.hljs-function,
+:root:not(.dark) .ProseMirror pre .hljs-title.function_,
+:root:not(.dark) .ProseMirror pre .hljs-function {
+  color: #795e26;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-string {
+  color: #a31515;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-comment,
+:root:not(.dark) .ProseMirror pre .hljs-quote {
+  color: #008000;
+  font-style: italic;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-number,
+:root:not(.dark) .ProseMirror pre .hljs-literal {
+  color: #098658;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-type,
+:root:not(.dark) .ProseMirror pre .hljs-title.class_,
+:root:not(.dark) .ProseMirror pre .hljs-built_in {
+  color: #267f99;
+}
+
+:root:not(.dark) .ProseMirror pre .hljs-variable,
+:root:not(.dark) .ProseMirror pre .hljs-property,
+:root:not(.dark) .ProseMirror pre .hljs-attr {
+  color: #001080;
 }
 
 /* ─── Custom Titlebar / Drag Region ─── */

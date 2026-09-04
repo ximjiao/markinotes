@@ -347,8 +347,13 @@ export function HomeDashboard() {
           
           <div className="flex items-center gap-2">
             {selectedFolder === "drafts" && notes.length > 0 && (
-              <Button onClick={handleOrganizeAI} variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700">
-                <Sparkles className="h-3.5 w-3.5" />
+              <Button
+                onClick={handleOrganizeAI}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 font-medium text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300 transition-colors shadow-xs rounded-lg"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                 Organize with AI
               </Button>
             )}

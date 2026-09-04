@@ -50,40 +50,39 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
-      <SidebarContent className="px-1 py-2 group-data-[collapsible=icon]:px-0">
-
+      <SidebarContent className="px-1.5 py-2 pt-2.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pt-2.5">
 
         {/* Space Group */}
-        <SidebarGroup>
-          <SidebarMenu>
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = selectedView === item.id;
-              return (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    isActive={active}
-                    onClick={() => onSelectView(item.id)}
-                    tooltip={item.label}
-                    className="text-xs font-medium"
-                  >
-                    <Icon className="h-4 w-4 text-txt-brand" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-          <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize">
-            My Space
-          </SidebarGroupLabel>
+        <SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1 group-data-[collapsible=icon]:gap-1.5">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = selectedView === item.id;
+                return (
+                  <SidebarMenuItem key={item.id} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+                    <SidebarMenuButton
+                      isActive={active}
+                      onClick={() => onSelectView(item.id)}
+                      tooltip={item.label}
+                      className="text-xs font-medium"
+                    >
+                      <Icon className="h-4 w-4 text-txt-brand" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+
+              <div className="group-data-[collapsible=icon]:hidden px-2 pt-2.5 pb-1 text-[11px] font-semibold text-txt-muted capitalize">
+                My Space
+              </div>
+
               {spaceItems.map((item) => {
                 const Icon = item.icon;
                 const active = selectedView === item.id;
                 return (
-                  <SidebarMenuItem key={item.id}>
+                  <SidebarMenuItem key={item.id} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
                     <SidebarMenuButton
                       isActive={active}
                       onClick={() => {
@@ -106,7 +105,7 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator />
+        <SidebarSeparator className="my-1.5 group-data-[collapsible=icon]:mx-2" />
 
         {/* OS Folders Group */}
         <SidebarGroup>
@@ -222,7 +221,7 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
           </div>
         </SidebarGroup>
 
-        <SidebarSeparator />
+        <SidebarSeparator className="group-data-[collapsible=icon]:hidden my-1" />
 
         {/* Tags Group */}
         <SidebarGroup>

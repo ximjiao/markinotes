@@ -28,7 +28,7 @@ export function HomeHeader({
       </div>
 
       {/* 2. Center Side: Search Bar */}
-      <div className="flex-1 w-full max-w-md mx-auto">
+      <div className="flex-1 w-full max-w-xl mx-auto">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-txt-muted" />
           <Input

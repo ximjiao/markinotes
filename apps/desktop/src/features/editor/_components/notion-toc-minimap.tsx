@@ -129,12 +129,17 @@ export function NotionTocMinimap({ editor }: NotionTocMinimapProps) {
 
   return (
     <div
-      className="fixed right-5 top-1/2 -translate-y-1/2 z-30 flex items-center justify-end group select-none"
+      className="fixed right-5 top-[20%] z-30 select-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* ─── 1. Notion Floating TOC Outline Minimap Bars ─── */}
-      <div className="flex flex-col items-end gap-1.5 py-1 px-1 cursor-pointer bg-transparent">
+      {/* ─── 1. Notion Floating TOC Outline Minimap Bars (Hidden when hovered) ─── */}
+      <div
+        className={cn(
+          "flex flex-col items-end gap-1.5 py-1 px-1 cursor-pointer bg-transparent transition-opacity duration-150",
+          isHovered ? "opacity-0 pointer-events-none" : "opacity-100"
+        )}
+      >
         {headings.map((item) => {
           const isActive = activePos === item.pos;
 
@@ -158,29 +163,21 @@ export function NotionTocMinimap({ editor }: NotionTocMinimapProps) {
                   ? "bg-primary opacity-100"
                   : "bg-muted-foreground/35 hover:bg-primary/80 hover:opacity-100"
               )}
-              title={`${item.text} (H${item.level})`}
               aria-label={`Jump to ${item.text}`}
             />
           );
         })}
       </div>
 
-      {/* ─── 2. Notion TOC Popover Card on Hover (Consistent with More Menu Dropdown) ─── */}
+      {/* ─── 2. Notion TOC Popover Card (Replaces the bars on Hover) ─── */}
       <div
         className={cn(
-          "absolute right-7 top-1/2 -translate-y-1/2 w-60 max-h-80 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md transition-all duration-150 origin-right pointer-events-auto",
+          "absolute right-0 top-0 w-56 max-h-80 overflow-y-auto rounded-xl border border-border bg-popover/95 backdrop-blur-md p-1.5 text-popover-foreground shadow-xl transition-all duration-150 origin-top-right",
           isHovered
-            ? "opacity-100 scale-100 translate-x-0 pointer-events-auto"
-            : "opacity-0 scale-95 translate-x-2 pointer-events-none"
+            ? "opacity-100 scale-100 pointer-events-auto"
+            : "opacity-0 scale-95 pointer-events-none"
         )}
       >
-        <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-txt-muted">
-          <span>Outline</span>
-          <span className="text-[10px] font-normal opacity-70">{headings.length} headings</span>
-        </div>
-
-        <div className="-mx-1 my-1 h-px bg-muted" />
-
         <div className="space-y-0.5">
           {headings.map((item) => {
             const isActive = activePos === item.pos;
@@ -194,15 +191,15 @@ export function NotionTocMinimap({ editor }: NotionTocMinimapProps) {
                   setIsHovered(false);
                 }}
                 className={cn(
-                  "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none transition-colors",
+                  "relative flex w-full cursor-pointer select-none items-center rounded-lg px-2 py-1.5 text-xs outline-none transition-colors",
                   item.level === 1 && "font-medium text-txt-primary",
                   item.level === 2 && "pl-4 text-txt-muted hover:text-txt-primary",
                   item.level === 3 && "pl-6 text-txt-muted/80 hover:text-txt-primary",
                   isActive
-                    ? "bg-accent text-txt-brand font-medium"
-                    : "hover:bg-accent hover:text-accent-foreground"
+                    ? "text-txt-brand font-semibold bg-accent/60"
+                    : "text-txt-muted hover:bg-accent hover:text-txt-primary"
                 )}
-                title={item.text}
+                aria-label={item.text}
               >
                 <span className="truncate">{item.text}</span>
               </button>

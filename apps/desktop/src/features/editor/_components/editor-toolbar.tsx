@@ -27,9 +27,11 @@ import {
   AlertCircle,
   Sparkles,
   Image as ImageIcon,
+  Link as LinkIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +42,36 @@ import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { exportDocument } from "../_lib/export-engine";
 import { cn } from "@/lib/utils";
 import type { SaveStatus } from "../_hooks/use-tiptap-editor";
+import {
+  NotionMenuSectionHeader,
+  NotionMenuItem,
+} from "./notion-popover-primitives";
+
+const TEXT_COLORS = [
+  { id: "default", label: "Default color", color: "inherit" },
+  { id: "gray", label: "Gray", color: "#9ca3af" },
+  { id: "brown", label: "Brown", color: "#b45309" },
+  { id: "orange", label: "Orange", color: "#f97316" },
+  { id: "yellow", label: "Yellow", color: "#eab308" },
+  { id: "green", label: "Green", color: "#22c55e" },
+  { id: "blue", label: "Blue", color: "#3b82f6" },
+  { id: "purple", label: "Purple", color: "#a855f7" },
+  { id: "pink", label: "Pink", color: "#ec4899" },
+  { id: "red", label: "Red", color: "#ef4444" },
+];
+
+const BG_HIGHLIGHTS = [
+  { id: "default", label: "Default background", bg: "transparent" },
+  { id: "gray_background", label: "Gray background", bg: "rgba(156, 163, 175, 0.25)" },
+  { id: "brown_background", label: "Brown background", bg: "rgba(180, 83, 9, 0.25)" },
+  { id: "orange_background", label: "Orange background", bg: "rgba(249, 115, 22, 0.25)" },
+  { id: "yellow_background", label: "Yellow background", bg: "rgba(234, 179, 8, 0.25)" },
+  { id: "green_background", label: "Green background", bg: "rgba(34, 197, 94, 0.25)" },
+  { id: "blue_background", label: "Blue background", bg: "rgba(59, 130, 246, 0.25)" },
+  { id: "purple_background", label: "Purple background", bg: "rgba(168, 85, 247, 0.25)" },
+  { id: "pink_background", label: "Pink background", bg: "rgba(236, 72, 153, 0.25)" },
+  { id: "red_background", label: "Red background", bg: "rgba(239, 68, 68, 0.25)" },
+];
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -61,6 +93,48 @@ export function EditorToolbar({
   onOpenImageDialog,
 }: EditorToolbarProps) {
   const [, setTick] = useState(0);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [isColorOpen, setIsColorOpen] = useState(false);
+
+  const handleApplyTextColor = (color: string) => {
+    if (!editor) return;
+    if (!color || color === "inherit" || color === "default") {
+      editor.chain().focus().unsetMark("textColor").run();
+    } else {
+      editor.chain().focus().setMark("textColor", { color }).run();
+    }
+    setIsColorOpen(false);
+  };
+
+  const handleApplyHighlight = (bgColor: string) => {
+    if (!editor) return;
+    if (!bgColor || bgColor === "transparent" || bgColor === "default") {
+      editor.chain().focus().unsetMark("textHighlight").run();
+    } else {
+      editor.chain().focus().setMark("textHighlight", { color: bgColor }).run();
+    }
+    setIsColorOpen(false);
+  };
+
+  const handleOpenLinkPopover = (open: boolean) => {
+    if (open && editor) {
+      const currentHref = editor.getAttributes("link").href || "";
+      setLinkUrl(currentHref);
+    }
+    setIsLinkOpen(open);
+  };
+
+  const handleSetLink = () => {
+    if (!editor) return;
+    if (!linkUrl.trim()) {
+      editor.chain().focus().unsetLink().run();
+    } else {
+      editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
+    }
+    setIsLinkOpen(false);
+    setLinkUrl("");
+  };
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -212,6 +286,122 @@ export function EditorToolbar({
         >
           <Code className="h-3.5 w-3.5" />
         </Button>
+        <Popover open={isLinkOpen} onOpenChange={handleOpenLinkPopover}>
+          <PopoverTrigger asChild>
+            <Button
+              variant={editor.isActive("link") ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              title="Tautan / Link (⌘K)"
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="bottom" align="center" className="w-64 p-2 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSetLink()}
+                placeholder="https://..."
+                className="flex-1 bg-accent/40 text-txt-primary text-xs px-2.5 py-1.5 rounded-lg border border-border/50 focus:outline-none focus:ring-1 focus:ring-primary/60"
+                autoFocus
+              />
+              <Button size="sm" onClick={handleSetLink} className="h-7 px-2 text-xs">
+                Set
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={isColorOpen} onOpenChange={setIsColorOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant={(editor.isActive("textColor") || editor.isActive("textHighlight")) ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              title="Warna teks & Highlight"
+            >
+              <div className="flex flex-col items-center justify-center leading-none">
+                <span 
+                  className="text-[11px] font-bold"
+                  style={{ 
+                    color: editor.getAttributes("textColor").color && editor.getAttributes("textColor").color !== "inherit" 
+                      ? editor.getAttributes("textColor").color 
+                      : undefined 
+                  }}
+                >
+                  A
+                </span>
+                <div 
+                  className="h-0.5 w-3 rounded-full mt-0.5" 
+                  style={{ 
+                    backgroundColor: editor.getAttributes("textHighlight").color && editor.getAttributes("textHighlight").color !== "transparent"
+                      ? editor.getAttributes("textHighlight").color 
+                      : editor.getAttributes("textColor").color && editor.getAttributes("textColor").color !== "inherit"
+                      ? editor.getAttributes("textColor").color
+                      : "currentColor" 
+                  }} 
+                />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent 
+            side="bottom" 
+            align="end" 
+            className="w-56 p-1 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs max-h-[300px] overflow-y-auto space-y-1"
+          >
+            <NotionMenuSectionHeader>Warna teks</NotionMenuSectionHeader>
+            <div className="space-y-0.5">
+              {TEXT_COLORS.map((c) => {
+                const activeColor = editor.getAttributes("textColor").color || "inherit";
+                const isSelected = (c.color === "inherit" && (!activeColor || activeColor === "inherit" || activeColor === "default")) || activeColor.toLowerCase() === c.color.toLowerCase();
+
+                return (
+                  <NotionMenuItem
+                    key={c.id}
+                    active={isSelected}
+                    icon={
+                      <div 
+                        className="h-4 w-4 rounded flex items-center justify-center font-bold text-xs text-txt-primary" 
+                        style={{ color: c.color !== "inherit" ? c.color : undefined }}
+                      >
+                        A
+                      </div>
+                    }
+                    onClick={() => handleApplyTextColor(c.color)}
+                  >
+                    {c.label}
+                  </NotionMenuItem>
+                );
+              })}
+            </div>
+
+            <NotionMenuSectionHeader className="pt-1.5 border-t border-border/40">Highlight</NotionMenuSectionHeader>
+            <div className="space-y-0.5">
+              {BG_HIGHLIGHTS.map((h) => {
+                const activeBg = editor.getAttributes("textHighlight").color || "transparent";
+                const isSelected = (h.bg === "transparent" && (!activeBg || activeBg === "transparent" || activeBg === "default")) || activeBg.toLowerCase() === h.bg.toLowerCase();
+
+                return (
+                  <NotionMenuItem
+                    key={h.id}
+                    active={isSelected}
+                    icon={
+                      <div className="h-4 w-4 rounded flex items-center justify-center font-bold text-xs" style={{ backgroundColor: h.bg }}>
+                        A
+                      </div>
+                    }
+                    onClick={() => handleApplyHighlight(h.bg)}
+                  >
+                    {h.label}
+                  </NotionMenuItem>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <Separator orientation="vertical" className="h-4 mx-1" />
 

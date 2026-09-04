@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
+import { CellSelection } from "@tiptap/pm/tables";
 import {
   GripVertical,
   GripHorizontal,
@@ -15,6 +16,9 @@ import {
   TableProperties,
   CheckCircle2,
   Layers,
+  Combine,
+  MoreVertical,
+  Sparkles,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +29,8 @@ import {
   NotionMenuSectionHeader,
   NotionMenuItem,
   NotionMenuSwitchItem,
+  NOTION_TEXT_COLORS,
+  NOTION_BG_HIGHLIGHTS,
 } from "./notion-popover-primitives";
 
 interface NotionTablePillHandlesProps {
@@ -83,6 +89,19 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
   const [hoveringRowPill, setHoveringRowPill] = useState(false);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState(false);
+
+  // Multi-Cell Selection State
+  const [cellSelectionBox, setCellSelectionBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    btnTop: number;
+    btnLeft: number;
+    cellCount: number;
+  } | null>(null);
+  const [cellMenuOpen, setCellMenuOpen] = useState(false);
+  const [cellColorMenuOpen, setCellColorMenuOpen] = useState(false);
 
   // Drag & Drop State
   const [isDraggingCol, setIsDraggingCol] = useState(false);
@@ -151,7 +170,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
       // 2. Row Pill (Centered on left edge of row)
       setRowPillPos({
         top: cellRect.top - containerRect.top + cellRect.height / 2 - 10,
-        left: tableRect.left - containerRect.left - 20,
+        left: tableRect.left - containerRect.left - 15,
         height: 20,
       });
 
@@ -255,6 +274,141 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
     },
     [editor, activeCell, getTableNodePos]
   );
+
+  // ─── Cell Selection Floating Toolbar Tracker ───
+  const updateCellSelection = useCallback(() => {
+    if (!editor || editor.isDestroyed || !editor.view?.dom) {
+      setCellSelectionBox(null);
+      return;
+    }
+
+    try {
+      const isCellSel = editor.state.selection instanceof CellSelection;
+      const containerElem = containerRef.current || editor.view.dom.parentElement || editor.view.dom;
+      const containerRect = containerElem.getBoundingClientRect();
+
+      let minTop = Infinity;
+      let maxBottom = -Infinity;
+      let minLeft = Infinity;
+      let maxRight = -Infinity;
+      let cellCount = 0;
+
+      if (isCellSel) {
+        const cellSel = editor.state.selection as CellSelection;
+        cellSel.forEachCell((node, pos) => {
+          try {
+            let dom = editor.view.nodeDOM(pos) as HTMLElement | null;
+            if (!dom || typeof dom.getBoundingClientRect !== "function" || !dom.closest("table")) {
+              const domInfo = editor.view.domAtPos(pos + 1);
+              const target = domInfo.node;
+              dom = (target.nodeType === 1 ? (target as HTMLElement) : target.parentElement)?.closest("td, th") as HTMLElement | null;
+            }
+
+            if (dom && typeof dom.getBoundingClientRect === "function") {
+              const rect = dom.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                if (rect.top < minTop) minTop = rect.top;
+                if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+                if (rect.left < minLeft) minLeft = rect.left;
+                if (rect.right > maxRight) maxRight = rect.right;
+                cellCount++;
+              }
+            }
+          } catch {}
+        });
+      }
+
+      // Query all DOM cells with .selectedCell class to ensure no cell is missed
+      const selectedCells = editor.view.dom.querySelectorAll("td.selectedCell, th.selectedCell, .selectedCell");
+      selectedCells.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          if (rect.top < minTop) minTop = rect.top;
+          if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+          if (rect.left < minLeft) minLeft = rect.left;
+          if (rect.right > maxRight) maxRight = rect.right;
+          if (!isCellSel) cellCount++;
+        }
+      });
+
+      const totalCount = Math.max(cellCount, selectedCells.length);
+
+      if (totalCount > 0 && minTop !== Infinity && maxRight !== -Infinity) {
+        setCellSelectionBox({
+          top: minTop - containerRect.top,
+          left: minLeft - containerRect.left,
+          width: maxRight - minLeft,
+          height: maxBottom - minTop,
+          btnTop: minTop - containerRect.top + 6,
+          btnLeft: maxRight - containerRect.left - 22,
+          cellCount: totalCount,
+        });
+      } else {
+        setCellSelectionBox(null);
+      }
+    } catch {
+      setCellSelectionBox(null);
+    }
+  }, [editor]);
+
+  // Multi-cell Actions (Merge, Split, Color, Clear)
+  const handleMergeOrSplit = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().mergeOrSplit().run();
+    setCellMenuOpen(false);
+  }, [editor]);
+
+  const handleClearSelectedCells = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().deleteRange(editor.state.selection).run();
+    setCellMenuOpen(false);
+  }, [editor]);
+
+  const handleSetSelectedTextColor = useCallback(
+    (color: string) => {
+      if (!editor) return;
+      if (color === "default" || color === "inherit") {
+        editor.chain().focus().unsetMark("textColor").run();
+      } else {
+        editor.chain().focus().setMark("textColor", { color }).run();
+      }
+      setCellColorMenuOpen(false);
+    },
+    [editor]
+  );
+
+  const handleSetSelectedCellBg = useCallback(
+    (bg: string) => {
+      if (!editor) return;
+      editor
+        .chain()
+        .focus()
+        .setCellAttribute("backgroundColor", bg === "transparent" || bg === "default" ? null : bg)
+        .run();
+      setCellColorMenuOpen(false);
+    },
+    [editor]
+  );
+
+  // Track selection updates for cells
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    editor.on("selectionUpdate", updateCellSelection);
+    editor.on("transaction", updateCellSelection);
+
+    const onMouseUp = () => {
+      setTimeout(updateCellSelection, 50);
+    };
+
+    window.addEventListener("mouseup", onMouseUp);
+
+    return () => {
+      editor.off("selectionUpdate", updateCellSelection);
+      editor.off("transaction", updateCellSelection);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [editor, updateCellSelection]);
 
   // Track mouse movement over tables
   useEffect(() => {
@@ -794,6 +948,27 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
     setRowMenuOpen(false);
     setActiveCell(null);
   };
+  const handleClearRow = () => {
+    if (!editor || !activeCell) return;
+    const table = activeCell.tableElem;
+    const rowIdx = activeCell.rowIndex;
+    const rows = Array.from(table.querySelectorAll("tr"));
+    const row = rows[rowIdx];
+    if (!row) return;
+
+    editor.chain().focus().run();
+    const cells = Array.from(row.children) as HTMLElement[];
+    cells.forEach((cell) => {
+      try {
+        const pos = editor.view.posAtDOM(cell, 0);
+        const node = editor.state.doc.nodeAt(pos);
+        if (node) {
+          editor.commands.deleteRange({ from: pos + 1, to: pos + node.nodeSize - 1 });
+        }
+      } catch {}
+    });
+    setRowMenuOpen(false);
+  };
   const handleToggleHeaderRow = () => {
     if (!editor || !activeCell) return;
     editor.chain().focus().setTextSelection(activeCell.cellPos).toggleHeaderRow().run();
@@ -1097,6 +1272,13 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 Sisipkan baris di bawah
               </NotionMenuItem>
 
+              <NotionMenuItem
+                icon={<Eraser className="h-3.5 w-3.5" />}
+                onClick={handleClearRow}
+              >
+                Hapus isi baris
+              </NotionMenuItem>
+
               {/* Only show Header Row controls on the first row (Single Header Enforcement) */}
               {activeCell?.rowIndex === 0 && (
                 <>
@@ -1153,6 +1335,110 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 onClick={handleDeleteRow}
               >
                 Hapus baris
+              </NotionMenuItem>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+
+      {/* ─── 7. Cell Selection Floating Action Button & Menu ─── */}
+      {cellSelectionBox && (
+        <div
+          className="pointer-events-auto absolute z-40"
+          style={{
+            top: `${cellSelectionBox.btnTop}px`,
+            left: `${cellSelectionBox.btnLeft}px`,
+          }}
+        >
+          <Popover open={cellMenuOpen} onOpenChange={setCellMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="h-5 w-4 rounded-xs bg-primary text-primary-foreground flex items-center justify-center cursor-pointer shadow-md hover:scale-110 transition-transform border border-primary-foreground/20"
+                title="Opsi seleksi sel (Merge, Warna, Hapus)"
+              >
+                <MoreVertical className="h-3 w-2.5" />
+              </button>
+            </PopoverTrigger>
+
+            <PopoverContent
+              side="right"
+              align="start"
+              sideOffset={6}
+              className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5"
+            >
+              <NotionMenuSectionHeader>
+                Opsi Sel ({cellSelectionBox.cellCount} sel)
+              </NotionMenuSectionHeader>
+
+              {/* Color Palette Submenu for Selected Cells */}
+              <Popover open={cellColorMenuOpen} onOpenChange={setCellColorMenuOpen}>
+                <PopoverTrigger asChild>
+                  <div>
+                    <NotionMenuItem
+                      icon={<Paintbrush className="h-3.5 w-3.5 text-purple-400" />}
+                      hasSubmenu
+                    >
+                      Color
+                    </NotionMenuItem>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="right"
+                  align="start"
+                  className="w-56 p-1.5 bg-popover text-txt-primary border border-border rounded-xl shadow-xl z-50 text-xs max-h-80 overflow-y-auto"
+                >
+                  <NotionMenuSectionHeader>Text color</NotionMenuSectionHeader>
+                  <div className="grid grid-cols-5 gap-1 pb-1">
+                    {NOTION_TEXT_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSetSelectedTextColor(c.color)}
+                        className="h-6 w-full rounded flex items-center justify-center font-bold text-xs border border-border/40 hover:scale-110 hover:border-txt-brand bg-accent/20 cursor-pointer transition-transform"
+                        style={{ color: c.color === "inherit" ? undefined : c.color }}
+                        title={c.label}
+                      >
+                        A
+                      </button>
+                    ))}
+                  </div>
+
+                  <Separator className="my-1.5" />
+                  <NotionMenuSectionHeader>Background color</NotionMenuSectionHeader>
+                  <div className="grid grid-cols-5 gap-1">
+                    {NOTION_BG_HIGHLIGHTS.map((bg) => (
+                      <button
+                        key={bg.id}
+                        type="button"
+                        onClick={() => handleSetSelectedCellBg(bg.bg)}
+                        className="h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center transition-transform"
+                        style={{ backgroundColor: bg.bg }}
+                        title={bg.label}
+                      >
+                        {bg.bg === "transparent" && <span className="text-[10px] text-txt-muted">∅</span>}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <Separator className="my-1" />
+
+              {/* Merge / Split cells */}
+              <NotionMenuItem
+                icon={<Combine className="h-3.5 w-3.5 text-purple-400" />}
+                onClick={handleMergeOrSplit}
+              >
+                Merge / Split cells
+              </NotionMenuItem>
+
+              {/* Clear contents */}
+              <NotionMenuItem
+                icon={<Eraser className="h-3.5 w-3.5 text-txt-muted" />}
+                onClick={handleClearSelectedCells}
+              >
+                Clear contents
               </NotionMenuItem>
             </PopoverContent>
           </Popover>

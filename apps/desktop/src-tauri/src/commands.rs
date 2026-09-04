@@ -281,6 +281,34 @@ pub async fn note_summarize_stream(
 }
 
 #[tauri::command]
+pub async fn note_edit_with_ai_stream(
+    workspace_path: String,
+    selected_text: String,
+    instruction: String,
+    custom_api_key: Option<String>,
+    custom_model: Option<String>,
+    on_chunk: tauri::ipc::Channel<String>,
+) -> Result<(), String> {
+    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
+        Some(k) => k,
+        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
+    };
+
+    let prompt = format!(
+        "Anda adalah asisten editor teks AI profesional.\n\
+        Tugas Anda: Proses, poles, atau edit teks terpilih berikut sesuai dengan instruksi yang diberikan.\n\
+        Output HANYA teks hasil edit/perbaikan tanpa basa-basi, salam pembuka/penutup, atau tanda kutip pembungkus ekstra.\n\n\
+        [INSTRUKSI]:\n\
+        {}\n\n\
+        [TEKS TERPILIH]:\n\
+        {}",
+        instruction, selected_text
+    );
+
+    crate::ai::stream_gemini_summary(&api_key, custom_model.as_deref(), &prompt, on_chunk).await
+}
+
+#[tauri::command]
 pub async fn note_organize_drafts(
     workspace_path: String,
     drafts_json: String,

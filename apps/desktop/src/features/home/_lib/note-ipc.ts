@@ -121,6 +121,35 @@ export const noteIpc = {
     }
   },
 
+  editWithAiStream: async (
+    workspacePath: string,
+    selectedText: string,
+    instruction: string,
+    onChunk: (chunk: string) => void,
+    customApiKey?: string,
+    customModel?: string
+  ): Promise<void> => {
+    if (isTauri()) {
+      const channel = new Channel<string>();
+      channel.onmessage = onChunk;
+      return invoke("note_edit_with_ai_stream", {
+        workspacePath,
+        selectedText,
+        instruction,
+        onChunk: channel,
+        customApiKey,
+        customModel
+      });
+    }
+
+    // Web fallback mock
+    const sampleWords = [" Improved", " version", " of", " the", " selected", " text", " with", " clean", " phrasing."];
+    for (const w of sampleWords) {
+      await new Promise((r) => setTimeout(r, 40));
+      onChunk(w);
+    }
+  },
+
   organizeDrafts: async (
     workspacePath: string,
     draftsJson: string,

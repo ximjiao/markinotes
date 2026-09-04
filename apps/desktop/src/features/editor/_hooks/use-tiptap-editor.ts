@@ -12,8 +12,12 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
 import { CustomImageExtension } from "../_components/custom-image-extension";
 import { Markdown } from "tiptap-markdown";
+import { common, createLowlight } from "lowlight";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { useState, useEffect } from "react";
 import type { NoteFrontmatter } from "../_types/editor.types";
+
+const lowlight = createLowlight(common);
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -43,6 +47,11 @@ export function useTiptapEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] },
+        codeBlock: false,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: "javascript",
       }),
       Placeholder.configure({
         placeholder: "Press '/' for commands or start typing...",

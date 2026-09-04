@@ -28,6 +28,8 @@ import { Link } from "@tiptap/extension-link";
 import { Mark, mergeAttributes, Extension } from "@tiptap/core";
 import { CustomImageExtension } from "./custom-image-extension";
 import { Markdown } from "tiptap-markdown";
+import { common, createLowlight } from "lowlight";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 
 import {
   Heading1,
@@ -91,6 +93,8 @@ import { AiSummaryDialog } from "./ai-summary-dialog";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { NotionTocMinimap } from "./notion-toc-minimap";
 import { NotionTablePillHandles } from "./notion-table-pill-handles";
+import { NotionSelectionPopover } from "./notion-selection-popover";
+import { NotionLinkHoverCard } from "./notion-link-hover-card";
 import { ImageDialog } from "./image-dialog";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 
@@ -452,11 +456,17 @@ const TextColor = Mark.create({
   parseHTML() {
     return [
       {
-        tag: "span",
+        tag: "span[data-color]",
         getAttrs: (element) => {
-          const hasColor = (element as HTMLElement).style.color || (element as HTMLElement).hasAttribute("data-color");
-          if (!hasColor) return false;
-          return {};
+          const color = (element as HTMLElement).getAttribute("data-color");
+          return color ? { color } : false;
+        },
+      },
+      {
+        tag: "span[style*='color']",
+        getAttrs: (element) => {
+          const color = (element as HTMLElement).style.color || (element as HTMLElement).getAttribute("data-color");
+          return color ? { color } : false;
         },
       },
     ];
@@ -493,13 +503,23 @@ const TextHighlight = Mark.create({
     return [
       {
         tag: "mark",
+        getAttrs: (element) => {
+          const bg = (element as HTMLElement).getAttribute("data-highlight") || (element as HTMLElement).style.backgroundColor || "rgba(234, 179, 8, 0.25)";
+          return { color: bg };
+        },
       },
       {
-        tag: "span",
+        tag: "span[data-highlight]",
         getAttrs: (element) => {
-          const hasBg = (element as HTMLElement).style.backgroundColor || (element as HTMLElement).hasAttribute("data-highlight");
-          if (!hasBg) return false;
-          return {};
+          const bg = (element as HTMLElement).getAttribute("data-highlight");
+          return bg ? { color: bg } : false;
+        },
+      },
+      {
+        tag: "span[style*='background']",
+        getAttrs: (element) => {
+          const bg = (element as HTMLElement).style.backgroundColor || (element as HTMLElement).getAttribute("data-highlight");
+          return bg ? { color: bg } : false;
         },
       },
     ];
@@ -583,6 +603,8 @@ const TABLE_HEADER_COLORS = [
   { label: "Red", value: "red", bg: "rgba(239, 68, 68, 0.22)" },
 ];
 
+const lowlight = createLowlight(common);
+
 const defaultExtensions = [
   // 1. StarterKit prioritized first for input rules (1., -, *, >, ```)
   StarterKit.configure({
@@ -590,7 +612,11 @@ const defaultExtensions = [
     bulletList: {},
     orderedList: {},
     blockquote: {},
-    codeBlock: {},
+    codeBlock: false,
+  }),
+  CodeBlockLowlight.configure({
+    lowlight,
+    defaultLanguage: "javascript",
   }),
 
   // 2. Dynamic Notion Block Placeholder
@@ -653,7 +679,12 @@ const defaultExtensions = [
   TextStyle,
   TextColor,
   TextHighlight,
-  Link.configure({ openOnClick: false }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: {
+      class: "editor-link cursor-pointer",
+    },
+  }),
   CustomImageExtension,
   slashCommand,
   GlobalDragHandle,
@@ -1370,6 +1401,7 @@ export function NovelEditor({
               />
               <NotionTocMinimap editor={editorInstance} />
               <NotionTablePillHandles editor={editorInstance} workspacePath={workspacePath} />
+              <NotionLinkHoverCard editor={editorInstance} />
             </>
           )}
 
@@ -1478,6 +1510,18 @@ export function NovelEditor({
                     }
                     return false;
                   },
+                  click: (_view: unknown, event: MouseEvent) => {
+                    const target = event.target as HTMLElement;
+                    const link = target.closest("a");
+                    if (link && link.href) {
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault();
+                        window.open(link.href, "_blank", "noopener,noreferrer");
+                        return true;
+                      }
+                    }
+                    return false;
+                  },
                 },
               }}
               onCreate={({ editor }) => {
@@ -1540,46 +1584,28 @@ export function NovelEditor({
                 </EditorCommandList>
               </EditorCommand>
 
-              {/* Selection Bubble Toolbar (Hidden in Tables to avoid blocking handles/cells) */}
+              {/* Notion-Grade Selection Popover (Turn Into, Formatting, Colors, and AI Skills) */}
               <EditorBubble
-                tippyOptions={{ maxWidth: "none" }}
+                tippyOptions={{ maxWidth: "none", placement: "top" }}
                 shouldShow={({ editor, state }) => {
                   if (!editor || !state) return false;
                   if (state.selection.empty || state.selection.from === state.selection.to) {
                     return false;
                   }
-                  if (
-                    editor.isActive("table") ||
-                    editor.isActive("tableCell") ||
-                    editor.isActive("tableHeader") ||
-                    editor.isActive("tableRow")
-                  ) {
+                  if (editor.isActive("image")) {
                     return false;
                   }
                   return true;
                 }}
-                className="flex items-center gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-xl backdrop-blur-sm z-50 text-txt-primary w-fit"
+                className="z-50 p-0 border-none bg-transparent shadow-none w-fit"
               >
-                <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleBold().run()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <Bold className="h-3.5 w-3.5" />
-                  </Button>
-                </EditorBubbleItem>
-                <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleItalic().run()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <Italic className="h-3.5 w-3.5" />
-                  </Button>
-                </EditorBubbleItem>
-                <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleStrike().run()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <Strikethrough className="h-3.5 w-3.5" />
-                  </Button>
-                </EditorBubbleItem>
-                <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleCode().run()}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <Code className="h-3.5 w-3.5" />
-                  </Button>
-                </EditorBubbleItem>
+                {editorInstance && (
+                  <NotionSelectionPopover
+                    editor={editorInstance}
+                    workspacePath={workspacePath}
+                    noteId={noteId}
+                  />
+                )}
               </EditorBubble>
             </EditorContent>
           </EditorRoot>

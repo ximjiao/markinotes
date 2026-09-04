@@ -432,44 +432,64 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
             const sourceResolved = editor.state.doc.resolve(sourceDOMPos);
             const targetResolved = editor.state.doc.resolve(targetDOMPos);
 
-            const sourceStartPos = sourceResolved.before(1);
-            const sourceEndPos = sourceResolved.after(1);
+            // Determine source depth (if inside listItem or taskItem, target that specific item)
+            let sourceDepth = 1;
+            for (let d = sourceResolved.depth; d >= 1; d--) {
+              const nodeName = sourceResolved.node(d).type.name;
+              if (nodeName === "listItem" || nodeName === "taskItem") {
+                sourceDepth = d;
+                break;
+              }
+            }
 
+            const sourceStartPos = sourceResolved.before(sourceDepth);
+            const sourceEndPos = sourceResolved.after(sourceDepth);
             const nodeToMove = editor.state.doc.nodeAt(sourceStartPos);
+
             if (nodeToMove) {
-              const isTaskItem =
-                targetBlockElem.getAttribute("data-type") === "taskItem" ||
-                !!targetBlockElem.closest("[data-type='taskItem']");
-              const isListItem =
-                targetBlockElem.tagName.toLowerCase() === "li" ||
-                !!targetBlockElem.closest("li");
+              const isSourceListChild = nodeToMove.type.name === "listItem" || nodeToMove.type.name === "taskItem";
+
+              // Determine target depth
+              let targetDepth = 1;
+              let isTargetListChild = false;
+              for (let d = targetResolved.depth; d >= 1; d--) {
+                const nodeName = targetResolved.node(d).type.name;
+                if (nodeName === "listItem" || nodeName === "taskItem") {
+                  targetDepth = d;
+                  isTargetListChild = true;
+                  break;
+                }
+              }
 
               let finalNode = nodeToMove;
-              let targetDepth = 1;
 
-              if (isListItem || isTaskItem) {
-                if (nodeToMove.type.name !== "listItem" && nodeToMove.type.name !== "taskItem") {
-                  const tr = editor.state.tr;
-                  tr.delete(sourceStartPos, sourceEndPos);
-                  const rawSplitPos = targetResolved.after(targetResolved.depth);
-                  const mappedSplitPos = tr.mapping.map(rawSplitPos);
-                  try {
-                    tr.split(mappedSplitPos);
-                  } catch {}
-                  const mappedInsertPos = tr.mapping.map(mappedSplitPos);
-                  tr.insert(mappedInsertPos, nodeToMove);
-                  editor.view.dispatch(tr);
-                  return;
-                }
-                targetDepth = targetResolved.depth > 1 ? targetResolved.depth : 1;
-              }
-
-              if ((nodeToMove.type.name === "listItem" || nodeToMove.type.name === "taskItem") && !isListItem && !isTaskItem) {
-                if (editor.schema.nodes.paragraph) {
-                  finalNode = nodeToMove.firstChild || nodeToMove;
+              // Case 1: Moving a listItem/taskItem OUTSIDE into a non-list root location
+              if (isSourceListChild && !isTargetListChild) {
+                // Wrap the single item in its corresponding list type to create a new list block
+                const parentListNode = sourceResolved.node(sourceDepth - 1);
+                const listType = parentListNode ? parentListNode.type : editor.schema.nodes.bulletList;
+                if (listType) {
+                  finalNode = listType.create(parentListNode?.attrs || null, [nodeToMove]);
                 }
               }
 
+              // Case 2: Moving a regular block (e.g. Paragraph) INTO a list item
+              if (!isSourceListChild && isTargetListChild) {
+                // Split target list at targetDepth and insert between the lists
+                const tr = editor.state.tr;
+                tr.delete(sourceStartPos, sourceEndPos);
+                const rawSplitPos = targetResolved.after(targetDepth);
+                const mappedSplitPos = tr.mapping.map(rawSplitPos);
+                try {
+                  tr.split(mappedSplitPos);
+                } catch {}
+                const mappedInsertPos = tr.mapping.map(mappedSplitPos);
+                tr.insert(mappedInsertPos, finalNode);
+                editor.view.dispatch(tr);
+                return;
+              }
+
+              // Case 3: Moving inside another list or standard block reorder
               const rawTargetPos = targetResolved.after(targetDepth);
               const tr = editor.state.tr;
               tr.delete(sourceStartPos, sourceEndPos);
@@ -678,14 +698,14 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
       {/* Notion Side Handle (+ and :: Grip) */}
       <div
-        className="notion-block-side-handle-container absolute flex items-center gap-0.5 transition-opacity duration-150 z-20 opacity-60 hover:opacity-100 select-none pointer-events-auto pr-8"
+        className="notion-block-side-handle-container absolute flex items-center gap-0.5 transition-opacity duration-150 z-20 opacity-60 hover:opacity-100 select-none pointer-events-none"
         style={{ top: `${topPos}px`, left: `${leftPos}px` }}
       >
         {/* Plus Button */}
         <button
           type="button"
           onClick={handleAddBlockBelow}
-          className="h-5 w-5 flex items-center justify-center text-txt-muted hover:text-txt-primary hover:bg-accent rounded transition-colors"
+          className="h-5 w-5 flex items-center justify-center text-txt-muted hover:text-txt-primary hover:bg-accent rounded transition-colors pointer-events-auto cursor-pointer"
           title="Add block below"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -708,7 +728,7 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
               type="button"
               onPointerDown={handlePointerDown}
               className={cn(
-                "h-5 w-4 flex items-center justify-center text-txt-muted hover:text-txt-primary cursor-grab active:cursor-grabbing rounded hover:bg-accent transition-colors",
+                "h-5 w-5 flex items-center justify-center text-txt-muted hover:text-txt-primary hover:bg-accent rounded transition-colors cursor-grab active:cursor-grabbing pointer-events-auto",
                 menuOpen && "bg-accent text-txt-primary"
               )}
               title="Click for actions, hold & drag to move"
@@ -732,7 +752,7 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
             {/* Block Type Badge Header */}
             <NotionMenuSectionHeader className="capitalize">
-              {blockInfo.label}
+              {blockInfo.isTable ? "Table options" : blockInfo.label}
             </NotionMenuSectionHeader>
 
             <Separator className="my-1" />
@@ -836,9 +856,6 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
               {/* Table Block Level 1 Specific Controls */}
               {blockInfo.isTable && (
                 <>
-                  <Separator className="my-1" />
-                  <NotionMenuSectionHeader>Table options</NotionMenuSectionHeader>
-
                   {/* Zebra Striping Toggle */}
                   <NotionMenuSwitchItem
                     icon={<TableProperties className="h-3.5 w-3.5" />}
