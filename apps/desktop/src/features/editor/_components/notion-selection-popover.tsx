@@ -43,6 +43,7 @@ import {
   NotionMenuItem,
 } from "./notion-popover-primitives";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
 
 const TEXT_COLORS = [
   { id: "default", label: "Default color", color: "inherit" },
@@ -175,13 +176,17 @@ export function NotionSelectionPopover({
     setErrorMessage("");
 
     try {
+      const config = workspaceConfig.get();
       await noteIpc.editWithAiStream(
         workspacePath || "",
         selectedText,
         instruction,
         (chunk) => {
           setAiResult((prev) => prev + chunk);
-        }
+        },
+        config.aiApiKey || config.geminiApiKey,
+        config.aiModel || config.geminiModel,
+        config.aiProvider
       );
       setAiStatus("completed");
     } catch (err: any) {

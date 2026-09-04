@@ -2,12 +2,17 @@
 
 import { LocalFolderNode } from "../_types/folder.types";
 
+export type AiProvider = "gemini" | "anthropic" | "openai" | "custom";
+
 export interface WorkspaceConfig {
   rootPath: string;
   name: string;
   folders: LocalFolderNode[];
   autoSaveMs: number;
   setupDone: boolean;
+  aiProvider?: AiProvider;
+  aiApiKey?: string;
+  aiModel?: string;
   geminiApiKey?: string;
   geminiModel?: string;
 }
@@ -20,6 +25,9 @@ const DEFAULT_CONFIG: WorkspaceConfig = {
   folders: [],
   autoSaveMs: 1000,
   setupDone: false,
+  aiProvider: "gemini",
+  aiApiKey: "",
+  aiModel: "",
   geminiApiKey: "",
   geminiModel: "",
 };

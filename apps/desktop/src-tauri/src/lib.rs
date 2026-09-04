@@ -31,9 +31,11 @@ pub fn run() {
             note_summarize_stream,
             note_edit_with_ai_stream,
             note_organize_drafts,
+            test_ai_connection,
             workspace_get_setting,
             workspace_set_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

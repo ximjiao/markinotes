@@ -11,13 +11,20 @@ import {
   Monitor,
   AlertTriangle,
   Check,
+  Eye,
+  EyeOff,
+  Loader2,
+  Sparkles,
+  CheckCircle2,
+  XCircle,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { workspaceConfig } from "../../workspace/_lib/workspace-config";
+import { workspaceConfig, AiProvider } from "../../workspace/_lib/workspace-config";
 import { LocalFolderNode } from "../../workspace/_types/folder.types";
-import { isTauri } from "../../home/_lib/note-ipc";
+import { isTauri, noteIpc } from "../../home/_lib/note-ipc";
 import { invoke } from "@tauri-apps/api/core";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
@@ -35,6 +42,62 @@ const TEXT_SIZES = [
   { label: "M", rem: 0.875 },
   { label: "L", rem: 1 },
   { label: "XL", rem: 1.125 },
+];
+
+const PROVIDER_OPTIONS: {
+  id: AiProvider;
+  label: string;
+  badge?: string;
+  keyPlaceholder: string;
+  defaultModel: string;
+  models: { id: string; label: string; desc?: string }[];
+}[] = [
+  {
+    id: "gemini",
+    label: "Google Gemini",
+    badge: "Fast & High Context",
+    keyPlaceholder: "AIzaSy...",
+    defaultModel: "gemini-1.5-flash",
+    models: [
+      { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Recommended · Fast & efficient" },
+      { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", desc: "Complex reasoning & deep analysis" },
+      { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Next-gen high speed" },
+    ],
+  },
+  {
+    id: "anthropic",
+    label: "Anthropic Claude",
+    badge: "Smart & Natural",
+    keyPlaceholder: "sk-ant-...",
+    defaultModel: "claude-3-5-sonnet-20241022",
+    models: [
+      { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Recommended · State of the art" },
+      { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", desc: "Lightweight & responsive" },
+      { id: "claude-3-opus-20240229", label: "Claude 3 Opus", desc: "Deep analytical reasoning" },
+    ],
+  },
+  {
+    id: "openai",
+    label: "OpenAI ChatGPT",
+    badge: "Industry Standard",
+    keyPlaceholder: "sk-...",
+    defaultModel: "gpt-4o-mini",
+    models: [
+      { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Recommended · Fast & versatile" },
+      { id: "gpt-4o", label: "GPT-4o", desc: "Flagship multi-modal model" },
+      { id: "o3-mini", label: "o3-mini", desc: "High-level STEM & reasoning" },
+    ],
+  },
+  {
+    id: "custom",
+    label: "Custom / Self-Hosted",
+    badge: "Custom Endpoint",
+    keyPlaceholder: "API key or token...",
+    defaultModel: "custom-model",
+    models: [
+      { id: "custom-model", label: "Custom Model", desc: "Specify custom model identifier" },
+    ],
+  },
 ];
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
@@ -146,7 +209,16 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
   const [rootPath] = useState(config.rootPath);
   const [folders, setFolders] = useState<LocalFolderNode[]>(config.folders || []);
   const [newFolderName, setNewFolderName] = useState("");
+  const [aiProvider, setAiProvider] = useState<AiProvider>(config.aiProvider || "gemini");
+  const [aiApiKey, setAiApiKey] = useState(config.aiApiKey || config.geminiApiKey || "");
+  const [aiModel, setAiModel] = useState(config.aiModel || config.geminiModel || "");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isCustomModelInput, setIsCustomModelInput] = useState(false);
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testFeedback, setTestFeedback] = useState<{ message: string; latency_ms?: number; model?: string } | null>(null);
   const [isReady, setIsReady] = useState(false);
+
+  const currentProvider = PROVIDER_OPTIONS.find((p) => p.id === aiProvider) || PROVIDER_OPTIONS[0];
 
   // Appearance states
   const { theme, setTheme } = useTheme();
@@ -158,6 +230,17 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
     const storedIdx = Number(localStorage.getItem("marki_text_size_idx") ?? "2");
     const savedContrast = localStorage.getItem("markidown-contrast") || "standard";
     const savedAccent = localStorage.getItem("markidown-accent") || "default";
+
+    const currentConfig = workspaceConfig.get();
+    const resolvedProvider = currentConfig.aiProvider || "gemini";
+    const resolvedKey = currentConfig.aiApiKey || currentConfig.geminiApiKey || "";
+    const resolvedModel = currentConfig.aiModel || currentConfig.geminiModel || "";
+
+    setAiProvider(resolvedProvider);
+    setAiApiKey(resolvedKey);
+    setAiModel(resolvedModel);
+    setWorkspaceName(currentConfig.name || "");
+    setFolders(currentConfig.folders || []);
 
     setTextSizeIdx(storedIdx);
     setContrast(savedContrast);
@@ -483,32 +566,235 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
       {/* ─── AI Configuration ─── */}
       <section>
         <SectionHeader>AI Configuration</SectionHeader>
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <SettingRow 
-            label="Gemini API Key" 
-            description="Leave empty to use the default built-in key."
-          >
-            <Input 
-              type="password"
-              placeholder="AIzaSy..." 
-              className="w-[200px] h-8 text-xs" 
-              value={config.geminiApiKey || ""}
-              onChange={(e) => workspaceConfig.set({ geminiApiKey: e.target.value })}
-            />
-          </SettingRow>
-          <SettingRow 
-            label="Custom Model" 
-            description="e.g. gemini-1.5-pro (Optional)"
-            noBorder
-          >
-            <Input 
-              type="text"
-              placeholder="gemini-pro" 
-              className="w-[200px] h-8 text-xs" 
-              value={config.geminiModel || ""}
-              onChange={(e) => workspaceConfig.set({ geminiModel: e.target.value })}
-            />
-          </SettingRow>
+        <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border/60">
+          
+          {/* Provider Selector */}
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div>
+              <p className="text-sm font-medium text-txt-primary">AI Provider</p>
+              <p className="text-xs text-txt-muted mt-0.5">
+                Choose the model provider for AI summary and editing
+              </p>
+            </div>
+            <Select
+              value={aiProvider}
+              onValueChange={(val: AiProvider) => {
+                setAiProvider(val);
+                const provDef = PROVIDER_OPTIONS.find((p) => p.id === val);
+                const nextModel = provDef?.defaultModel || "";
+                setAiModel(nextModel);
+                setIsCustomModelInput(val === "custom");
+                workspaceConfig.set({ aiProvider: val, aiModel: nextModel });
+                setTestStatus("idle");
+                setTestFeedback(null);
+              }}
+            >
+              <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
+                <SelectValue placeholder="Select provider..." />
+              </SelectTrigger>
+              <SelectContent>
+                {PROVIDER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-3 w-3 text-txt-brand" />
+                      <span>{opt.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Model Selector */}
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div>
+              <p className="text-sm font-medium text-txt-primary">Model</p>
+              <p className="text-xs text-txt-muted mt-0.5">
+                {currentProvider?.badge || "Select model"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isCustomModelInput && aiProvider !== "custom" ? (
+                <div className="flex items-center gap-1.5">
+                  <Select
+                    value={aiModel || currentProvider?.defaultModel || ""}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setIsCustomModelInput(true);
+                      } else {
+                        setAiModel(val);
+                        workspaceConfig.set({ aiModel: val, geminiModel: val });
+                        setTestStatus("idle");
+                        setTestFeedback(null);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
+                      <SelectValue placeholder="Select model..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currentProvider?.models.map((m) => (
+                        <SelectItem key={m.id} value={m.id} className="text-xs">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{m.label}</span>
+                            {m.desc && <span className="text-[10px] text-txt-muted">{m.desc}</span>}
+                          </div>
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__custom__" className="text-xs text-txt-brand font-medium">
+                        Custom Model ID…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="text"
+                    placeholder={currentProvider?.defaultModel || "Enter model ID..."}
+                    className="w-[150px] h-8 text-xs"
+                    value={aiModel}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAiModel(val);
+                      workspaceConfig.set({ aiModel: val, geminiModel: val });
+                      setTestStatus("idle");
+                      setTestFeedback(null);
+                    }}
+                  />
+                  {aiProvider !== "custom" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-txt-muted hover:text-txt-primary"
+                      onClick={() => {
+                        setIsCustomModelInput(false);
+                        const fallbackModel = currentProvider?.defaultModel || "";
+                        setAiModel(fallbackModel);
+                        workspaceConfig.set({ aiModel: fallbackModel, geminiModel: fallbackModel });
+                      }}
+                    >
+                      Presets
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* API Key */}
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div>
+              <p className="text-sm font-medium text-txt-primary">API Key</p>
+              <p className="text-xs text-txt-muted mt-0.5">
+                Leave blank to fallback to .env configuration
+              </p>
+            </div>
+            <div className="relative flex items-center">
+              <Input
+                type={showApiKey ? "text" : "password"}
+                placeholder={currentProvider?.keyPlaceholder || "API key..."}
+                className="w-[200px] h-8 text-xs pr-8"
+                value={aiApiKey}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAiApiKey(val);
+                  workspaceConfig.set({ aiApiKey: val, geminiApiKey: val });
+                  setTestStatus("idle");
+                  setTestFeedback(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2 text-txt-muted hover:text-txt-primary focus:outline-none transition-colors"
+                title={showApiKey ? "Hide API key" : "Show API key"}
+              >
+                {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Test Connection & Live Status */}
+          <div className="flex flex-col gap-3 px-5 py-4 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-txt-primary">Connectivity Test</span>
+                {testStatus === "success" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Connected ({testFeedback?.latency_ms}ms)
+                  </span>
+                )}
+                {testStatus === "error" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
+                    <XCircle className="h-3 w-3" />
+                    Connection Error
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs shrink-0"
+                disabled={testStatus === "testing"}
+                onClick={async () => {
+                  setTestStatus("testing");
+                  setTestFeedback(null);
+                  try {
+                    const res = await noteIpc.testAiConnection(
+                      rootPath,
+                      aiProvider,
+                      aiApiKey.trim() || undefined,
+                      aiModel.trim() || undefined
+                    );
+                    if (res.success) {
+                      setTestStatus("success");
+                      setTestFeedback(res);
+                      toast.success(`Connected (${res.latency_ms}ms)`);
+                    } else {
+                      setTestStatus("error");
+                      setTestFeedback(res);
+                      toast.error(res.message || "Connection failed");
+                    }
+                  } catch (err: any) {
+                    setTestStatus("error");
+                    const msg = typeof err === "string" ? err : err?.message || "Failed to connect to AI provider";
+                    setTestFeedback({ message: msg });
+                    toast.error(msg);
+                  }
+                }}
+              >
+                {testStatus === "testing" ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-3.5 w-3.5 text-amber-500" />
+                    Test Connection
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {testFeedback?.message && (
+              <p
+                className={cn(
+                  "text-[11px] leading-relaxed rounded-lg p-2.5 border",
+                  testStatus === "success"
+                    ? "bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                    : testStatus === "error"
+                    ? "bg-destructive/5 text-destructive border-destructive/20"
+                    : "bg-muted text-txt-muted border-border"
+                )}
+              >
+                {testFeedback.message}
+              </p>
+            )}
+          </div>
+
         </div>
       </section>
 

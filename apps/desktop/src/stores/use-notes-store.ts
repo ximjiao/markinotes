@@ -78,14 +78,28 @@ export const useNotesStore = create<NotesState>()(
 
         try {
           const content = await noteIpc.read(targetRef.path);
+          let resolvedContent = content;
+
+          // If content on disk is empty or just the title header, but note card had an excerpt, recover it
+          if (
+            (!resolvedContent ||
+              resolvedContent.trim() === `# ${targetRef.title}` ||
+              resolvedContent.trim() === targetRef.title) &&
+            note?.excerpt &&
+            note.excerpt.trim().length > targetRef.title.length + 5
+          ) {
+            resolvedContent = `# ${targetRef.title}\n\n${note.excerpt}`;
+          }
+
           set({
-            activeNoteContent: content || `# ${targetRef.title}\n\n`,
+            activeNoteContent: resolvedContent || `# ${targetRef.title}\n\n`,
             isContentLoading: false,
           });
         } catch (e) {
           console.error("Failed to read note content:", e);
+          const fallback = note?.excerpt ? `# ${targetRef.title}\n\n${note.excerpt}` : `# ${targetRef.title}\n\n`;
           set({
-            activeNoteContent: `# ${targetRef.title}\n\n`,
+            activeNoteContent: fallback,
             isContentLoading: false,
           });
         }

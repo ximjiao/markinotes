@@ -103,6 +103,7 @@ export function HomeDashboard() {
     return (
       <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden">
         <NovelEditor
+          key={activeNoteRef.id}
           noteId={note?.id}
           workspacePath={workspace?.path}
           initialTitle={note?.title || "Untitled"}
@@ -222,8 +223,9 @@ export function HomeDashboard() {
         workspace.path,
         JSON.stringify(draftTitles),
         JSON.stringify(availableFolders),
-        config.geminiApiKey,
-        config.geminiModel
+        config.aiApiKey || config.geminiApiKey,
+        config.aiModel || config.geminiModel,
+        config.aiProvider
       );
 
       const suggestions = JSON.parse(suggestionsStr);

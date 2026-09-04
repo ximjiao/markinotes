@@ -94,12 +94,38 @@ export const noteIpc = {
     };
   },
 
+  testAiConnection: async (
+    workspacePath?: string,
+    provider?: string,
+    customApiKey?: string,
+    customModel?: string
+  ): Promise<{ success: boolean; latency_ms: number; message: string; model: string }> => {
+    if (isTauri()) {
+      return invoke("test_ai_connection", {
+        workspacePath,
+        provider,
+        customApiKey,
+        customModel,
+      });
+    }
+
+    // Web mock fallback
+    await new Promise((r) => setTimeout(r, 600));
+    return {
+      success: true,
+      latency_ms: 120,
+      message: `Successfully connected to ${provider || "Gemini"} (Web Demo)`,
+      model: customModel || "default-model",
+    };
+  },
+
   summarizeStream: async (
     workspacePath: string, 
     noteId: string, 
     onChunk: (chunk: string) => void,
     customApiKey?: string,
-    customModel?: string
+    customModel?: string,
+    provider?: string
   ): Promise<void> => {
     if (isTauri()) {
       const channel = new Channel<string>();
@@ -107,9 +133,10 @@ export const noteIpc = {
       return invoke("note_summarize_stream", {
         workspacePath,
         noteId,
-        onChunk: channel,
+        provider,
         customApiKey,
-        customModel
+        customModel,
+        onChunk: channel,
       });
     }
 
@@ -127,7 +154,8 @@ export const noteIpc = {
     instruction: string,
     onChunk: (chunk: string) => void,
     customApiKey?: string,
-    customModel?: string
+    customModel?: string,
+    provider?: string
   ): Promise<void> => {
     if (isTauri()) {
       const channel = new Channel<string>();
@@ -136,9 +164,10 @@ export const noteIpc = {
         workspacePath,
         selectedText,
         instruction,
-        onChunk: channel,
+        provider,
         customApiKey,
-        customModel
+        customModel,
+        onChunk: channel,
       });
     }
 
@@ -155,15 +184,17 @@ export const noteIpc = {
     draftsJson: string,
     foldersJson: string,
     customApiKey?: string,
-    customModel?: string
+    customModel?: string,
+    provider?: string
   ): Promise<string> => {
     if (isTauri()) {
       return invoke("note_organize_drafts", {
         workspacePath,
         draftsJson,
         foldersJson,
+        provider,
         customApiKey,
-        customModel
+        customModel,
       });
     }
     // Web fallback mock
@@ -184,4 +215,5 @@ export const noteIpc = {
     localStorage.setItem(`marki_setting_${workspacePath}_${key}`, value);
   }
 };
+
 

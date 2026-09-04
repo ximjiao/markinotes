@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
 
 interface AiSummaryDialogProps {
   isOpen: boolean;
@@ -74,17 +75,21 @@ export function AiSummaryDialog({
     setStatus("streaming");
 
     try {
+      const config = workspaceConfig.get();
       await noteIpc.summarizeStream(
         workspacePath,
         noteId,
         (chunk) => {
           setSummary((prev) => prev + chunk);
-        }
+        },
+        config.aiApiKey || config.geminiApiKey,
+        config.aiModel || config.geminiModel,
+        config.aiProvider
       );
       setStatus("completed");
     } catch (err: any) {
       setStatus("error");
-      setErrorMessage(typeof err === "string" ? err : err?.message || "Couldn't generate summary. Please check your Gemini API key and try again.");
+      setErrorMessage(typeof err === "string" ? err : err?.message || "Couldn't generate summary. Please check your AI configuration in Settings and try again.");
     }
   };
 

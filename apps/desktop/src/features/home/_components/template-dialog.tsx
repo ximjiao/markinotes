@@ -243,8 +243,9 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
           fullOutput += chunk;
           setGeneratedMarkdown(fullOutput);
         },
-        config.geminiApiKey,
-        config.geminiModel
+        config.aiApiKey || config.geminiApiKey,
+        config.aiModel || config.geminiModel,
+        config.aiProvider
       );
 
       // Extract title from first line

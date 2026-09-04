@@ -1370,6 +1370,13 @@ export function NovelEditor({
               }}
               onCreate={({ editor }) => {
                 setEditorInstance(editor);
+                if (initialContent) {
+                  try {
+                    editor.commands.setContent(initialContent, false, { preserveWhitespace: true });
+                  } catch (e) {
+                    console.error("Failed to parse initial markdown content:", e);
+                  }
+                }
                 const text = editor.getText();
                 setCharCount(text.length);
                 setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);

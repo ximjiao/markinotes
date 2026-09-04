@@ -131,10 +131,18 @@ pub fn note_create(workspace_path: String, folder_path: String, title: String) -
     fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
 
     let id = Uuid::new_v4().to_string();
-    // Sanitized filename
-    let file_name = format!("{}.md", title.replace(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-', "_"));
+    let sanitized = title.replace(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-', "_");
+    let mut counter = 0;
+    let mut file_name = format!("{sanitized}.md");
     let mut path = PathBuf::from(&folder_path);
     path.push(&file_name);
+
+    while path.exists() {
+        counter += 1;
+        file_name = format!("{sanitized}_{counter}.md");
+        path = PathBuf::from(&folder_path);
+        path.push(&file_name);
+    }
     let path_str = path.to_string_lossy().to_string();
 
     let content = format!("# {}\n\n", title);
@@ -219,9 +227,22 @@ pub fn note_toggle_star(workspace_path: String, note_path: String, starred: bool
 
 #[tauri::command]
 pub fn note_move(workspace_path: String, note_path: String, new_folder_path: String) -> Result<String, String> {
+    fs::create_dir_all(&new_folder_path).map_err(|e| e.to_string())?;
+
     let file_name = PathBuf::from(&note_path).file_name().unwrap_or_default().to_string_lossy().to_string();
     let mut new_path_buf = PathBuf::from(&new_folder_path);
     new_path_buf.push(&file_name);
+
+    if new_path_buf.exists() && new_path_buf != PathBuf::from(&note_path) {
+        let stem = PathBuf::from(&note_path).file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let mut counter = 1;
+        while new_path_buf.exists() {
+            new_path_buf = PathBuf::from(&new_folder_path);
+            new_path_buf.push(format!("{stem}_{counter}.md"));
+            counter += 1;
+        }
+    }
+
     let new_path_str = new_path_buf.to_string_lossy().to_string();
 
     std::fs::rename(&note_path, &new_path_str).map_err(|e| e.to_string())?;
@@ -244,17 +265,16 @@ pub fn note_move(workspace_path: String, note_path: String, new_folder_path: Str
 pub async fn note_summarize_stream(
     workspace_path: String,
     note_id: String,
-    model: Option<String>,
+    provider: Option<String>,
     custom_api_key: Option<String>,
     custom_model: Option<String>,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
-    // Ambil API key otomatis dari config UI atau .env
-    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
-        Some(k) => k,
-        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
-    };
-    let resolved_model = custom_model.filter(|m| !m.is_empty()).or(model);
+    let api_key = crate::ai::resolve_api_key(
+        provider.as_deref(),
+        Some(&workspace_path),
+        custom_api_key.as_deref(),
+    )?;
 
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
@@ -276,8 +296,14 @@ pub async fn note_summarize_stream(
     // 2. Build summarize prompt with frequency pointers + original content
     let prompt = crate::ai::build_summarize_prompt(&title, &content, &pointers);
 
-    // 3. Stream response from Gemini API via channel
-    crate::ai::stream_gemini_summary(&api_key, resolved_model.as_deref(), &prompt, on_chunk).await
+    // 3. Stream response via channel based on provider
+    crate::ai::stream_ai_completion(
+        provider.as_deref(),
+        &api_key,
+        custom_model.as_deref(),
+        &prompt,
+        on_chunk,
+    ).await
 }
 
 #[tauri::command]
@@ -285,14 +311,16 @@ pub async fn note_edit_with_ai_stream(
     workspace_path: String,
     selected_text: String,
     instruction: String,
+    provider: Option<String>,
     custom_api_key: Option<String>,
     custom_model: Option<String>,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
-    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
-        Some(k) => k,
-        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
-    };
+    let api_key = crate::ai::resolve_api_key(
+        provider.as_deref(),
+        Some(&workspace_path),
+        custom_api_key.as_deref(),
+    )?;
 
     let prompt = format!(
         "You are a professional AI text editor.\n\
@@ -305,7 +333,13 @@ pub async fn note_edit_with_ai_stream(
         instruction, selected_text
     );
 
-    crate::ai::stream_gemini_summary(&api_key, custom_model.as_deref(), &prompt, on_chunk).await
+    crate::ai::stream_ai_completion(
+        provider.as_deref(),
+        &api_key,
+        custom_model.as_deref(),
+        &prompt,
+        on_chunk,
+    ).await
 }
 
 #[tauri::command]
@@ -313,18 +347,44 @@ pub async fn note_organize_drafts(
     workspace_path: String,
     drafts_json: String,
     folders_json: String,
+    provider: Option<String>,
     custom_api_key: Option<String>,
     custom_model: Option<String>,
 ) -> Result<String, String> {
-    // Read API key
-    let api_key = match custom_api_key.filter(|k| !k.is_empty()) {
-        Some(k) => k,
-        None => crate::ai::get_gemini_api_key(Some(&workspace_path))?
-    };
-    let env_model = custom_model.filter(|m| !m.is_empty()).or_else(|| std::env::var("GEMINI_MODEL").ok());
+    let api_key = crate::ai::resolve_api_key(
+        provider.as_deref(),
+        Some(&workspace_path),
+        custom_api_key.as_deref(),
+    )?;
     
     // Call AI to get suggestions
-    crate::ai::organize_drafts(&api_key, env_model.as_deref(), &drafts_json, &folders_json).await
+    crate::ai::organize_drafts(
+        provider.as_deref(),
+        &api_key,
+        custom_model.as_deref(),
+        &drafts_json,
+        &folders_json,
+    ).await
+}
+
+#[tauri::command]
+pub async fn test_ai_connection(
+    workspace_path: Option<String>,
+    provider: Option<String>,
+    custom_api_key: Option<String>,
+    custom_model: Option<String>,
+) -> Result<crate::ai::TestAiConnectionResult, String> {
+    let api_key = crate::ai::resolve_api_key(
+        provider.as_deref(),
+        workspace_path.as_deref(),
+        custom_api_key.as_deref(),
+    )?;
+
+    crate::ai::test_ai_connection(
+        provider.as_deref(),
+        &api_key,
+        custom_model.as_deref(),
+    ).await
 }
 
 #[tauri::command]
@@ -336,3 +396,4 @@ pub fn workspace_get_setting(workspace_path: String, key: String) -> Result<Opti
 pub fn workspace_set_setting(workspace_path: String, key: String, value: String) -> Result<(), String> {
     crate::db::set_setting(&workspace_path, &key, &value).map_err(|e| e.to_string())
 }
+
