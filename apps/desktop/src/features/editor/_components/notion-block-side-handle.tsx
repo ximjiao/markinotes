@@ -23,6 +23,10 @@ import {
   Type,
   ChevronRight,
   Sparkles,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
@@ -91,7 +95,7 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
   // Menu Popover State
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSubmenu, setActiveSubmenu] = useState<"turnInto" | "color" | "tableHeaderColor" | "tableZebraColor" | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<"turnInto" | "color" | "align" | "tableHeaderColor" | "tableZebraColor" | null>(null);
   const [copied, setCopied] = useState(false);
 
   const hoveredElementRef = useRef<HTMLElement | null>(null);
@@ -624,6 +628,14 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
     setMenuOpen(false);
   };
 
+  const handleApplyAlign = (alignment: string) => {
+    const range = getBlockPosRange();
+    if (!range || !editor) return;
+
+    editor.chain().focus().setTextSelection(range.from + 1).setTextAlign(alignment).run();
+    setMenuOpen(false);
+  };
+
   // Table Level 1 Controls
   const handleSetTableZebra = (enabled: boolean) => {
     const info = getTableNodeAndPos();
@@ -852,6 +864,53 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
                   ))}
                 </PopoverContent>
               </Popover>
+
+              {/* Align > Submenu Trigger */}
+              {!blockInfo.isTable && (
+                <Popover open={activeSubmenu === "align"} onOpenChange={(open) => setActiveSubmenu(open ? "align" : null)}>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <NotionMenuItem
+                        icon={<AlignLeft className="h-3.5 w-3.5" />}
+                        hasSubmenu
+                      >
+                        Align
+                      </NotionMenuItem>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="right"
+                    align="start"
+                    className="w-44 p-1.5 bg-popover text-txt-primary border border-border rounded-xl shadow-xl z-50 text-xs space-y-0.5"
+                  >
+                    <NotionMenuSectionHeader>Perataan teks</NotionMenuSectionHeader>
+                    <NotionMenuItem
+                      icon={<AlignLeft className="h-3.5 w-3.5" />}
+                      onClick={() => handleApplyAlign("left")}
+                    >
+                      Rata kiri
+                    </NotionMenuItem>
+                    <NotionMenuItem
+                      icon={<AlignCenter className="h-3.5 w-3.5" />}
+                      onClick={() => handleApplyAlign("center")}
+                    >
+                      Rata tengah
+                    </NotionMenuItem>
+                    <NotionMenuItem
+                      icon={<AlignRight className="h-3.5 w-3.5" />}
+                      onClick={() => handleApplyAlign("right")}
+                    >
+                      Rata kanan
+                    </NotionMenuItem>
+                    <NotionMenuItem
+                      icon={<AlignJustify className="h-3.5 w-3.5" />}
+                      onClick={() => handleApplyAlign("justify")}
+                    >
+                      Rata justify
+                    </NotionMenuItem>
+                  </PopoverContent>
+                </Popover>
+              )}
 
               {/* Table Block Level 1 Specific Controls */}
               {blockInfo.isTable && (

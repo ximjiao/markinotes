@@ -29,6 +29,10 @@ import {
   Send,
   Wand2,
   FileText,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -440,6 +444,59 @@ export function NotionSelectionPopover({
                   );
                 })}
               </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Alignment Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={(editor.isActive({ textAlign: "center" }) || editor.isActive({ textAlign: "right" }) || editor.isActive({ textAlign: "justify" })) ? "secondary" : "ghost"}
+                size="icon"
+                className="h-7 w-7 rounded-md"
+                title="Perataan teks (Align)"
+              >
+                {editor.isActive({ textAlign: "center" }) ? (
+                  <AlignCenter className="h-3.5 w-3.5" />
+                ) : editor.isActive({ textAlign: "right" }) ? (
+                  <AlignRight className="h-3.5 w-3.5" />
+                ) : editor.isActive({ textAlign: "justify" }) ? (
+                  <AlignJustify className="h-3.5 w-3.5" />
+                ) : (
+                  <AlignLeft className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="end" className="w-40 p-1 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs space-y-0.5">
+              <NotionMenuSectionHeader>Perataan teks</NotionMenuSectionHeader>
+              <NotionMenuItem
+                icon={<AlignLeft className="h-3.5 w-3.5" />}
+                active={!editor.isActive({ textAlign: "center" }) && !editor.isActive({ textAlign: "right" }) && !editor.isActive({ textAlign: "justify" })}
+                onClick={() => editor.chain().focus().setTextAlign("left").run()}
+              >
+                Rata kiri
+              </NotionMenuItem>
+              <NotionMenuItem
+                icon={<AlignCenter className="h-3.5 w-3.5" />}
+                active={editor.isActive({ textAlign: "center" })}
+                onClick={() => editor.chain().focus().setTextAlign("center").run()}
+              >
+                Rata tengah
+              </NotionMenuItem>
+              <NotionMenuItem
+                icon={<AlignRight className="h-3.5 w-3.5" />}
+                active={editor.isActive({ textAlign: "right" })}
+                onClick={() => editor.chain().focus().setTextAlign("right").run()}
+              >
+                Rata kanan
+              </NotionMenuItem>
+              <NotionMenuItem
+                icon={<AlignJustify className="h-3.5 w-3.5" />}
+                active={editor.isActive({ textAlign: "justify" })}
+                onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+              >
+                Rata justify
+              </NotionMenuItem>
             </PopoverContent>
           </Popover>
         </div>

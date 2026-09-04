@@ -6,7 +6,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
@@ -50,7 +49,7 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
-      <SidebarContent className="px-1.5 py-2 pt-2.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pt-2.5">
+      <SidebarContent className="px-1.5 py-2 pt-2.5 gap-0.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pt-2.5">
 
         {/* Space Group */}
         <SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
@@ -74,7 +73,7 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
                 );
               })}
 
-              <div className="group-data-[collapsible=icon]:hidden px-2 pt-2.5 pb-1 text-[11px] font-semibold text-txt-muted capitalize">
+              <div className="group-data-[collapsible=icon]:hidden px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">
                 My Space
               </div>
 
@@ -105,16 +104,14 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator className="my-1.5 group-data-[collapsible=icon]:mx-2" />
+        <SidebarSeparator className="my-1 group-data-[collapsible=icon]:mx-2" />
 
         {/* OS Folders Group */}
-        <SidebarGroup>
+        <SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
           {/* A. Uncollapsed View: Full inline folder tree */}
-          <div className="group-data-[collapsible=icon]:hidden space-y-1">
-            <div className="flex items-center justify-between px-2 py-1">
-              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize p-0">
-                Folders
-              </SidebarGroupLabel>
+          <div className="group-data-[collapsible=icon]:hidden space-y-0.5">
+            <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">
+              <span>Folders</span>
               <button
                 onClick={() => setIsCreatingFolder(true)}
                 className="text-txt-muted hover:text-txt-primary transition-colors"
@@ -224,12 +221,10 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
         <SidebarSeparator className="group-data-[collapsible=icon]:hidden my-1" />
 
         {/* Tags Group */}
-        <SidebarGroup>
-          <div className="group-data-[collapsible=icon]:hidden space-y-1">
-            <div className="flex items-center justify-between px-2 py-1">
-              <SidebarGroupLabel className="text-[11px] font-semibold text-txt-muted capitalize p-0">
-                Tags
-              </SidebarGroupLabel>
+        <SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+          <div className="group-data-[collapsible=icon]:hidden space-y-0.5">
+            <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">
+              <span>Tags</span>
             </div>
 
             <SidebarGroupContent>

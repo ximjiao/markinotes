@@ -35,7 +35,7 @@ export function HomeHeader({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search documents... (Cmd+K)"
+            placeholder="Search documents... ⌘K"
             className="pl-9 pr-4 h-8 bg-accent/50 text-xs text-txt-primary border-border placeholder:text-txt-muted focus-visible:ring-primary w-full shadow-sm"
           />
         </div>

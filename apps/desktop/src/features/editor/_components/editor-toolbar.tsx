@@ -28,6 +28,10 @@ import {
   Sparkles,
   Image as ImageIcon,
   Link as LinkIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -402,6 +406,63 @@ export function EditorToolbar({
             </div>
           </PopoverContent>
         </Popover>
+
+        {/* Alignment Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={(editor.isActive({ textAlign: "center" }) || editor.isActive({ textAlign: "right" }) || editor.isActive({ textAlign: "justify" })) ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-1.5 text-xs flex items-center gap-0.5"
+              title="Perataan teks (Align)"
+            >
+              {editor.isActive({ textAlign: "center" }) ? (
+                <AlignCenter className="h-3.5 w-3.5" />
+              ) : editor.isActive({ textAlign: "right" }) ? (
+                <AlignRight className="h-3.5 w-3.5" />
+              ) : editor.isActive({ textAlign: "justify" }) ? (
+                <AlignJustify className="h-3.5 w-3.5" />
+              ) : (
+                <AlignLeft className="h-3.5 w-3.5" />
+              )}
+              <ChevronDown className="h-3 w-3 text-txt-muted" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="bottom" align="start" className="w-40 p-1 text-xs">
+            <DropdownMenuItem
+              onClick={() => editor.chain().focus().setTextAlign("left").run()}
+              className={cn("cursor-pointer flex items-center justify-between", (!editor.isActive({ textAlign: "center" }) && !editor.isActive({ textAlign: "right" }) && !editor.isActive({ textAlign: "justify" })) && "bg-accent font-medium text-txt-brand")}
+            >
+              <div className="flex items-center gap-2">
+                <AlignLeft className="h-3.5 w-3.5" /> Rata kiri
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => editor.chain().focus().setTextAlign("center").run()}
+              className={cn("cursor-pointer flex items-center justify-between", editor.isActive({ textAlign: "center" }) && "bg-accent font-medium text-txt-brand")}
+            >
+              <div className="flex items-center gap-2">
+                <AlignCenter className="h-3.5 w-3.5" /> Rata tengah
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => editor.chain().focus().setTextAlign("right").run()}
+              className={cn("cursor-pointer flex items-center justify-between", editor.isActive({ textAlign: "right" }) && "bg-accent font-medium text-txt-brand")}
+            >
+              <div className="flex items-center gap-2">
+                <AlignRight className="h-3.5 w-3.5" /> Rata kanan
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+              className={cn("cursor-pointer flex items-center justify-between", editor.isActive({ textAlign: "justify" }) && "bg-accent font-medium text-txt-brand")}
+            >
+              <div className="flex items-center gap-2">
+                <AlignJustify className="h-3.5 w-3.5" /> Rata justify
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Separator orientation="vertical" className="h-4 mx-1" />
 

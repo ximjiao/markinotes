@@ -30,6 +30,7 @@ import { CustomImageExtension } from "./custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import TextAlign from "@tiptap/extension-text-align";
 
 import {
   Heading1,
@@ -45,6 +46,10 @@ import {
   Bold,
   Italic,
   Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
   MoreVertical,
   FileType,
   FileCode,
@@ -676,6 +681,11 @@ const defaultExtensions = [
   CustomTableCell,
   CustomTableHeader,
   IndentExtension,
+  TextAlign.configure({
+    types: ["heading", "paragraph", "blockquote"],
+    alignments: ["left", "center", "right", "justify"],
+    defaultAlignment: "left",
+  }),
   TextStyle,
   TextColor,
   TextHighlight,
@@ -1052,176 +1062,6 @@ export function NovelEditor({
             })()}
           </PopoverContent>
         </Popover>
-
-        <Separator orientation="vertical" className="h-4 shrink-0" />
-
-        {/* Undo / Redo */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editorInstance?.chain().focus().undo().scrollIntoView().run()}
-          disabled={!editorInstance?.can().undo()}
-          title="Undo"
-        >
-          <Undo className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editorInstance?.chain().focus().redo().scrollIntoView().run()}
-          disabled={!editorInstance?.can().redo()}
-          title="Redo"
-        >
-          <Redo className="h-3.5 w-3.5" />
-        </Button>
-
-        <Separator orientation="vertical" className="h-4 shrink-0" />
-
-        {/* Heading Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-medium gap-1 text-txt-secondary shrink-0">
-              <span>
-                {editorInstance?.isActive("heading", { level: 1 })
-                  ? "Heading 1"
-                  : editorInstance?.isActive("heading", { level: 2 })
-                    ? "Heading 2"
-                    : editorInstance?.isActive("heading", { level: 3 })
-                      ? "Heading 3"
-                      : "Normal text"}
-              </span>
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-40">
-            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().setParagraph().run()} className="text-xs">Normal text</DropdownMenuItem>
-            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 1 }).run()} className="text-xs"><Heading1 className="mr-2 h-3.5 w-3.5" /> Heading 1</DropdownMenuItem>
-            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 2 }).run()} className="text-xs"><Heading2 className="mr-2 h-3.5 w-3.5" /> Heading 2</DropdownMenuItem>
-            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 3 }).run()} className="text-xs"><Heading3 className="mr-2 h-3.5 w-3.5" /> Heading 3</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Separator orientation="vertical" className="h-4 shrink-0" />
-
-        {/* Inline Formatting */}
-        <Button variant={editorInstance?.isActive("bold") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleBold().run()} title="Bold"><Bold className="h-3.5 w-3.5" /></Button>
-        <Button variant={editorInstance?.isActive("italic") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleItalic().run()} title="Italic"><Italic className="h-3.5 w-3.5" /></Button>
-        <Button variant={editorInstance?.isActive("strike") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleStrike().run()} title="Strikethrough"><Strikethrough className="h-3.5 w-3.5" /></Button>
-        <Button variant={editorInstance?.isActive("code") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleCode().run()} title="Inline Code"><Code className="h-3.5 w-3.5" /></Button>
-
-        <Separator orientation="vertical" className="h-4 shrink-0" />
-
-        {/* Lists Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={
-                editorInstance?.isActive("bulletList") ||
-                  editorInstance?.isActive("orderedList") ||
-                  editorInstance?.isActive("taskList") ||
-                  editorInstance?.isActive("blockquote")
-                  ? "secondary"
-                  : "ghost"
-              }
-              size="sm"
-              className="h-7 px-2 text-xs font-medium gap-1 text-txt-secondary shrink-0"
-              onMouseDown={(e) => e.preventDefault()}
-              title="Tipe List"
-            >
-              {editorInstance?.isActive("orderedList") ? (
-                <ListOrdered className="h-3.5 w-3.5" />
-              ) : editorInstance?.isActive("taskList") ? (
-                <CheckSquare className="h-3.5 w-3.5" />
-              ) : editorInstance?.isActive("blockquote") ? (
-                <Quote className="h-3.5 w-3.5" />
-              ) : (
-                <List className="h-3.5 w-3.5" />
-              )}
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52">
-            <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Tipe List</div>
-            <DropdownMenuItem
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editorInstance?.chain().focus().toggleBulletList().run()}
-              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("bulletList") ? "bg-accent text-txt-primary font-medium" : ""}`}
-            >
-              <div className="flex items-center gap-2"><List className="h-3.5 w-3.5" /> Bullet List</div>
-              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">-</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editorInstance?.chain().focus().toggleOrderedList().run()}
-              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("orderedList") ? "bg-accent text-txt-primary font-medium" : ""}`}
-            >
-              <div className="flex items-center gap-2"><ListOrdered className="h-3.5 w-3.5" /> Numbered List</div>
-              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">1.</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editorInstance?.chain().focus().toggleTaskList().run()}
-              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("taskList") ? "bg-accent text-txt-primary font-medium" : ""}`}
-            >
-              <div className="flex items-center gap-2"><CheckSquare className="h-3.5 w-3.5" /> To-do List</div>
-              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">[]</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editorInstance?.chain().focus().toggleBlockquote().run()}
-              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("blockquote") ? "bg-accent text-txt-primary font-medium" : ""}`}
-            >
-              <div className="flex items-center gap-2"><Quote className="h-3.5 w-3.5" /> Quote</div>
-              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">&gt;</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-
-        {/* Table */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant={editorInstance?.isActive("table") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} title="Table"><TableIcon className="h-3.5 w-3.5" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" className="w-48">
-            {!editorInstance?.isActive("table") ? (
-              <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="cursor-pointer text-xs">Sisipkan Tabel 3x3</DropdownMenuItem>
-            ) : (
-              <>
-                <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Kontrol Tabel</div>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowAfter().run()} className="cursor-pointer text-xs">+ Tambah Baris di Bawah</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowBefore().run()} className="cursor-pointer text-xs">+ Tambah Baris di Atas</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addColumnAfter().run()} className="cursor-pointer text-xs">+ Tambah Kolom Kanan</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addColumnBefore().run()} className="cursor-pointer text-xs">+ Tambah Kolom Kiri</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().mergeOrSplit().run()} className="cursor-pointer text-xs text-purple-400 font-medium">Gabung / Pisahkan Sel</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteRow().run()} className="cursor-pointer text-xs text-amber-500">- Hapus Baris Ini</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteColumn().run()} className="cursor-pointer text-xs text-amber-500">- Hapus Kolom Ini</DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteTable().run()} className="cursor-pointer text-xs text-red-500 font-semibold">Hapus Seluruh Tabel</DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editorInstance?.chain().focus().setImage({ src: "" }).run()}
-          title="Insert Image"
-        >
-          <ImageIcon className="h-3.5 w-3.5" />
-        </Button>
-
-        <Separator orientation="vertical" className="h-4 shrink-0" />
-
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Formatting">
-          <RemoveFormatting className="h-3.5 w-3.5 text-txt-muted" />
-        </Button>
 
         {/* Spacer */}
         <div className="flex-1" />

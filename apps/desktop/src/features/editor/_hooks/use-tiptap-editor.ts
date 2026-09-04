@@ -14,6 +14,7 @@ import { CustomImageExtension } from "../_components/custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import TextAlign from "@tiptap/extension-text-align";
 import { useState, useEffect } from "react";
 import type { NoteFrontmatter } from "../_types/editor.types";
 
@@ -63,6 +64,11 @@ export function useTiptapEditor({
       TableCell,
       TableHeader,
       Link.configure({ openOnClick: false }),
+      TextAlign.configure({
+        types: ["heading", "paragraph", "blockquote"],
+        alignments: ["left", "center", "right", "justify"],
+        defaultAlignment: "left",
+      }),
       CustomImageExtension,
       Markdown.configure({
         html: true,

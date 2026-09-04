@@ -410,7 +410,8 @@ export function HomeDashboard() {
       <TemplateDialog 
         isOpen={isTemplateDialogOpen} 
         onClose={() => setTemplateDialogOpen(false)} 
-        onSelectTemplate={handleUseTemplate} 
+        onSelectTemplate={handleUseTemplate}
+        workspacePath={workspace?.path}
       />
 
       {movingNoteId && movingNote && (
