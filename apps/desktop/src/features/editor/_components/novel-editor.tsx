@@ -25,7 +25,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, mergeAttributes, Extension } from "@tiptap/core";
 import { CustomImageExtension } from "./custom-image-extension";
 import { Markdown } from "tiptap-markdown";
 
@@ -89,6 +89,7 @@ import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
+import { NotionTocMinimap } from "./notion-toc-minimap";
 import { ImageDialog } from "./image-dialog";
 
 interface NovelEditorProps {
@@ -374,6 +375,42 @@ const TextColor = Mark.create({
   },
 });
 
+const IndentExtension = Extension.create({
+  name: "indent",
+  addOptions() {
+    return {
+      types: ["paragraph", "heading", "blockquote"],
+      minLevel: 0,
+      maxLevel: 6,
+    };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          indent: {
+            default: 0,
+            parseHTML: (element) => {
+              const dataIndent = element.getAttribute("data-indent");
+              return dataIndent ? parseInt(dataIndent, 10) : 0;
+            },
+            renderHTML: (attributes) => {
+              if (!attributes.indent || attributes.indent <= 0) {
+                return {};
+              }
+              return {
+                "data-indent": attributes.indent,
+                style: `margin-left: ${attributes.indent * 28}px;`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
 const TABLE_TEXT_COLORS = [
   { label: "Default", value: "inherit" },
   { label: "Gray", value: "#9ca3af" },
@@ -466,6 +503,7 @@ const defaultExtensions = [
   TableRow,
   CustomTableCell,
   CustomTableHeader,
+  IndentExtension,
   TextStyle,
   TextColor,
   Link.configure({ openOnClick: false }),
@@ -1168,17 +1206,23 @@ export function NovelEditor({
 
       {/* 3. Pure 100% Canvas Writing Space (Scrollable Area) */}
       <div className="flex-1 overflow-y-auto w-full">
-        <div className={cn("py-10 mx-auto w-full transition-all duration-200", isFullWidth ? "max-w-none px-24" : "max-w-4xl px-16")}>
+        <div
+          data-full-width={isFullWidth ? "true" : undefined}
+          className={cn("py-10 mx-auto w-full transition-all duration-200", isFullWidth ? "max-w-none px-24" : "max-w-4xl px-16")}
+        >
         {/* Dedicated Relative Wrapper for Editor Canvas & Side Handle Alignment */}
         <div className="relative w-full">
           {/* Notion Block Side Handle (+ and :: Grip) */}
           {editorInstance && (
-            <NotionBlockSideHandle
-              editor={editorInstance}
-              onOpenSlashMenu={() => {
-                // Focus and trigger suggestion
-              }}
-            />
+            <>
+              <NotionBlockSideHandle
+                editor={editorInstance}
+                onOpenSlashMenu={() => {
+                  // Focus and trigger suggestion
+                }}
+              />
+              <NotionTocMinimap editor={editorInstance} />
+            </>
           )}
 
           {/* Novel Root */}
@@ -1194,6 +1238,7 @@ export function NovelEditor({
               editorProps={{
                 handleDOMEvents: {
                   keydown: (_view: unknown, event: KeyboardEvent) => {
+                    // 1. Undo / Redo
                     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
                       event.preventDefault();
                       if (event.shiftKey) {
@@ -1203,6 +1248,83 @@ export function NovelEditor({
                       }
                       return true;
                     }
+
+                    // 2. Tab & Shift+Tab (Notion-Style Block Leveling & Indent)
+                    if (event.key === "Tab") {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      if (!editorInstance || editorInstance.isDestroyed) return true;
+
+                      // A. Inside Table -> navigate cells
+                      if (editorInstance.isActive("table")) {
+                        if (event.shiftKey) {
+                          editorInstance.chain().focus().goToPreviousCell().run();
+                        } else {
+                          editorInstance.chain().focus().goToNextCell().run();
+                        }
+                        return true;
+                      }
+
+                      // B. Inside List / Task -> sink / lift
+                      if (editorInstance.isActive("listItem") || editorInstance.isActive("taskItem")) {
+                        if (event.shiftKey) {
+                          editorInstance.chain().focus().liftListItem("listItem").liftListItem("taskItem").run();
+                        } else {
+                          editorInstance.chain().focus().sinkListItem("listItem").sinkListItem("taskItem").run();
+                        }
+                        return true;
+                      }
+
+                      // C. Inside CodeBlock -> insert 2 spaces
+                      if (editorInstance.isActive("codeBlock")) {
+                        editorInstance.chain().focus().insertContent("  ").run();
+                        return true;
+                      }
+
+                      // D. Paragraph, Heading, Blockquote -> Indent / Outdent
+                      const { selection } = editorInstance.state;
+                      const { $from } = selection;
+                      const currentBlock = $from.node($from.depth);
+                      if (currentBlock) {
+                        const currentIndent = currentBlock.attrs.indent || 0;
+                        if (event.shiftKey) {
+                          if (currentIndent > 0) {
+                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
+                              indent: currentIndent - 1,
+                            });
+                          }
+                        } else {
+                          if (currentIndent < 6) {
+                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
+                              indent: currentIndent + 1,
+                            });
+                          }
+                        }
+                        return true;
+                      }
+
+                      return true;
+                    }
+
+                    // 3. Backspace at beginning of indented block -> outdent
+                    if (event.key === "Backspace") {
+                      if (editorInstance && !editorInstance.isDestroyed) {
+                        const { selection } = editorInstance.state;
+                        if (selection.empty && selection.$from.parentOffset === 0) {
+                          const currentBlock = selection.$from.node(selection.$from.depth);
+                          if (currentBlock && (currentBlock.attrs.indent || 0) > 0) {
+                            event.preventDefault();
+                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
+                              indent: currentBlock.attrs.indent - 1,
+                            });
+                            return true;
+                          }
+                        }
+                      }
+                    }
+
+                    // 4. Slash command navigation
                     if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(event.key)) {
                       return handleCommandNavigation(event);
                     }

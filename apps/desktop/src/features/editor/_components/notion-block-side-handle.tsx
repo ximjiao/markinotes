@@ -16,13 +16,22 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
   const [dropIndicatorTop, setDropIndicatorTop] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPreview, setDragPreview] = useState<{ x: number; y: number; text: string } | null>(null);
+  const hoveredElementRef = React.useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || !editor.view?.dom) return;
 
     const editorDom = editor.view.dom;
-
     const BLOCK_SELECTOR = "p, h1, h2, h3, h4, li, blockquote, pre, [data-type='taskItem'], [data-type='imageBlock'], [data-node-view-wrapper], .image-block-node-view, .tableWrapper, table";
+
+    const updatePosition = (block?: HTMLElement | null) => {
+      const elem = block || hoveredElementRef.current;
+      if (!elem || !editorDom.contains(elem) || isDragging) return;
+      const editorRect = editorDom.getBoundingClientRect();
+      const blockRect = elem.getBoundingClientRect();
+      setTopPos(blockRect.top - editorRect.top + 4);
+      setLeftPos(blockRect.left - editorRect.left - 40);
+    };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) return;
@@ -34,19 +43,28 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
           const tableParent = blockNode.closest(".tableWrapper, table") as HTMLElement | null;
           const actualBlock = tableParent || blockNode;
 
-          const editorRect = editorDom.getBoundingClientRect();
-          const blockRect = actualBlock.getBoundingClientRect();
-          setTopPos(blockRect.top - editorRect.top + 4);
-          setLeftPos(blockRect.left - editorRect.left - 40);
+          hoveredElementRef.current = actualBlock;
           setHoveredElement(actualBlock);
+          updatePosition(actualBlock);
         }
       } catch {
         // Safe fallback
       }
     };
 
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
     editorDom.addEventListener("mousemove", handleMouseMove);
-    return () => editorDom.removeEventListener("mousemove", handleMouseMove);
+    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+
+    return () => {
+      editorDom.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("scroll", handleScrollOrResize, { capture: true });
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
   }, [editor, isDragging]);
 
   const handlePointerDown = (startEvent: React.PointerEvent) => {
@@ -267,7 +285,7 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
 
       {/* Notion Side Handle (+ and :: Grip) */}
       <div
-        className="absolute flex items-center gap-0.5 transition-all duration-100 z-20 opacity-60 hover:opacity-100 select-none"
+        className="absolute flex items-center gap-0.5 transition-opacity duration-150 z-20 opacity-60 hover:opacity-100 select-none pointer-events-auto"
         style={{ top: `${topPos}px`, left: `${leftPos}px` }}
       >
         {/* Plus Button */}

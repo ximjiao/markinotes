@@ -97,6 +97,7 @@
     --sidebar-primary: 221.2 83.2% 53.3%;
     --text-brand: #2563eb;
   }
+
   .dark[data-accent="blue"] {
     --primary: 217.2 91.2% 59.8%;
     --ring: 217.2 91.2% 59.8%;
@@ -110,13 +111,14 @@
     --sidebar-primary: 142.1 76.2% 36.3%;
     --text-brand: #16a34a;
   }
+
   .dark[data-accent="green"] {
     --primary: 142.1 70.6% 45.3%;
     --ring: 142.1 70.6% 45.3%;
     --sidebar-primary: 142.1 70.6% 45.3%;
     --text-brand: #22c55e;
   }
-  
+
   [data-accent="yellow"] {
     --primary: 47.9 95.8% 53.1%;
     --ring: 47.9 95.8% 53.1%;
@@ -125,6 +127,7 @@
     --primary-foreground: 240 5.9% 10%;
     --sidebar-primary-foreground: 240 5.9% 10%;
   }
+
   .dark[data-accent="yellow"] {
     --primary: 47.9 95.8% 53.1%;
     --ring: 47.9 95.8% 53.1%;
@@ -133,13 +136,14 @@
     --primary-foreground: 240 5.9% 10%;
     --sidebar-primary-foreground: 240 5.9% 10%;
   }
-  
+
   [data-accent="pink"] {
     --primary: 330 81% 60%;
     --ring: 330 81% 60%;
     --sidebar-primary: 330 81% 60%;
     --text-brand: #ec4899;
   }
+
   .dark[data-accent="pink"] {
     --primary: 330 81% 60%;
     --ring: 330 81% 60%;
@@ -153,19 +157,21 @@
     --sidebar-primary: 24.6 95% 53.1%;
     --text-brand: #f97316;
   }
+
   .dark[data-accent="orange"] {
     --primary: 24.6 95% 53.1%;
     --ring: 24.6 95% 53.1%;
     --sidebar-primary: 24.6 95% 53.1%;
     --text-brand: #f97316;
   }
-  
+
   [data-accent="purple"] {
     --primary: 271.5 81.3% 55.9%;
     --ring: 271.5 81.3% 55.9%;
     --sidebar-primary: 271.5 81.3% 55.9%;
     --text-brand: #9333ea;
   }
+
   .dark[data-accent="purple"] {
     --primary: 270 91% 65%;
     --ring: 270 91% 65%;
@@ -179,6 +185,7 @@
     --sidebar-primary: 240 5.9% 10%;
     --text-brand: #171717;
   }
+
   .dark[data-accent="white"] {
     --primary: 0 0% 98%;
     --ring: 0 0% 98%;
@@ -337,6 +344,12 @@
   box-sizing: border-box;
 }
 
+/* Conditional saat Full Width ON: samakan padding dengan px-24 (6rem) */
+[data-full-width="true"] .ProseMirror .tableWrapper {
+  padding-left: 6rem !important;
+  padding-right: 6rem !important;
+}
+
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: auto !important;
@@ -351,17 +364,21 @@
   border: 1px solid hsl(var(--border));
   padding: 0.5rem 0.75rem;
   vertical-align: top;
-  min-width: 140px;
+  min-width: 60px;
   height: 2.5rem;
   box-sizing: border-box;
   position: relative;
   background-color: transparent;
+  overflow-wrap: anywhere !important;
+  word-break: normal;
 }
 
 .ProseMirror td>p,
 .ProseMirror th>p {
   margin: 0 !important;
   min-height: 1.25rem;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap;
 }
 
 .ProseMirror th {
@@ -379,7 +396,7 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(147, 51, 234, 0.15);
+  background: hsl(var(--primary) / 0.12);
   pointer-events: none;
 }
 
@@ -389,14 +406,22 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background-color: #9333ea;
+  background-color: hsl(var(--primary));
   opacity: 0;
   cursor: col-resize;
   z-index: 20;
   transition: opacity 0.15s;
+  pointer-events: auto;
 }
 
-/* Show handle when hovering near column edge (ProseMirror adds resize-cursor class) */
+/* Show handle & lock col-resize cursor with zero text selection during active drag */
+.ProseMirror.resize-cursor,
+.ProseMirror.resize-cursor * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 .ProseMirror.resize-cursor .column-resize-handle {
   opacity: 1;
 }
