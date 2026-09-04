@@ -20,7 +20,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
-import { Table } from "@tiptap/extension-table";
+import { Table, TableView } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
@@ -244,7 +244,59 @@ const slashCommand = Command.configure({
   },
 });
 
+class CustomTableView extends TableView {
+  constructor(node: any, cellMinWidth: number) {
+    super(node, cellMinWidth);
+    this.updateCustomAttributes(node);
+  }
+
+  update(node: any) {
+    const result = super.update(node);
+    if (result) {
+      this.updateCustomAttributes(node);
+    }
+    return result;
+  }
+
+  updateCustomAttributes(node: any) {
+    const attrs = node.attrs || {};
+
+    // 1. data-zebra
+    if (attrs.zebra) {
+      this.table.setAttribute("data-zebra", "true");
+      this.dom.setAttribute("data-zebra", "true");
+    } else {
+      this.table.removeAttribute("data-zebra");
+      this.dom.removeAttribute("data-zebra");
+    }
+
+    // 2. data-zebra-color
+    if (attrs.zebraColor && attrs.zebraColor !== "default") {
+      this.table.setAttribute("data-zebra-color", attrs.zebraColor);
+      this.dom.setAttribute("data-zebra-color", attrs.zebraColor);
+    } else {
+      this.table.removeAttribute("data-zebra-color");
+      this.dom.removeAttribute("data-zebra-color");
+    }
+
+    // 3. data-header-color
+    if (attrs.headerColor && attrs.headerColor !== "default") {
+      this.table.setAttribute("data-header-color", attrs.headerColor);
+      this.dom.setAttribute("data-header-color", attrs.headerColor);
+    } else {
+      this.table.removeAttribute("data-header-color");
+      this.dom.removeAttribute("data-header-color");
+    }
+  }
+}
+
 const CustomTable = Table.extend({
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      View: CustomTableView,
+    };
+  },
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -268,12 +320,23 @@ const CustomTable = Table.extend({
           };
         },
       },
+      zebraColor: {
+        default: "default",
+        parseHTML: (element) => element.getAttribute("data-zebra-color") || "default",
+        renderHTML: (attributes) => {
+          if (!attributes.zebraColor || attributes.zebraColor === "default") return {};
+          return {
+            "data-zebra-color": attributes.zebraColor,
+          };
+        },
+      },
     };
   },
 }).configure({
   resizable: true,
   lastColumnResizable: true,
   cellMinWidth: 50,
+  View: CustomTableView,
 });
 
 const CustomTableCell = TableCell.extend({
@@ -393,6 +456,49 @@ const TextColor = Mark.create({
         getAttrs: (element) => {
           const hasColor = (element as HTMLElement).style.color || (element as HTMLElement).hasAttribute("data-color");
           if (!hasColor) return false;
+          return {};
+        },
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+  },
+});
+
+const TextHighlight = Mark.create({
+  name: "textHighlight",
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (element) => (element as HTMLElement).style.backgroundColor || element.getAttribute("data-highlight") || null,
+        renderHTML: (attributes) => {
+          if (!attributes.color) return {};
+          return {
+            style: `background-color: ${attributes.color}`,
+            "data-highlight": attributes.color,
+            class: "px-1 py-0.5 rounded",
+          };
+        },
+      },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "mark",
+      },
+      {
+        tag: "span",
+        getAttrs: (element) => {
+          const hasBg = (element as HTMLElement).style.backgroundColor || (element as HTMLElement).hasAttribute("data-highlight");
+          if (!hasBg) return false;
           return {};
         },
       },
@@ -546,6 +652,7 @@ const defaultExtensions = [
   IndentExtension,
   TextStyle,
   TextColor,
+  TextHighlight,
   Link.configure({ openOnClick: false }),
   CustomImageExtension,
   slashCommand,

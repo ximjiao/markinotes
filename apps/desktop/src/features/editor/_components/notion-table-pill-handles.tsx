@@ -21,6 +21,11 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import {
+  NotionMenuSectionHeader,
+  NotionMenuItem,
+  NotionMenuSwitchItem,
+} from "./notion-popover-primitives";
 
 interface NotionTablePillHandlesProps {
   editor: Editor | null;
@@ -952,112 +957,79 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
               </button>
             </PopoverTrigger>
 
-            <PopoverContent side="top" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-popover-foreground text-xs z-50 space-y-0.5">
-              <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted flex items-center justify-between">
-                <span>Kolom {activeCell.colIndex + 1}</span>
-              </div>
+            <PopoverContent side="top" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5">
+              <NotionMenuSectionHeader>
+                Kolom {activeCell.colIndex + 1}
+              </NotionMenuSectionHeader>
 
               <Separator className="my-1" />
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<ArrowLeft className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertColBefore}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
               >
-                <ArrowLeft className="h-3.5 w-3.5 text-txt-brand" /> Sisipkan kolom di kiri
-              </button>
+                Sisipkan kolom di kiri
+              </NotionMenuItem>
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<ArrowRight className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertColAfter}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
               >
-                <ArrowRight className="h-3.5 w-3.5 text-txt-brand" /> Sisipkan kolom di kanan
-              </button>
+                Sisipkan kolom di kanan
+              </NotionMenuItem>
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<Eraser className="h-3.5 w-3.5" />}
                 onClick={handleClearCol}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
               >
-                <Eraser className="h-3.5 w-3.5 text-txt-muted" /> Hapus isi kolom
-              </button>
+                Hapus isi kolom
+              </NotionMenuItem>
 
-              {/* Table Header Color Palette */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Paintbrush className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Warna header</span>
-                    </div>
-                    <span className="text-txt-muted text-xs">›</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs">
-                  <div className="font-semibold text-txt-muted px-1 pb-1.5 text-[11px]">Tema Warna Header</div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {TABLE_HEADER_COLORS.map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => handleSetTableHeaderColor(c.value)}
-                        className={cn(
-                          "h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center text-[10px] transition-transform",
-                          currentAttrs.headerColor === c.value && "ring-2 ring-primary font-bold"
-                        )}
-                        style={{ backgroundColor: c.bg }}
-                        title={c.label}
+              {/* Table Header Color Palette ONLY if this column is set as header */}
+              {activeCell.colIndex === 0 && activeCell.cellElem.tagName.toLowerCase() === "th" && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div>
+                      <NotionMenuItem
+                        icon={<Paintbrush className="h-3.5 w-3.5 text-emerald-500" />}
+                        hasSubmenu
                       >
-                        {c.value === "default" ? "∅" : ""}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* Zebra Striping Switch */}
-              <div className="flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-lg select-none">
-                <span className="flex items-center gap-2">
-                  <TableProperties className="h-3.5 w-3.5 text-txt-brand" /> Zebra baris
-                </span>
-                <Switch
-                  checked={currentAttrs.zebra || false}
-                  onCheckedChange={(checked) => handleSetTableZebra(checked)}
-                  className="scale-75"
-                />
-              </div>
-
-              {/* Save table style to SQLite as workspace default */}
-              {workspacePath && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await noteIpc.setSetting(
-                      workspacePath,
-                      "default_table_style",
-                      JSON.stringify({ zebra: currentAttrs.zebra || false, headerColor: currentAttrs.headerColor || "default" })
-                    );
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-muted hover:text-txt-primary cursor-pointer transition-colors text-[11px]"
-                  title="Gunakan gaya tabel ini untuk setiap tabel baru di workspace"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-txt-brand" /> Setel default workspace
-                </button>
+                        Warna header
+                      </NotionMenuItem>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs">
+                    <NotionMenuSectionHeader>Tema warna header</NotionMenuSectionHeader>
+                    <div className="grid grid-cols-5 gap-1.5 mt-1">
+                      {TABLE_HEADER_COLORS.map((c) => (
+                        <button
+                          key={c.label}
+                          type="button"
+                          onClick={() => handleSetTableHeaderColor(c.value)}
+                          className={cn(
+                            "h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center text-[10px] transition-transform",
+                            currentAttrs.headerColor === c.value && "ring-2 ring-primary font-bold"
+                          )}
+                          style={{ backgroundColor: c.bg }}
+                          title={c.label}
+                        >
+                          {c.value === "default" ? "∅" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
 
               <Separator className="my-1" />
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                destructive
                 onClick={handleDeleteCol}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-destructive/15 text-destructive text-left cursor-pointer transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Hapus kolom
-              </button>
+                Hapus kolom
+              </NotionMenuItem>
             </PopoverContent>
           </Popover>
         </div>
@@ -1104,94 +1076,84 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
               </button>
             </PopoverTrigger>
 
-            <PopoverContent side="left" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-popover-foreground text-xs z-50 space-y-0.5">
-              <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted flex items-center justify-between">
-                <span>Baris {activeCell.rowIndex + 1}</span>
-              </div>
+            <PopoverContent side="left" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5">
+              <NotionMenuSectionHeader>
+                Baris {activeCell.rowIndex + 1}
+              </NotionMenuSectionHeader>
 
               <Separator className="my-1" />
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<ArrowUp className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertRowBefore}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
               >
-                <ArrowUp className="h-3.5 w-3.5 text-txt-brand" /> Sisipkan baris di atas
-              </button>
+                Sisipkan baris di atas
+              </NotionMenuItem>
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<ArrowDown className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertRowAfter}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
               >
-                <ArrowDown className="h-3.5 w-3.5 text-txt-brand" /> Sisipkan baris di bawah
-              </button>
+                Sisipkan baris di bawah
+              </NotionMenuItem>
 
-              <button
-                type="button"
-                onClick={handleToggleHeaderRow}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground text-left cursor-pointer transition-colors"
-              >
-                <TableProperties className="h-3.5 w-3.5 text-txt-muted" /> Beralih baris header
-              </button>
-
-              {/* Table Header Color Palette in Row Menu */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
+              {/* Only show Header Row controls on the first row (Single Header Enforcement) */}
+              {activeCell?.rowIndex === 0 && (
+                <>
+                  <NotionMenuItem
+                    icon={<TableProperties className="h-3.5 w-3.5" />}
+                    onClick={handleToggleHeaderRow}
                   >
-                    <div className="flex items-center gap-2">
-                      <Paintbrush className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Warna header</span>
-                    </div>
-                    <span className="text-txt-muted text-xs">›</span>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs">
-                  <div className="font-semibold text-txt-muted px-1 pb-1.5 text-[11px]">Tema Warna Header</div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {TABLE_HEADER_COLORS.map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => handleSetTableHeaderColor(c.value)}
-                        className={cn(
-                          "h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center text-[10px] transition-transform",
-                          currentAttrs.headerColor === c.value && "ring-2 ring-primary font-bold"
-                        )}
-                        style={{ backgroundColor: c.bg }}
-                        title={c.label}
-                      >
-                        {c.value === "default" ? "∅" : ""}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                    Beralih baris header
+                  </NotionMenuItem>
 
-              {/* Zebra Striping Switch in Row Menu */}
-              <div className="flex items-center justify-between px-2.5 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-lg select-none">
-                <span className="flex items-center gap-2">
-                  <TableProperties className="h-3.5 w-3.5 text-txt-brand" /> Zebra baris
-                </span>
-                <Switch
-                  checked={currentAttrs.zebra || false}
-                  onCheckedChange={(checked) => handleSetTableZebra(checked)}
-                  className="scale-75"
-                />
-              </div>
+                  {/* Table Header Color Palette in Row Menu ONLY if currently a header */}
+                  {activeCell.cellElem.tagName.toLowerCase() === "th" && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div>
+                          <NotionMenuItem
+                            icon={<Paintbrush className="h-3.5 w-3.5 text-emerald-500" />}
+                            hasSubmenu
+                          >
+                            Warna header
+                          </NotionMenuItem>
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs">
+                        <NotionMenuSectionHeader>Tema warna header</NotionMenuSectionHeader>
+                        <div className="grid grid-cols-5 gap-1.5 mt-1">
+                          {TABLE_HEADER_COLORS.map((c) => (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => handleSetTableHeaderColor(c.value)}
+                              className={cn(
+                                "h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center text-[10px] transition-transform",
+                                currentAttrs.headerColor === c.value && "ring-2 ring-primary font-bold"
+                              )}
+                              style={{ backgroundColor: c.bg }}
+                              title={c.label}
+                            >
+                              {c.value === "default" ? "∅" : ""}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </>
+              )}
 
               <Separator className="my-1" />
 
-              <button
-                type="button"
+              <NotionMenuItem
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                destructive
                 onClick={handleDeleteRow}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-destructive/15 text-destructive text-left cursor-pointer transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Hapus baris
-              </button>
+                Hapus baris
+              </NotionMenuItem>
             </PopoverContent>
           </Popover>
         </div>
