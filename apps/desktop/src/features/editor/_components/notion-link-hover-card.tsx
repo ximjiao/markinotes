@@ -192,7 +192,7 @@ export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
             type="button"
             onClick={handleOpen}
             className="flex items-center gap-1.5 max-w-[180px] hover:underline text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium truncate py-0.5 px-1 rounded transition-colors group cursor-pointer"
-            title={`Buka: ${activeLink.href}`}
+            title={`Open: ${activeLink.href}`}
           >
             <LinkIcon className="h-3 w-3 shrink-0 text-txt-muted group-hover:text-blue-500" />
             <span className="truncate text-xs">{activeLink.href}</span>
@@ -206,7 +206,7 @@ export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
             size="icon"
             onClick={handleOpen}
             className="h-6 w-6 rounded-md text-txt-muted hover:text-txt-primary hover:bg-accent cursor-pointer"
-            title="Buka tautan di browser"
+            title="Open link in browser"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </Button>
@@ -217,7 +217,7 @@ export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
             size="icon"
             onClick={handleCopy}
             className="h-6 w-6 rounded-md text-txt-muted hover:text-txt-primary hover:bg-accent cursor-pointer"
-            title={copied ? "Tersalin!" : "Salin tautan"}
+            title={copied ? "Copied!" : "Copy link to clipboard"}
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
           </Button>
@@ -228,7 +228,7 @@ export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
             size="icon"
             onClick={handleStartEdit}
             className="h-6 w-6 rounded-md text-txt-muted hover:text-txt-primary hover:bg-accent cursor-pointer"
-            title="Edit tautan"
+            title="Edit link URL"
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -239,7 +239,7 @@ export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
             size="icon"
             onClick={handleUnlink}
             className="h-6 w-6 rounded-md text-red-500/80 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
-            title="Hapus tautan"
+            title="Remove hyperlink"
           >
             <Unlink className="h-3.5 w-3.5" />
           </Button>

@@ -1126,7 +1126,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                   "notion-pill-handle-button h-3.5 w-6 rounded-xs bg-muted/80 hover:bg-primary/90 hover:text-primary-foreground text-muted-foreground flex items-center justify-center cursor-grab active:cursor-grabbing shadow-xs transition-all border border-border/60 hover:scale-105",
                   (hoveringColPill || colMenuOpen || isDraggingCol) && "bg-primary text-primary-foreground border-primary"
                 )}
-                title="Klik untuk opsi kolom atau geser untuk memindahkan kolom"
+                title="Click for column options or drag to move column"
               >
                 <GripHorizontal className="h-2.5 w-3.5" />
               </button>
@@ -1134,7 +1134,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
 
             <PopoverContent side="top" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5">
               <NotionMenuSectionHeader>
-                Kolom {activeCell.colIndex + 1}
+                Column {activeCell.colIndex + 1}
               </NotionMenuSectionHeader>
 
               <Separator className="my-1" />
@@ -1143,21 +1143,21 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 icon={<ArrowLeft className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertColBefore}
               >
-                Sisipkan kolom di kiri
+                Insert column left
               </NotionMenuItem>
 
               <NotionMenuItem
                 icon={<ArrowRight className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertColAfter}
               >
-                Sisipkan kolom di kanan
+                Insert column right
               </NotionMenuItem>
 
               <NotionMenuItem
                 icon={<Eraser className="h-3.5 w-3.5" />}
                 onClick={handleClearCol}
               >
-                Hapus isi kolom
+                Clear column content
               </NotionMenuItem>
 
               {/* Table Header Color Palette ONLY if this column is set as header */}
@@ -1169,12 +1169,12 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                         icon={<Paintbrush className="h-3.5 w-3.5 text-emerald-500" />}
                         hasSubmenu
                       >
-                        Warna header
+                        Header color
                       </NotionMenuItem>
                     </div>
                   </PopoverTrigger>
                   <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs">
-                    <NotionMenuSectionHeader>Tema warna header</NotionMenuSectionHeader>
+                    <NotionMenuSectionHeader>Header color theme</NotionMenuSectionHeader>
                     <div className="grid grid-cols-5 gap-1.5 mt-1">
                       {TABLE_HEADER_COLORS.map((c) => (
                         <button
@@ -1203,7 +1203,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 destructive
                 onClick={handleDeleteCol}
               >
-                Hapus kolom
+                Delete column
               </NotionMenuItem>
             </PopoverContent>
           </Popover>
@@ -1245,7 +1245,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                   "notion-pill-handle-button h-5 w-3.5 rounded-xs bg-muted/80 hover:bg-primary/90 hover:text-primary-foreground text-muted-foreground flex items-center justify-center cursor-grab active:cursor-grabbing shadow-xs transition-all border border-border/60 hover:scale-105",
                   (hoveringRowPill || rowMenuOpen || isDraggingRow) && "bg-primary text-primary-foreground border-primary"
                 )}
-                title="Klik untuk opsi baris atau geser untuk memindahkan baris"
+                title="Click for row options or drag to move row"
               >
                 <GripVertical className="h-3 w-2.5" />
               </button>
@@ -1253,7 +1253,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
 
             <PopoverContent side="left" align="center" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5">
               <NotionMenuSectionHeader>
-                Baris {activeCell.rowIndex + 1}
+                Row {activeCell.rowIndex + 1}
               </NotionMenuSectionHeader>
 
               <Separator className="my-1" />
@@ -1262,21 +1262,21 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 icon={<ArrowUp className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertRowBefore}
               >
-                Sisipkan baris di atas
+                Insert row above
               </NotionMenuItem>
 
               <NotionMenuItem
                 icon={<ArrowDown className="h-3.5 w-3.5 text-txt-brand" />}
                 onClick={handleInsertRowAfter}
               >
-                Sisipkan baris di bawah
+                Insert row below
               </NotionMenuItem>
 
               <NotionMenuItem
                 icon={<Eraser className="h-3.5 w-3.5" />}
                 onClick={handleClearRow}
               >
-                Hapus isi baris
+                Clear row content
               </NotionMenuItem>
 
               {/* Only show Header Row controls on the first row (Single Header Enforcement) */}
@@ -1286,7 +1286,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                     icon={<TableProperties className="h-3.5 w-3.5" />}
                     onClick={handleToggleHeaderRow}
                   >
-                    Beralih baris header
+                    Toggle header row
                   </NotionMenuItem>
 
                   {/* Table Header Color Palette in Row Menu ONLY if currently a header */}
@@ -1298,12 +1298,12 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                             icon={<Paintbrush className="h-3.5 w-3.5 text-emerald-500" />}
                             hasSubmenu
                           >
-                            Warna header
+                            Header color
                           </NotionMenuItem>
                         </div>
                       </PopoverTrigger>
                       <PopoverContent side="right" align="start" className="w-52 p-2 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs">
-                        <NotionMenuSectionHeader>Tema warna header</NotionMenuSectionHeader>
+                        <NotionMenuSectionHeader>Header color theme</NotionMenuSectionHeader>
                         <div className="grid grid-cols-5 gap-1.5 mt-1">
                           {TABLE_HEADER_COLORS.map((c) => (
                             <button
@@ -1334,7 +1334,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
                 destructive
                 onClick={handleDeleteRow}
               >
-                Hapus baris
+                Delete row
               </NotionMenuItem>
             </PopoverContent>
           </Popover>
@@ -1355,7 +1355,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
               <button
                 type="button"
                 className="h-5 w-4 rounded-xs bg-primary text-primary-foreground flex items-center justify-center cursor-pointer shadow-md hover:scale-110 transition-transform border border-primary-foreground/20"
-                title="Opsi seleksi sel (Merge, Warna, Hapus)"
+                title="Cell selection options (Merge, Color, Clear)"
               >
                 <MoreVertical className="h-3 w-2.5" />
               </button>
@@ -1368,7 +1368,7 @@ export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePil
               className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-xl text-txt-primary text-xs z-50 space-y-0.5"
             >
               <NotionMenuSectionHeader>
-                Opsi Sel ({cellSelectionBox.cellCount} sel)
+                Cell Options ({cellSelectionBox.cellCount} {cellSelectionBox.cellCount === 1 ? "cell" : "cells"})
               </NotionMenuSectionHeader>
 
               {/* Color Palette Submenu for Selected Cells */}

@@ -37,7 +37,7 @@ export function AiSummaryDialog({
   onClose,
   noteId,
   workspacePath,
-  noteTitle = "Catatan",
+  noteTitle = "Note",
   onInsertSummary,
 }: AiSummaryDialogProps) {
   const [summary, setSummary] = useState("");
@@ -64,7 +64,7 @@ export function AiSummaryDialog({
 
   const handleStartSummarize = async () => {
     if (!noteId || !workspacePath) {
-      setErrorMessage("ID catatan atau path workspace tidak ditemukan.");
+      setErrorMessage("Note ID or workspace path could not be found.");
       setStatus("error");
       return;
     }
@@ -84,7 +84,7 @@ export function AiSummaryDialog({
       setStatus("completed");
     } catch (err: any) {
       setStatus("error");
-      setErrorMessage(typeof err === "string" ? err : err?.message || "Terjadi kesalahan saat memproses ringkasan.");
+      setErrorMessage(typeof err === "string" ? err : err?.message || "Couldn't generate summary. Please check your Gemini API key and try again.");
     }
   };
 
@@ -119,21 +119,21 @@ export function AiSummaryDialog({
             )}
             {status === "completed" && (
               <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-500/30 bg-emerald-500/10">
-                <Check className="h-3 w-3" /> Selesai
+                <Check className="h-3 w-3" /> Completed
               </Badge>
             )}
           </div>
           <DialogDescription className="text-xs text-txt-muted">
-            Merangkum <strong>&ldquo;{noteTitle}&rdquo;</strong> dengan pointer kata kunci terbanyak & konteks utuh.
+            Summarizing <strong>&ldquo;{noteTitle}&rdquo;</strong> by highlighting core context and key takeaways.
           </DialogDescription>
         </DialogHeader>
 
         {/* Content Preview / Stream Output */}
         <div className="flex-1 min-h-[240px] max-h-[400px] flex flex-col rounded-lg border border-border bg-background overflow-hidden">
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/40 text-[11px] text-txt-muted">
-            <span>Hasil Ringkasan (Markdown)</span>
+            <span>Summary Result (Markdown)</span>
             {summary && (
-              <span>{summary.split(/\s+/).filter(Boolean).length} kata</span>
+              <span>{summary.split(/\s+/).filter(Boolean).length} words</span>
             )}
           </div>
 
@@ -141,7 +141,7 @@ export function AiSummaryDialog({
             {status === "idle" && !summary && (
               <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-txt-muted text-xs text-center gap-2">
                 <Sparkles className="h-8 w-8 text-purple-400/40" />
-                <p>Klik tombol <strong>&ldquo;Mulai Ringkas&rdquo;</strong> untuk merangkum catatan dengan Gemini AI.</p>
+                <p>Ready to distill your notes? Click <strong>&ldquo;Start Summarizing&rdquo;</strong> to extract key takeaways with AI.</p>
               </div>
             )}
 
@@ -149,7 +149,7 @@ export function AiSummaryDialog({
               <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-medium">Gagal memproses ringkasan:</p>
+                  <p className="font-medium">Failed to generate summary:</p>
                   <p className="text-[11px] mt-0.5 opacity-90">{errorMessage}</p>
                 </div>
               </div>
@@ -175,10 +175,10 @@ export function AiSummaryDialog({
                 size="sm"
                 onClick={handleCopy}
                 disabled={status === "streaming"}
-                className="h-8 text-xs gap-1.5"
+                className="h-8 text-xs gap-1.5 cursor-pointer"
               >
                 {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                {isCopied ? "Tersalin!" : "Salin"}
+                {isCopied ? "Copied!" : "Copy"}
               </Button>
             )}
             {summary && onInsertSummary && (
@@ -187,10 +187,10 @@ export function AiSummaryDialog({
                 size="sm"
                 onClick={handleInsert}
                 disabled={status === "streaming"}
-                className="h-8 text-xs gap-1.5 text-purple-600 border-purple-500/30 hover:bg-purple-500/10"
+                className="h-8 text-xs gap-1.5 text-purple-600 border-purple-500/30 hover:bg-purple-500/10 cursor-pointer"
               >
                 <FileDown className="h-3.5 w-3.5" />
-                Sisipkan ke Catatan
+                Insert into Note
               </Button>
             )}
           </div>
@@ -200,31 +200,31 @@ export function AiSummaryDialog({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 text-xs"
+              className="h-8 text-xs cursor-pointer"
             >
-              Tutup
+              Close
             </Button>
             <Button
               variant="default"
               size="sm"
               onClick={handleStartSummarize}
               disabled={status === "streaming"}
-              className="h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
+              className="h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
             >
               {status === "streaming" ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Merangkum...
+                  Summarizing...
                 </>
               ) : summary ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Ringkas Ulang
+                  Regenerate Summary
                 </>
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  Mulai Ringkas
+                  Start Summarizing
                 </>
               )}
             </Button>

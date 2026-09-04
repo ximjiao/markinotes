@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Folder, FolderPlus, Loader2 } from "lucide-react";
-import { AIOrganizeResponse } from "./home-dashboard";
+import type { AIOrganizeResponse } from "../_types/home.types";
 
 interface AIOrganizeDialogProps {
   isOpen: boolean;

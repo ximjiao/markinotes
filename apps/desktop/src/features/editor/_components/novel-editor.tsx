@@ -102,6 +102,7 @@ import { NotionSelectionPopover } from "./notion-selection-popover";
 import { NotionLinkHoverCard } from "./notion-link-hover-card";
 import { ImageDialog } from "./image-dialog";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { useUiStore } from "@/stores";
 
 interface NovelEditorProps {
   initialTitle?: string;
@@ -126,7 +127,7 @@ interface CustomSlashItem {
 const rawSlashItems: CustomSlashItem[] = [
   {
     title: "Heading 1",
-    description: "Judul seksi besar",
+    description: "Large section heading",
     icon: <Heading1 className="h-4 w-4" />,
     badge: "#",
     searchTerms: ["h1", "heading", "title", "#"],
@@ -136,7 +137,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Heading 2",
-    description: "Judul seksi sedang",
+    description: "Medium section heading",
     icon: <Heading2 className="h-4 w-4" />,
     badge: "##",
     searchTerms: ["h2", "subtitle", "##"],
@@ -146,7 +147,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Heading 3",
-    description: "Judul sub-seksi kecil",
+    description: "Small sub-section heading",
     icon: <Heading3 className="h-4 w-4" />,
     badge: "###",
     searchTerms: ["h3", "sub-subtitle", "###"],
@@ -156,7 +157,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Bullet List",
-    description: "Daftar poin sederhana",
+    description: "Create a simple bulleted list",
     icon: <List className="h-4 w-4" />,
     badge: "-",
     searchTerms: ["bullet", "list", "unordered", "-"],
@@ -166,7 +167,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Numbered List",
-    description: "Daftar bernomor berurutan",
+    description: "Create a list with numbering",
     icon: <ListOrdered className="h-4 w-4" />,
     badge: "1.",
     searchTerms: ["numbered", "list", "ordered", "1."],
@@ -176,7 +177,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "To-do List",
-    description: "Daftar tugas dengan kotak centang",
+    description: "Track tasks with a to-do checklist",
     icon: <CheckSquare className="h-4 w-4" />,
     badge: "[]",
     searchTerms: ["todo", "task", "checklist", "[]"],
@@ -186,7 +187,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Code Block",
-    description: "Blok kode program",
+    description: "Capture code snippets with syntax highlighting",
     icon: <Code className="h-4 w-4" />,
     badge: "```",
     searchTerms: ["code", "snippet", "```"],
@@ -196,7 +197,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Table",
-    description: "Tabel 3x3",
+    description: "Insert a 3x3 table grid",
     icon: <TableIcon className="h-4 w-4" />,
     badge: "3x3",
     searchTerms: ["table", "grid"],
@@ -206,7 +207,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Image",
-    description: "Unggah gambar atau tautan URL",
+    description: "Upload an image or paste URL",
     icon: <ImageIcon className="h-4 w-4" />,
     badge: "img",
     searchTerms: ["image", "photo", "picture", "upload", "img"],
@@ -216,7 +217,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Quote",
-    description: "Blok kutipan teks",
+    description: "Capture a notable quote or callout",
     icon: <Quote className="h-4 w-4" />,
     badge: ">",
     searchTerms: ["quote", "citation", ">"],
@@ -226,7 +227,7 @@ const rawSlashItems: CustomSlashItem[] = [
   },
   {
     title: "Divider",
-    description: "Garis pemisah antar blok",
+    description: "Visually divide blocks with a horizontal rule",
     icon: <Minus className="h-4 w-4" />,
     badge: "---",
     searchTerms: ["line", "divider", "hr", "---"],
@@ -730,9 +731,12 @@ export function NovelEditor({
   const [newTagInput, setNewTagInput] = useState("");
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
-  const [fontStyle, setFontStyle] = useState<"default" | "serif" | "mono">("default");
-  const [isSmallText, setIsSmallText] = useState(false);
-  const [isFullWidth, setIsFullWidth] = useState(false);
+  const fontStyle = useUiStore((s) => s.editorFontStyle);
+  const setFontStyle = useUiStore((s) => s.setEditorFontStyle);
+  const isSmallText = useUiStore((s) => s.editorIsSmallText);
+  const setIsSmallText = useUiStore((s) => s.setEditorIsSmallText);
+  const isFullWidth = useUiStore((s) => s.editorIsFullWidth);
+  const setIsFullWidth = useUiStore((s) => s.setEditorIsFullWidth);
 
   useEffect(() => {
     const handleOpenImageDialog = () => setIsImageDialogOpen(true);
@@ -1390,7 +1394,7 @@ export function NovelEditor({
               {/* Notion Slash Commands Popup */}
               <EditorCommand className="z-50 h-auto max-h-[330px] w-72 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl transition-all">
                 <EditorCommandEmpty className="p-2 text-xs text-txt-muted">
-                  Tidak ada blok yang cocok
+                  No matching blocks found
                 </EditorCommandEmpty>
                 <EditorCommandList>
                   {rawSlashItems.map((item) => {

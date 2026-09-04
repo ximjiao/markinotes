@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Clock, Share2, Sparkles, Folder, FolderTree, Star, Calendar, Bookmark, HelpCircle, FolderPlus, Settings, Check, X, FileText, Plus } from "lucide-react";
+import { Clock, Folder, FolderTree, Star, FolderPlus, Settings, FileText, Plus } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,18 +14,25 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useFolderTree, FolderTreeItem } from "@features/workspace";
+import { FolderTreeItem } from "@features/workspace";
+import { useWorkspaceStore, useNotesStore, useUiStore } from "@/stores";
 
 interface HomeSidebarProps {
-  selectedView: string;
-  allTags?: string[];
-  onSelectView: (view: string) => void;
   onCreateNote?: (folderPath: string) => void;
-  onOpenTemplates?: () => void;
 }
 
-export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreateNote, onOpenTemplates }: HomeSidebarProps) {
-  const { folders, toggleExpand, createSubfolder, addFolder, renameFolder } = useFolderTree();
+export function HomeSidebar({ onCreateNote }: HomeSidebarProps) {
+  const folders = useWorkspaceStore((s) => s.folders);
+  const allTags = useWorkspaceStore((s) => s.allTags);
+  const toggleExpand = useWorkspaceStore((s) => s.toggleExpand);
+  const createSubfolder = useWorkspaceStore((s) => s.createSubfolder);
+  const addFolder = useWorkspaceStore((s) => s.addFolder);
+  const renameFolder = useWorkspaceStore((s) => s.renameFolder);
+
+  const selectedFolder = useNotesStore((s) => s.selectedFolder);
+  const setSelectedFolder = useNotesStore((s) => s.setSelectedFolder);
+  const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
+
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
@@ -57,12 +64,12 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
             <SidebarMenu className="gap-1 group-data-[collapsible=icon]:gap-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const active = selectedView === item.id;
+                const active = selectedFolder === item.id;
                 return (
                   <SidebarMenuItem key={item.id} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
                     <SidebarMenuButton
                       isActive={active}
-                      onClick={() => onSelectView(item.id)}
+                      onClick={() => setSelectedFolder(item.id)}
                       tooltip={item.label}
                       className="text-xs font-medium"
                     >
@@ -79,16 +86,16 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
 
               {spaceItems.map((item) => {
                 const Icon = item.icon;
-                const active = selectedView === item.id;
+                const active = selectedFolder === item.id;
                 return (
                   <SidebarMenuItem key={item.id} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
                     <SidebarMenuButton
                       isActive={active}
                       onClick={() => {
                         if (item.id === "templates") {
-                          onOpenTemplates?.();
+                          setTemplateDialogOpen(true);
                         } else {
-                          onSelectView(item.id);
+                          setSelectedFolder(item.id);
                         }
                       }}
                       tooltip={item.label}
@@ -147,8 +154,8 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
                   <FolderTreeItem
                     key={folder.id}
                     folder={folder}
-                    activeId={selectedView}
-                    onSelect={onSelectView}
+                    activeId={selectedFolder}
+                    onSelect={setSelectedFolder}
                     onToggleExpand={toggleExpand}
                     onCreateSubfolder={createSubfolder}
                     onCreateNote={onCreateNote}
@@ -203,8 +210,8 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
                           <FolderTreeItem
                             key={folder.id}
                             folder={folder}
-                            activeId={selectedView}
-                            onSelect={onSelectView}
+                            activeId={selectedFolder}
+                            onSelect={setSelectedFolder}
                             onToggleExpand={toggleExpand}
                             onCreateSubfolder={createSubfolder}
                           />
@@ -235,8 +242,8 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
                   allTags.map((tag) => (
                     <SidebarMenuItem key={tag}>
                       <SidebarMenuButton
-                        isActive={selectedView === `tag:${tag}`}
-                        onClick={() => onSelectView(`tag:${tag}`)}
+                        isActive={selectedFolder === `tag:${tag}`}
+                        onClick={() => setSelectedFolder(`tag:${tag}`)}
                         className="text-xs font-normal"
                       >
                         <span className="text-txt-muted">#</span>
@@ -258,15 +265,14 @@ export function HomeSidebar({ selectedView, allTags = [], onSelectView, onCreate
           <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton
               tooltip="Settings"
-              isActive={selectedView === "settings"}
-              onClick={() => onSelectView("settings")}
+              isActive={selectedFolder === "settings"}
+              onClick={() => setSelectedFolder("settings")}
               className="text-xs text-txt-secondary group-data-[collapsible=icon]:mx-auto"
             >
               <Settings className="h-4 w-4" />
               <span>Settings</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
-
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

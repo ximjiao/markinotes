@@ -12,6 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { NoteCardData } from "../_types/home.types";
 import { cn, formatRelativeTime, stripMarkdown } from "@/lib/utils";
 
@@ -25,6 +31,10 @@ interface NoteCardProps {
 }
 
 export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExport }: NoteCardProps) {
+  const tags = note.tags || [];
+  const visibleTags = tags.slice(0, 2);
+  const remainingTags = tags.slice(2);
+
   return (
     <Card
       onClick={() => onOpen?.(note.id)}
@@ -101,15 +111,55 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
       </CardContent>
 
       {/* Footer Meta: Tags & Timestamp */}
-      <CardFooter className="p-4 pt-1 flex items-center justify-between text-[11px] text-txt-muted z-10 bg-card">
-        <div className="flex items-center gap-1 overflow-hidden max-w-[70%]">
-          {note.tags?.map((tag) => (
-            <Badge key={tag} variant="secondary" className="px-1.5 py-0 text-[10px] font-normal text-txt-secondary">
+      <CardFooter className="p-4 pt-1 flex items-center justify-between text-[11px] text-txt-muted z-10 bg-card gap-2">
+        <div className="flex items-center gap-1 overflow-hidden min-w-0 max-w-[70%]">
+          {visibleTags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="secondary"
+              title={`#${tag}`}
+              className="max-w-[85px] truncate px-1.5 py-0 text-[10px] font-normal text-txt-secondary shrink-0"
+            >
               #{tag}
             </Badge>
           ))}
+
+          {remainingTags.length > 0 && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="secondary"
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-1.5 py-0 text-[10px] font-normal text-txt-muted hover:text-txt-primary hover:bg-accent cursor-default shrink-0"
+                  >
+                    +{remainingTags.length}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-2.5 max-w-[220px] shadow-xl bg-popover text-popover-foreground border border-border rounded-lg"
+                >
+                  <p className="text-[10px] text-txt-muted font-medium mb-1.5">All tags in this note:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {remainingTags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="px-1.5 py-0 text-[10px] font-normal text-txt-secondary"
+                      >
+                        #{tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        <span className="shrink-0">Edited {formatRelativeTime(note.updatedAt)}</span>
+        <span className="shrink-0 text-[10px]">Edited {formatRelativeTime(note.updatedAt)}</span>
       </CardFooter>
     </Card>
   );

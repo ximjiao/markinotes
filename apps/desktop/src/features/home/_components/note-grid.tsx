@@ -10,6 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, Folder, MoreHorizontal, Star, Trash2, FolderOutput } from "lucide-react";
 import { EmptyState } from "@/components/shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface NoteGridProps {
   notes: NoteCardData[];
@@ -82,13 +88,59 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1 overflow-hidden w-full">
-                        {note.tags?.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px] shrink-0">
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
+                      {(() => {
+                        const tags = note.tags || [];
+                        const visibleTags = tags.slice(0, 2);
+                        const remainingTags = tags.slice(2);
+                        return (
+                          <div className="flex items-center gap-1 overflow-hidden w-full">
+                            {visibleTags.map((tag) => (
+                              <Badge
+                                key={tag}
+                                variant="outline"
+                                title={`#${tag}`}
+                                className="text-[10px] max-w-[85px] truncate shrink-0"
+                              >
+                                #{tag}
+                              </Badge>
+                            ))}
+                            {remainingTags.length > 0 && (
+                              <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] text-txt-muted hover:text-txt-primary cursor-default shrink-0"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      +{remainingTags.length}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="top"
+                                    align="start"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-2.5 max-w-[220px] shadow-xl bg-popover text-popover-foreground border border-border rounded-lg"
+                                  >
+                                    <p className="text-[10px] text-txt-muted font-medium mb-1.5">All tags in this note:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {remainingTags.map((tag) => (
+                                        <Badge
+                                          key={tag}
+                                          variant="secondary"
+                                          className="px-1.5 py-0 text-[10px] font-normal text-txt-secondary"
+                                        >
+                                          #{tag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right text-xs text-txt-muted whitespace-nowrap">
                       {formatRelativeTime(note.updatedAt)}

@@ -265,18 +265,18 @@ pub async fn note_summarize_stream(
             params![note_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|e| format!("Catatan dengan ID '{note_id}' tidak ditemukan: {e}"))?;
+        .map_err(|e| format!("Note with ID '{note_id}' was not found: {e}"))?;
 
     let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Gagal membaca file catatan di '{path}': {e}"))?;
+        .map_err(|e| format!("Unable to read note file at '{path}': {e}"))?;
 
-    // 1. Ekstrak kata terbanyak (descending) dengan stopwords filter
+    // 1. Extract top word pointers with stopwords filter
     let pointers = crate::ai::extract_top_word_pointers(&content, 15);
 
-    // 2. Susun prompt dengan pointers frekuensi kata + konten asli catatan
+    // 2. Build summarize prompt with frequency pointers + original content
     let prompt = crate::ai::build_summarize_prompt(&title, &content, &pointers);
 
-    // 3. Streaming respons dari Gemini API via channel
+    // 3. Stream response from Gemini API via channel
     crate::ai::stream_gemini_summary(&api_key, resolved_model.as_deref(), &prompt, on_chunk).await
 }
 
@@ -295,12 +295,12 @@ pub async fn note_edit_with_ai_stream(
     };
 
     let prompt = format!(
-        "Anda adalah asisten editor teks AI profesional.\n\
-        Tugas Anda: Proses, poles, atau edit teks terpilih berikut sesuai dengan instruksi yang diberikan.\n\
-        Output HANYA teks hasil edit/perbaikan tanpa basa-basi, salam pembuka/penutup, atau tanda kutip pembungkus ekstra.\n\n\
-        [INSTRUKSI]:\n\
+        "You are a professional AI text editor.\n\
+        Your task: Polish, edit, or transform the selected text below according to the provided instructions.\n\
+        Output ONLY the edited/improved text with no conversational filler, pleasantries, or surrounding quotes.\n\n\
+        [INSTRUCTIONS]:\n\
         {}\n\n\
-        [TEKS TERPILIH]:\n\
+        [SELECTED TEXT]:\n\
         {}",
         instruction, selected_text
     );

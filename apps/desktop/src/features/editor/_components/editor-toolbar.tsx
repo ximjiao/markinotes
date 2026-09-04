@@ -325,15 +325,15 @@ export function EditorToolbar({
               variant={(editor.isActive("textColor") || editor.isActive("textHighlight")) ? "secondary" : "ghost"}
               size="icon"
               className="h-7 w-7"
-              title="Warna teks & Highlight"
+              title="Text Color & Highlight"
             >
               <div className="flex flex-col items-center justify-center leading-none">
                 <span 
                   className="text-[11px] font-bold"
                   style={{ 
                     color: editor.getAttributes("textColor").color && editor.getAttributes("textColor").color !== "inherit" 
-                      ? editor.getAttributes("textColor").color 
-                      : undefined 
+                    ? editor.getAttributes("textColor").color 
+                    : undefined 
                   }}
                 >
                   A
@@ -356,7 +356,7 @@ export function EditorToolbar({
             align="end" 
             className="w-56 p-1 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs max-h-[300px] overflow-y-auto space-y-1"
           >
-            <NotionMenuSectionHeader>Warna teks</NotionMenuSectionHeader>
+            <NotionMenuSectionHeader>Text Color</NotionMenuSectionHeader>
             <div className="space-y-0.5">
               {TEXT_COLORS.map((c) => {
                 const activeColor = editor.getAttributes("textColor").color || "inherit";
@@ -382,7 +382,7 @@ export function EditorToolbar({
               })}
             </div>
 
-            <NotionMenuSectionHeader className="pt-1.5 border-t border-border/40">Highlight</NotionMenuSectionHeader>
+            <NotionMenuSectionHeader className="pt-1.5 border-t border-border/40">Highlight Color</NotionMenuSectionHeader>
             <div className="space-y-0.5">
               {BG_HIGHLIGHTS.map((h) => {
                 const activeBg = editor.getAttributes("textHighlight").color || "transparent";
@@ -414,7 +414,7 @@ export function EditorToolbar({
               variant={(editor.isActive({ textAlign: "center" }) || editor.isActive({ textAlign: "right" }) || editor.isActive({ textAlign: "justify" })) ? "secondary" : "ghost"}
               size="sm"
               className="h-7 px-1.5 text-xs flex items-center gap-0.5"
-              title="Perataan teks (Align)"
+              title="Text Alignment"
             >
               {editor.isActive({ textAlign: "center" }) ? (
                 <AlignCenter className="h-3.5 w-3.5" />

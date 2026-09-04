@@ -20,3 +20,8 @@ export interface WorkspaceFolderInfo {
   totalNotes: number;
   folders: LocalFolderNode[];
 }
+
+export interface AIOrganizeResponse {
+  moves?: { [noteId: string]: string };
+  creates?: { [noteId: string]: string };
+}

@@ -68,7 +68,7 @@ pub fn extract_top_word_pointers(content: &str, limit: usize) -> Vec<(String, us
 /// Build the structured prompt combining top word pointers and the full original note
 pub fn build_summarize_prompt(title: &str, content: &str, pointers: &[(String, usize)]) -> String {
     let pointer_str = if pointers.is_empty() {
-        "- (Tidak ada kata kunci dominan)".to_string()
+        "- (No dominant keywords found)".to_string()
     } else {
         pointers
             .iter()
@@ -78,19 +78,19 @@ pub fn build_summarize_prompt(title: &str, content: &str, pointers: &[(String, u
     };
 
     format!(
-        "Anda adalah asisten perangkum catatan cerdas.\n\
-        Tugas Anda adalah membuat ringkasan (summary) yang komprehensif, padat, dan terstruktur dari catatan pengguna di bawah ini.\n\n\
-        [POINTER KATA KUNCI UTAMA (Diurutkan dari frekuensi terbanyak)]:\n\
+        "You are an intelligent, clear, and structured note summarization assistant.\n\
+        Your task is to create a comprehensive, concise, and well-structured summary of the user's note below.\n\n\
+        [PRIMARY KEYWORD POINTERS (Sorted by frequency)]:\n\
         {pointer_str}\n\n\
-        [CATATAN ASLI]:\n\
-        Judul: {title}\n\
+        [ORIGINAL NOTE]:\n\
+        Title: {title}\n\
         ---\n\
         {content}\n\
         ---\n\n\
-        [INSTRUKSI RINGKASAN]:\n\
-        1. Pastikan seluruh poin utama yang berkaitan dengan daftar kata kunci di atas terangkum dengan baik.\n\
-        2. Sajikan ringkasan dalam format Markdown dengan bahasa yang sama seperti bahasa utama catatan.\n\
-        3. Mulai dengan ringkasan singkat (TL;DR), diikuti dengan poin-poin penting (Key Takeaways)."
+        [SUMMARIZATION INSTRUCTIONS]:\n\
+        1. Ensure all core points related to the primary keywords are well synthesized.\n\
+        2. Present the summary in clean Markdown format using the same primary language as the note.\n\
+        3. Start with a brief overview (TL;DR), followed by structured Key Takeaways and Action Items if applicable."
     )
 }
 
@@ -193,7 +193,7 @@ pub async fn stream_gemini_summary(
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("Gagal menghubungi Gemini API: {e}"))?;
+        .map_err(|e| format!("Unable to connect to Gemini API. Please check your network connection: {e}"))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -205,7 +205,7 @@ pub async fn stream_gemini_summary(
     let mut buffer = String::new();
 
     while let Some(chunk_res) = stream.next().await {
-        let chunk_bytes = chunk_res.map_err(|e| format!("Error membaca stream Gemini: {e}"))?;
+        let chunk_bytes = chunk_res.map_err(|e| format!("Error reading Gemini stream: {e}"))?;
         let text_chunk = String::from_utf8_lossy(&chunk_bytes);
         buffer.push_str(&text_chunk);
 
@@ -329,7 +329,7 @@ pub async fn organize_drafts(
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("Gagal menghubungi Gemini API: {e}"))?;
+        .map_err(|e| format!("Unable to connect to Gemini API. Please check your network connection: {e}"))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -345,7 +345,7 @@ pub async fn organize_drafts(
     let parsed_res: GeminiResponse = response
         .json()
         .await
-        .map_err(|e| format!("Gagal parsing response Gemini: {e}"))?;
+        .map_err(|e| format!("Failed to parse Gemini response: {e}"))?;
 
     if let Some(candidates) = parsed_res.candidates {
         if let Some(first) = candidates.into_iter().next() {
@@ -363,5 +363,5 @@ pub async fn organize_drafts(
         }
     }
 
-    Err("Gemini tidak mengembalikan teks yang valid".to_string())
+    Err("Gemini did not return valid text content".to_string())
 }

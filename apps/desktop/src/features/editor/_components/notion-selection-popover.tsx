@@ -186,7 +186,7 @@ export function NotionSelectionPopover({
       setAiStatus("completed");
     } catch (err: any) {
       setAiStatus("error");
-      setErrorMessage(typeof err === "string" ? err : err?.message || "Gagal memproses AI");
+      setErrorMessage(typeof err === "string" ? err : err?.message || "AI request couldn't be completed. Please try again.");
     }
   };
 
@@ -518,28 +518,28 @@ export function NotionSelectionPopover({
 
           <NotionMenuItem
             icon={<Check className="h-3.5 w-3.5 text-emerald-500" />}
-            onClick={() => handleRunAi("Perbaiki seluruh kesalahan ejaan, tata bahasa (grammar/PUEBI), dan tanda baca pada teks ini.")}
+            onClick={() => handleRunAi("Fix all spelling, grammar, and punctuation mistakes in this selected text while maintaining its voice.")}
           >
             Fix spelling & grammar
           </NotionMenuItem>
 
           <NotionMenuItem
             icon={<FileText className="h-3.5 w-3.5 text-blue-500" />}
-            onClick={() => handleRunAi("Jelaskan maksud dan konsep dari teks ini secara ringkas dan mudah dimengerti.")}
+            onClick={() => handleRunAi("Explain the core concepts and meaning of this text clearly and concisely.")}
           >
             Explain
           </NotionMenuItem>
 
           <NotionMenuItem
             icon={<Sparkles className="h-3.5 w-3.5 text-amber-500" />}
-            onClick={() => handleRunAi("Buat ringkasan (summary) yang padat dari teks terpilih ini.")}
+            onClick={() => handleRunAi("Summarize this selected text into clear, concise key takeaways.")}
           >
             Summarize selection
           </NotionMenuItem>
 
           <NotionMenuItem
             icon={<ArrowDownToLine className="h-3.5 w-3.5 text-indigo-500" />}
-            onClick={() => handleRunAi("Buat teks ini lebih ringkas dan to the point (make shorter).")}
+            onClick={() => handleRunAi("Make this selected text shorter, punchier, and more concise.")}
           >
             Make shorter
           </NotionMenuItem>
