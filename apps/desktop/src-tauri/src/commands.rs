@@ -298,3 +298,13 @@ pub async fn note_organize_drafts(
     // Call AI to get suggestions
     crate::ai::organize_drafts(&api_key, env_model.as_deref(), &drafts_json, &folders_json).await
 }
+
+#[tauri::command]
+pub fn workspace_get_setting(workspace_path: String, key: String) -> Result<Option<String>, String> {
+    crate::db::get_setting(&workspace_path, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn workspace_set_setting(workspace_path: String, key: String, value: String) -> Result<(), String> {
+    crate::db::set_setting(&workspace_path, &key, &value).map_err(|e| e.to_string())
+}

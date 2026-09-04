@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 .antigravityrules
 .claude
+.docs/tickets
 
 # next
 .next/

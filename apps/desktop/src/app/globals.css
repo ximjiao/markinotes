@@ -386,6 +386,101 @@
   text-align: left;
   color: var(--text-primary);
   background-color: hsl(var(--accent) / 0.6);
+  transition: background-color 0.15s ease;
+}
+
+/* ─── Excel / Notion Table Zebra Striping ─── */
+.ProseMirror table[data-zebra="true"] tr:nth-child(even) > td,
+.ProseMirror table[data-zebra="true"] tbody tr:nth-child(even) > td {
+  background-color: hsl(var(--muted) / 0.45) !important;
+}
+
+.dark .ProseMirror table[data-zebra="true"] tr:nth-child(even) > td,
+.dark .ProseMirror table[data-zebra="true"] tbody tr:nth-child(even) > td {
+  background-color: hsl(var(--muted) / 0.35) !important;
+}
+
+/* ─── Table Header Color Palettes ─── */
+.ProseMirror table[data-header-color="gray"] th,
+.ProseMirror table[data-header-color="gray"] tr:first-child > * {
+  background-color: rgba(156, 163, 175, 0.25) !important;
+}
+
+.ProseMirror table[data-header-color="blue"] th,
+.ProseMirror table[data-header-color="blue"] tr:first-child > * {
+  background-color: rgba(59, 130, 246, 0.22) !important;
+  color: #2563eb;
+}
+
+.dark .ProseMirror table[data-header-color="blue"] th,
+.dark .ProseMirror table[data-header-color="blue"] tr:first-child > * {
+  color: #60a5fa;
+}
+
+.ProseMirror table[data-header-color="green"] th,
+.ProseMirror table[data-header-color="green"] tr:first-child > * {
+  background-color: rgba(34, 197, 94, 0.22) !important;
+  color: #16a34a;
+}
+
+.dark .ProseMirror table[data-header-color="green"] th,
+.dark .ProseMirror table[data-header-color="green"] tr:first-child > * {
+  color: #4ade80;
+}
+
+.ProseMirror table[data-header-color="yellow"] th,
+.ProseMirror table[data-header-color="yellow"] tr:first-child > * {
+  background-color: rgba(234, 179, 8, 0.25) !important;
+  color: #ca8a04;
+}
+
+.dark .ProseMirror table[data-header-color="yellow"] th,
+.dark .ProseMirror table[data-header-color="yellow"] tr:first-child > * {
+  color: #facc15;
+}
+
+.ProseMirror table[data-header-color="pink"] th,
+.ProseMirror table[data-header-color="pink"] tr:first-child > * {
+  background-color: rgba(236, 72, 153, 0.22) !important;
+  color: #db2777;
+}
+
+.dark .ProseMirror table[data-header-color="pink"] th,
+.dark .ProseMirror table[data-header-color="pink"] tr:first-child > * {
+  color: #f472b6;
+}
+
+.ProseMirror table[data-header-color="orange"] th,
+.ProseMirror table[data-header-color="orange"] tr:first-child > * {
+  background-color: rgba(249, 115, 22, 0.22) !important;
+  color: #ea580c;
+}
+
+.dark .ProseMirror table[data-header-color="orange"] th,
+.dark .ProseMirror table[data-header-color="orange"] tr:first-child > * {
+  color: #fb923c;
+}
+
+.ProseMirror table[data-header-color="purple"] th,
+.ProseMirror table[data-header-color="purple"] tr:first-child > * {
+  background-color: rgba(168, 85, 247, 0.22) !important;
+  color: #9333ea;
+}
+
+.dark .ProseMirror table[data-header-color="purple"] th,
+.dark .ProseMirror table[data-header-color="purple"] tr:first-child > * {
+  color: #c084fc;
+}
+
+.ProseMirror table[data-header-color="red"] th,
+.ProseMirror table[data-header-color="red"] tr:first-child > * {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+  color: #dc2626;
+}
+
+.dark .ProseMirror table[data-header-color="red"] th,
+.dark .ProseMirror table[data-header-color="red"] tr:first-child > * {
+  color: #f87171;
 }
 
 .ProseMirror .selectedCell:after {

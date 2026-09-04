@@ -29,7 +29,9 @@ pub fn run() {
             reveal_in_finder,
             folder_rename,
             note_summarize_stream,
-            note_organize_drafts
+            note_organize_drafts,
+            workspace_get_setting,
+            workspace_set_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

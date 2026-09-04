@@ -139,5 +139,20 @@ export const noteIpc = {
     }
     // Web fallback mock
     return "{}";
+  },
+
+  getSetting: async (workspacePath: string, key: string): Promise<string | null> => {
+    if (isTauri()) {
+      return invoke("workspace_get_setting", { workspacePath, key });
+    }
+    return localStorage.getItem(`marki_setting_${workspacePath}_${key}`);
+  },
+
+  setSetting: async (workspacePath: string, key: string, value: string): Promise<void> => {
+    if (isTauri()) {
+      return invoke("workspace_set_setting", { workspacePath, key, value });
+    }
+    localStorage.setItem(`marki_setting_${workspacePath}_${key}`, value);
   }
 };
+

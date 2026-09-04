@@ -32,6 +32,38 @@ pub fn init_db(workspace_path: &str) -> Result<()> {
         )",
         [],
     )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )?;
     
     Ok(())
 }
+
+pub fn get_setting(workspace_path: &str, key: &str) -> Result<Option<String>> {
+    let db_path = get_db_path(workspace_path);
+    let conn = Connection::open(&db_path)?;
+    let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+    let mut rows = stmt.query([key])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(row.get(0)?))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn set_setting(workspace_path: &str, key: &str, value: &str) -> Result<()> {
+    let db_path = get_db_path(workspace_path);
+    let conn = Connection::open(&db_path)?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )?;
+    Ok(())
+}
+

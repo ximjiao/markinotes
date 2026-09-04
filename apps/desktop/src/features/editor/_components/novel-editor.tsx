@@ -90,7 +90,9 @@ import { EditorFooter } from "./editor-footer";
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { NotionTocMinimap } from "./notion-toc-minimap";
+import { NotionTablePillHandles } from "./notion-table-pill-handles";
 import { ImageDialog } from "./image-dialog";
+import { noteIpc } from "@/features/home/_lib/note-ipc";
 
 interface NovelEditorProps {
   initialTitle?: string;
@@ -190,7 +192,7 @@ const rawSlashItems: CustomSlashItem[] = [
     badge: "3x3",
     searchTerms: ["table", "grid"],
     command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run();
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
     },
   },
   {
@@ -242,7 +244,33 @@ const slashCommand = Command.configure({
   },
 });
 
-const CustomTable = Table.configure({
+const CustomTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      zebra: {
+        default: false,
+        parseHTML: (element) => element.getAttribute("data-zebra") === "true",
+        renderHTML: (attributes) => {
+          if (!attributes.zebra) return {};
+          return {
+            "data-zebra": "true",
+          };
+        },
+      },
+      headerColor: {
+        default: "default",
+        parseHTML: (element) => element.getAttribute("data-header-color") || "default",
+        renderHTML: (attributes) => {
+          if (!attributes.headerColor || attributes.headerColor === "default") return {};
+          return {
+            "data-header-color": attributes.headerColor,
+          };
+        },
+      },
+    };
+  },
+}).configure({
   resizable: true,
   lastColumnResizable: true,
   cellMinWidth: 50,
@@ -435,6 +463,18 @@ const TABLE_BG_COLORS = [
   { label: "Purple", value: "rgba(168, 85, 247, 0.2)" },
   { label: "Pink", value: "rgba(236, 72, 153, 0.2)" },
   { label: "Red", value: "rgba(239, 68, 68, 0.2)" },
+];
+
+const TABLE_HEADER_COLORS = [
+  { label: "Default", value: "default", bg: "hsl(var(--accent) / 0.6)" },
+  { label: "Gray", value: "gray", bg: "rgba(156, 163, 175, 0.25)" },
+  { label: "Blue", value: "blue", bg: "rgba(59, 130, 246, 0.22)" },
+  { label: "Green", value: "green", bg: "rgba(34, 197, 94, 0.22)" },
+  { label: "Yellow", value: "yellow", bg: "rgba(234, 179, 8, 0.25)" },
+  { label: "Pink", value: "pink", bg: "rgba(236, 72, 153, 0.22)" },
+  { label: "Orange", value: "orange", bg: "rgba(249, 115, 22, 0.22)" },
+  { label: "Purple", value: "purple", bg: "rgba(168, 85, 247, 0.22)" },
+  { label: "Red", value: "red", bg: "rgba(239, 68, 68, 0.22)" },
 ];
 
 const defaultExtensions = [
@@ -1011,7 +1051,7 @@ export function NovelEditor({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-48">
             {!editorInstance?.isActive("table") ? (
-              <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run()} className="cursor-pointer text-xs">Sisipkan Tabel 3x3</DropdownMenuItem>
+              <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="cursor-pointer text-xs">Sisipkan Tabel 3x3</DropdownMenuItem>
             ) : (
               <>
                 <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Kontrol Tabel</div>
@@ -1222,6 +1262,7 @@ export function NovelEditor({
                 }}
               />
               <NotionTocMinimap editor={editorInstance} />
+              <NotionTablePillHandles editor={editorInstance} workspacePath={workspacePath} />
             </>
           )}
 
@@ -1392,166 +1433,26 @@ export function NovelEditor({
                 </EditorCommandList>
               </EditorCommand>
 
-              {/* Selection Bubble Toolbar */}
+              {/* Selection Bubble Toolbar (Hidden in Tables to avoid blocking handles/cells) */}
               <EditorBubble
                 tippyOptions={{ maxWidth: "none" }}
+                shouldShow={({ editor, state }) => {
+                  if (!editor || !state) return false;
+                  if (state.selection.empty || state.selection.from === state.selection.to) {
+                    return false;
+                  }
+                  if (
+                    editor.isActive("table") ||
+                    editor.isActive("tableCell") ||
+                    editor.isActive("tableHeader") ||
+                    editor.isActive("tableRow")
+                  ) {
+                    return false;
+                  }
+                  return true;
+                }}
                 className="flex items-center gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-xl backdrop-blur-sm z-50 text-txt-primary w-fit"
               >
-                {isTableActive() && (
-                  <>
-                    {/* Compact Notion-Style Table Menu Popover */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
-                          title="Menu Aksi Tabel"
-                        >
-                          <TableIcon className="h-3.5 w-3.5" />
-                          <span>Table</span>
-                          <ChevronDown className="h-3 w-3 opacity-60" />
-                        </Button>
-                      </PopoverTrigger>
-
-                      <PopoverContent align="start" className="w-52 p-1.5 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs space-y-0.5">
-                        {/* 1. Header Cell Switch Toggle */}
-                        <div
-                          onClick={() => editorInstance?.chain().focus().toggleHeaderCell().run()}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer select-none transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <TableProperties className="h-3.5 w-3.5 text-txt-brand" />
-                            <span>Header</span>
-                          </div>
-                          <Switch
-                            checked={editorInstance?.isActive("tableHeader") ?? false}
-                            onCheckedChange={() => editorInstance?.chain().focus().toggleHeaderCell().run()}
-                            className="scale-75 pointer-events-none"
-                          />
-                        </div>
-
-                        {/* 2. Color Submenu Popover */}
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Paintbrush className="h-3.5 w-3.5 text-purple-400" />
-                                <span>Color</span>
-                              </div>
-                              <span className="text-txt-muted text-xs">›</span>
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent side="right" align="start" className="w-56 p-2 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs">
-                            <div className="font-semibold text-txt-muted px-1 pb-1 text-[11px]">Text color</div>
-                            <div className="grid grid-cols-5 gap-1 pb-2">
-                              {TABLE_TEXT_COLORS.map((c) => (
-                                <button
-                                  key={c.label}
-                                  type="button"
-                                  onClick={() => {
-                                    if (c.value === "inherit") editorInstance?.chain().focus().unsetMark("textColor").run();
-                                    else editorInstance?.chain().focus().setMark("textColor", { color: c.value }).run();
-                                  }}
-                                  className="h-6 w-full rounded flex items-center justify-center font-bold text-xs border border-border/40 hover:scale-110 hover:border-txt-brand bg-accent/20 cursor-pointer"
-                                  style={{ color: c.value === "inherit" ? undefined : c.value }}
-                                  title={c.label}
-                                >
-                                  A
-                                </button>
-                              ))}
-                            </div>
-                            <Separator className="my-1" />
-                            <div className="font-semibold text-txt-muted px-1 py-1 text-[11px]">Background color</div>
-                            <div className="grid grid-cols-5 gap-1">
-                              {TABLE_BG_COLORS.map((c) => (
-                                <button
-                                  key={c.label}
-                                  type="button"
-                                  onClick={() => {
-                                    editorInstance
-                                      ?.chain()
-                                      .focus()
-                                      .setCellAttribute("backgroundColor", c.value === "transparent" ? null : c.value)
-                                      .run();
-                                  }}
-                                  className="h-6 w-full rounded border border-border/40 hover:scale-110 hover:border-txt-brand cursor-pointer flex items-center justify-center"
-                                  style={{ backgroundColor: c.value }}
-                                  title={c.label}
-                                >
-                                  {c.value === "transparent" && <span className="text-[10px] text-txt-muted">∅</span>}
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-
-                        <Separator className="my-1" />
-
-                        {/* 3. Insert Row / Col */}
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().addColumnAfter().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
-                        >
-                          <Plus className="h-3.5 w-3.5 text-txt-brand" /> Insert column
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().addRowAfter().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
-                        >
-                          <Plus className="h-3.5 w-3.5 text-txt-brand" /> Insert row
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().mergeOrSplit().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-primary cursor-pointer transition-colors"
-                        >
-                          <Combine className="h-3.5 w-3.5 text-purple-400" /> Merge / Split cells
-                        </button>
-
-                        <Separator className="my-1" />
-
-                        {/* 4. Clear & Delete Actions */}
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().deleteRange(editorInstance.state.selection).run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-txt-muted hover:text-txt-primary cursor-pointer transition-colors"
-                        >
-                          <Eraser className="h-3.5 w-3.5" /> Clear contents
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().deleteRow().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete row
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().deleteColumn().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete column
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => editorInstance?.chain().focus().deleteTable().run()}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 text-red-500 cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete table
-                        </button>
-                      </PopoverContent>
-                    </Popover>
-
-                    <Separator orientation="vertical" className="h-4 mx-0.5" />
-                  </>
-                )}
-
                 <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleBold().run()}>
                   <Button variant="ghost" size="icon" className="h-7 w-7">
                     <Bold className="h-3.5 w-3.5" />
