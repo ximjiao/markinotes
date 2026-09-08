@@ -20,8 +20,10 @@ import {
   FileDown,
   AlertCircle,
   RefreshCw,
+  Settings,
 } from "lucide-react";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { PrettifiedSummary } from "./ai-summary-panel";
 import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
 
 interface AiSummaryDialogProps {
@@ -31,6 +33,7 @@ interface AiSummaryDialogProps {
   workspacePath?: string | null;
   noteTitle?: string;
   onInsertSummary?: (summaryText: string) => void;
+  onOpenSettings?: () => void;
 }
 
 export function AiSummaryDialog({
@@ -40,6 +43,7 @@ export function AiSummaryDialog({
   workspacePath,
   noteTitle = "Note",
   onInsertSummary,
+  onOpenSettings,
 }: AiSummaryDialogProps) {
   const [summary, setSummary] = useState("");
   const [status, setStatus] = useState<"idle" | "streaming" | "completed" | "error">("idle");
@@ -76,20 +80,51 @@ export function AiSummaryDialog({
 
     try {
       const config = workspaceConfig.get();
-      await noteIpc.summarizeStream(
-        workspacePath,
-        noteId,
-        (chunk) => {
-          setSummary((prev) => prev + chunk);
-        },
-        config.aiApiKey || config.geminiApiKey,
-        config.aiModel || config.geminiModel,
-        config.aiProvider
-      );
-      setStatus("completed");
+      const isSystemMode = config.aiMode === "system";
+
+      if (isSystemMode) {
+        const quota = workspaceConfig.checkSystemAiQuota();
+        if (!quota.allowed) {
+          setStatus("error");
+          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau beralih ke mode 'Token Sendiri' (Gratis).");
+          return;
+        }
+
+        await noteIpc.summarizeStream(
+          workspacePath,
+          noteId,
+          (chunk) => {
+            setSummary((prev) => prev + chunk);
+          },
+          undefined,
+          "gemini-2.0-flash",
+          "system"
+        );
+        workspaceConfig.consumeSystemAiQuota(1);
+        setStatus("completed");
+      } else {
+        const apiKey = (config.aiApiKey || config.geminiApiKey || "").trim() || undefined;
+
+        await noteIpc.summarizeStream(
+          workspacePath,
+          noteId,
+          (chunk) => {
+            setSummary((prev) => prev + chunk);
+          },
+          apiKey,
+          config.aiModel || config.geminiModel,
+          config.aiProvider
+        );
+        setStatus("completed");
+      }
     } catch (err: any) {
       setStatus("error");
-      setErrorMessage(typeof err === "string" ? err : err?.message || "Couldn't generate summary. Please check your AI configuration in Settings and try again.");
+      const raw = typeof err === "string" ? err : err?.message || "";
+      if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden") || raw.toLowerCase().includes("not found")) {
+        setErrorMessage("Gagal terhubung ke AI. API Key belum terpasang atau tidak valid. Silakan atur di file .env atau menu Settings.");
+      } else {
+        setErrorMessage(raw || "Couldn't generate summary. Please check your AI configuration in Settings and try again.");
+      }
     }
   };
 
@@ -151,22 +186,31 @@ export function AiSummaryDialog({
             )}
 
             {status === "error" && (
-              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2">
+              <div className="p-3.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-medium">Failed to generate summary:</p>
-                  <p className="text-[11px] mt-0.5 opacity-90">{errorMessage}</p>
+                  <p className="font-semibold">Gagal memproses ringkasan:</p>
+                  <p className="text-[11px] mt-1 opacity-90 leading-normal">{errorMessage}</p>
+                  {onOpenSettings && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        onClose();
+                        onOpenSettings();
+                      }}
+                      className="gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-xs cursor-pointer mt-2.5 h-7"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      Buka Settings
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
 
             {summary && (
-              <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans text-txt-primary">
-                {summary}
-                {status === "streaming" && (
-                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-500 animate-pulse align-middle" />
-                )}
-              </div>
+              <PrettifiedSummary content={summary} isStreaming={status === "streaming"} />
             )}
           </ScrollArea>
         </div>

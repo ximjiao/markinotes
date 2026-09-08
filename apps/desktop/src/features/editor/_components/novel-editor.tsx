@@ -62,20 +62,11 @@ import {
   Plus,
   Trash2,
   X,
+  Sparkles,
   CheckCircle2,
   Loader2,
   AlertCircle,
-  Sparkles,
   Image as ImageIcon,
-  Copy,
-  CopyPlus,
-  Maximize2,
-  Minimize2,
-  FolderOutput,
-  Tag,
-  Paintbrush,
-  Eraser,
-  TableProperties,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -94,7 +85,7 @@ import { cn } from "@/lib/utils";
 import { exportDocument } from "../_lib/export-engine";
 import type { ExportType, NoteDocument } from "../_types/editor.types";
 import { EditorFooter } from "./editor-footer";
-import { AiSummaryDialog } from "./ai-summary-dialog";
+import { AiSummaryPanel } from "./ai-summary-panel";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { NotionTocMinimap } from "./notion-toc-minimap";
 import { NotionTablePillHandles } from "./notion-table-pill-handles";
@@ -111,6 +102,7 @@ interface NovelEditorProps {
   allWorkspaceTags?: string[];
   onBack?: () => void;
   onSave?: (title: string, content: string, tags: string[]) => void;
+  onOpenSettings?: () => void;
   noteId?: string;
   workspacePath?: string | null;
 }
@@ -713,6 +705,7 @@ export function NovelEditor({
   allWorkspaceTags = [],
   onBack,
   onSave,
+  onOpenSettings,
   noteId,
   workspacePath,
 }: NovelEditorProps) {
@@ -722,7 +715,7 @@ export function NovelEditor({
   const [content, setContent] = useState(initialContent);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
-  const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving">("saved");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving" | "streaming" | "error">("saved");
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
@@ -766,13 +759,18 @@ export function NovelEditor({
   useEffect(() => { tagsRef.current = tags; }, [tags]);
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
-  const performSave = useCallback(() => {
+  const performSave = useCallback(async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     setSaveCountdown(null);
-    setSaveStatus("saving");
-    onSaveRef.current?.(titleRef.current, contentRef.current, tagsRef.current);
-    setSaveStatus("saved");
+    setSaveStatus("streaming");
+    try {
+      await Promise.resolve(onSaveRef.current?.(titleRef.current, contentRef.current, tagsRef.current));
+      setSaveStatus("saved");
+    } catch (err) {
+      console.error("Save stream error:", err);
+      setSaveStatus("error");
+    }
   }, []);
 
   /** Call this whenever content or title changes — starts/resets 3s countdown */
@@ -900,591 +898,565 @@ export function NovelEditor({
 
   return (
     <div className="flex flex-col h-full w-full bg-background text-txt-primary overflow-hidden">
-      {/* 1. Header Navigation Bar (Google Docs Style Editable Title Input) */}
-      {/* Combined Header + Toolbar */}
-      <div className="px-3 py-1.5 border-b border-border bg-background flex items-center gap-2 shrink-0 select-none overflow-x-auto">
-        {/* Left: Back + Page Title */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs gap-1.5 text-txt-secondary hover:text-txt-primary shrink-0"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </Button>
+      {/* 1. Header Navigation Bar (Top Bar: Back, Title, Tags, Actions) */}
+      <div className="px-4 py-2 border-b border-border/80 bg-background/95 backdrop-blur-xs flex items-center justify-between gap-3 shrink-0 select-none">
+        {/* Left: Back + Page Title + Tags */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1.5 text-txt-secondary hover:text-txt-primary shrink-0"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </Button>
 
-        <Separator orientation="vertical" className="h-4 shrink-0" />
+          <Separator orientation="vertical" className="h-4 shrink-0" />
 
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setIsTitleCustom(true);
-            scheduleAutoSave();
-          }}
-          placeholder="Untitled document"
-          className="text-xs font-semibold text-txt-primary bg-transparent outline-none border border-transparent hover:border-border focus:border-txt-brand rounded px-2 py-1 w-40 min-w-0 transition-colors shrink-0"
-        />
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setIsTitleCustom(true);
+              scheduleAutoSave();
+            }}
+            placeholder="Untitled document"
+            className="text-sm font-semibold text-txt-primary bg-transparent outline-none border border-transparent hover:border-border focus:border-txt-brand rounded px-2 py-0.5 max-w-xs sm:max-w-md w-auto min-w-[120px] transition-colors truncate"
+          />
 
-        {/* Tags Popover Editor */}
-        <Popover open={isEditingTags} onOpenChange={setIsEditingTags}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs font-medium gap-1.5 text-txt-secondary hover:text-txt-primary shrink-0 ml-0.5"
-              title="Manage document tags"
-            >
-              <Tag className="h-3.5 w-3.5 text-txt-brand" />
-              <span>Tags</span>
-              {tags.length > 0 && (
-                <Badge variant="secondary" className="h-4 px-1 text-[10px] font-semibold bg-accent border border-border">
-                  {tags.length}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 p-3 bg-popover border border-border shadow-xl rounded-xl space-y-2.5">
-            <div className="flex items-center justify-between px-0.5">
-              <span className="text-xs font-semibold text-txt-primary flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5 text-txt-brand" /> Tags
-              </span>
-              <span className="text-[10px] text-txt-muted font-normal">{tags.length} selected</span>
-            </div>
-
-            {/* Current Active Tags with Remove X & Click-to-Rename */}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-accent/30 rounded-lg border border-border/40">
-                {tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="text-[10px] px-2 py-0.5 rounded font-normal flex items-center gap-1.5 bg-background text-txt-primary border border-border/60 shadow-xs"
-                  >
-                    {editingTag === tag ? (
-                      <input
-                        autoFocus
-                        className="w-16 bg-transparent outline-none border-b border-txt-brand text-[10px] font-semibold text-txt-primary"
-                        value={editingValue}
-                        onChange={(e) => setEditingValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                        onBlur={() => {
-                          if (editingValue.trim() && editingValue.trim() !== tag) {
-                            setTags(tags.map((t) => (t === tag ? editingValue.trim() : t)));
-                            scheduleAutoSave();
-                          }
-                          setEditingTag(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && editingValue.trim()) {
-                            e.preventDefault();
-                            setTags(tags.map((t) => (t === tag ? editingValue.trim() : t)));
-                            scheduleAutoSave();
-                            setEditingTag(null);
-                          }
-                          if (e.key === "Escape") {
-                            setEditingTag(null);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span
-                        onClick={() => {
-                          setEditingTag(tag);
-                          setEditingValue(tag);
-                        }}
-                        className="cursor-pointer hover:underline hover:text-txt-brand transition-colors"
-                        title="Click to rename tag"
-                      >
+          {/* Tags Popover Editor */}
+          <Popover open={isEditingTags} onOpenChange={setIsEditingTags}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-1 shrink-0 ml-1 px-1.5 py-0.5 rounded hover:bg-accent/50 transition-colors">
+                {tags.length === 0 ? (
+                  <span className="text-[10px] text-txt-muted flex items-center gap-0.5 border border-dashed border-transparent hover:border-border rounded px-1">
+                    <Plus className="h-2.5 w-2.5" /> Add Tag
+                  </span>
+                ) : (
+                  <>
+                    {tags.slice(0, 2).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0 h-4 rounded-sm font-normal text-txt-secondary border-border">
                         #{tag}
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setTags(tags.filter((t) => t !== tag));
-                        scheduleAutoSave();
-                      }}
-                      className="hover:text-destructive transition-colors focus:outline-none cursor-pointer"
-                      title="Remove tag"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            {/* New Tag Input */}
-            <input
-              autoFocus
-              placeholder="Type tag & press Enter..."
-              className="text-xs px-2.5 py-1.5 w-full bg-background border border-border rounded-lg outline-none focus:border-txt-brand text-txt-primary transition-colors"
-              value={newTagInput}
-              onChange={(e) => setNewTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newTagInput.trim()) {
-                  e.preventDefault();
-                  if (!tags.includes(newTagInput.trim())) {
-                    setTags([...tags, newTagInput.trim()]);
-                    scheduleAutoSave();
-                  }
-                  setNewTagInput("");
-                }
-              }}
-            />
-
-            {/* Existing Workspace Tags to pick from */}
-            {(() => {
-              const availableTags = allWorkspaceTags.filter(t => !tags.includes(t) && t.includes(newTagInput));
-              if (availableTags.length === 0) return null;
-              return (
-                <div className="pt-1">
-                  <div className="text-[10px] text-txt-muted mb-1.5 font-medium px-0.5">Workspace Tags</div>
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                    {availableTags.map(tag => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-accent hover:text-txt-primary transition-colors text-txt-secondary font-normal"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setTags([...tags, tag]);
-                          scheduleAutoSave();
-                          setNewTagInput("");
-                        }}
-                      >
-                        +#{tag}
                       </Badge>
                     ))}
-                  </div>
+                    {tags.length > 2 && (
+                      <span className="text-[10px] text-txt-muted font-medium px-0.5">+{tags.length - 2}</span>
+                    )}
+                  </>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2.5 space-y-2 bg-popover border-border shadow-md rounded-lg">
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0.5 rounded font-normal flex items-center gap-1 bg-accent/50 text-txt-secondary border-border hover:bg-accent transition-colors">
+                      #{tag}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setTags(tags.filter(t => t !== tag));
+                          scheduleAutoSave();
+                        }}
+                        className="hover:text-destructive transition-colors focus:outline-none"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
-              );
-            })()}
-          </PopoverContent>
-        </Popover>
+              )}
+              <input
+                autoFocus
+                placeholder="Type tag & press enter..."
+                className="text-xs px-2 py-1.5 w-full bg-background border border-border rounded-md outline-none focus:border-txt-brand text-txt-primary transition-colors shadow-sm"
+                value={newTagInput}
+                onChange={(e) => setNewTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (newTagInput && !tags.includes(newTagInput)) {
+                      setTags([...tags, newTagInput]);
+                      scheduleAutoSave();
+                    }
+                    setNewTagInput("");
+                  }
+                }}
+              />
+              {(() => {
+                const availableTags = allWorkspaceTags.filter(t => !tags.includes(t) && t.includes(newTagInput));
+                if (availableTags.length === 0) return null;
+                return (
+                  <div className="pt-2">
+                    <div className="text-[10px] text-txt-muted mb-1.5 font-medium px-0.5">Existing Tags</div>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                      {availableTags.map(tag => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-accent hover:text-txt-primary transition-colors text-txt-secondary font-normal"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setTags([...tags, tag]);
+                            scheduleAutoSave();
+                            setNewTagInput("");
+                          }}
+                        >
+                          #{tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </PopoverContent>
+          </Popover>
+        </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Right: Save Status & AI Actions (Sebelah kiri dari More icon) */}
+        {/* Right Side: Save Status Indicator, AI Summarize, & Export */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Save Status Indicator */}
           {saveStatus === "saved" && (
-            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-emerald-600 border-emerald-600/30 bg-emerald-500/10">
-              <CheckCircle2 className="h-3 w-3" /> Saved
-            </Badge>
+            <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-emerald-600 bg-emerald-500/10 rounded-full border border-emerald-600/30">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+            </div>
+          )}
+          {saveStatus === "streaming" && (
+            <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-sky-600 dark:text-sky-400 bg-sky-500/10 rounded-full border border-sky-500/30 animate-pulse">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" /> Streaming...
+            </div>
           )}
           {saveStatus === "saving" && (
-            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-amber-600 border-amber-600/30 bg-amber-500/10">
-              <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-            </Badge>
+            <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-amber-600 bg-amber-500/10 rounded-full border border-amber-600/30">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...
+            </div>
           )}
           {saveStatus === "dirty" && (
-            <Badge variant="outline" className="h-6 px-2 text-[10px] gap-1 font-normal text-txt-muted border-border">
-              Unsaved {saveCountdown !== null ? `(${saveCountdown}s)` : ""}
-            </Badge>
+            <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-txt-muted bg-secondary rounded-full border border-border">
+              Unsaved {saveCountdown !== null ? `(in ${saveCountdown}s)` : ""}
+            </div>
+          )}
+          {saveStatus === "error" && (
+            <div className="flex items-center h-6 px-2 text-[11px] gap-1 font-medium text-red-600 bg-red-500/10 rounded-full border border-red-600/30">
+              <AlertCircle className="h-3.5 w-3.5" /> Save Error
+            </div>
           )}
 
           {/* Summarize with AI Button */}
           <Button
-            variant="outline"
+            variant={isAiDialogOpen ? "secondary" : "outline"}
             size="sm"
-            onClick={() => setIsAiDialogOpen(true)}
-            className="h-6 px-2 text-[10px] gap-1.5 font-medium text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300 transition-colors shadow-xs rounded-full"
+            onClick={() => setIsAiDialogOpen(prev => !prev)}
+            className={`h-7 px-2.5 text-xs gap-1.5 font-medium transition-colors shadow-xs rounded-full cursor-pointer ${
+              isAiDialogOpen
+                ? "text-purple-700 dark:text-purple-300 border-purple-500/50 bg-purple-500/20"
+                : "text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300"
+            }`}
           >
-            <Sparkles className="h-3 w-3 text-purple-500" />
-            Summarize with AI
+            <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+            {isAiDialogOpen ? "Tutup Summary" : "Summarize with AI"}
           </Button>
+
+          {/* Export Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-txt-secondary hover:text-txt-primary">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <div className="px-2 py-1 text-[11px] font-semibold text-txt-muted capitalize">Export Document</div>
+              <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-red-500" /> Export to PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("docx")} className="cursor-pointer text-xs"><FileType className="mr-2 h-4 w-4 text-blue-500" /> Export to Word (.docx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("md")} className="cursor-pointer text-xs"><FileCode className="mr-2 h-4 w-4 text-purple-500" /> Export to Markdown (.md)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+      </div>
 
-        <Separator orientation="vertical" className="h-4 shrink-0 mx-0.5" />
+      {/* 2. Formatting Toolbar Row */}
+      <div className="px-4 py-1 border-b border-border/50 bg-secondary/20 flex items-center gap-1 shrink-0 select-none overflow-x-auto">
+        {/* Undo / Redo */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editorInstance?.chain().focus().undo().run()}
+          disabled={!editorInstance?.can().undo()}
+          title="Undo"
+        >
+          <Undo className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editorInstance?.chain().focus().redo().run()}
+          disabled={!editorInstance?.can().redo()}
+          title="Redo"
+        >
+          <Redo className="h-3.5 w-3.5" />
+        </Button>
 
-        {/* Right: Notion-Style 3-Dots Page Options Menu */}
+        <Separator orientation="vertical" className="h-4 shrink-0 mx-1" />
+
+        {/* Heading Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-txt-secondary hover:text-txt-primary">
-              <MoreVertical className="h-4 w-4" />
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-medium gap-1 text-txt-secondary shrink-0">
+              <span>
+                {editorInstance?.isActive("heading", { level: 1 })
+                  ? "Heading 1"
+                  : editorInstance?.isActive("heading", { level: 2 })
+                    ? "Heading 2"
+                    : editorInstance?.isActive("heading", { level: 3 })
+                      ? "Heading 3"
+                      : "Normal text"}
+              </span>
+              <ChevronDown className="h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 p-2 bg-popover border border-border shadow-2xl rounded-xl space-y-1">
-            {/* 1. Font Style Selector */}
-            <div className="grid grid-cols-3 gap-1 p-1 bg-accent/40 rounded-lg text-center select-none mb-1">
-              <button
-                type="button"
-                onClick={() => setFontStyle("default")}
-                className={cn(
-                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
-                  fontStyle === "default" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
-                )}
-              >
-                <span className="text-sm font-sans font-semibold">Ag</span>
-                <span className="text-[9px]">Default</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFontStyle("serif")}
-                className={cn(
-                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
-                  fontStyle === "serif" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
-                )}
-              >
-                <span className="text-sm font-serif font-semibold">Ag</span>
-                <span className="text-[9px]">Serif</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFontStyle("mono")}
-                className={cn(
-                  "py-1 rounded text-xs flex flex-col items-center transition-all cursor-pointer",
-                  fontStyle === "mono" ? "bg-background font-bold text-txt-brand shadow-xs" : "text-txt-muted hover:text-txt-primary"
-                )}
-              >
-                <span className="text-sm font-mono font-semibold">Ag</span>
-                <span className="text-[9px]">Mono</span>
-              </button>
-            </div>
-
-            <DropdownMenuSeparator />
-
-            {/* 2. Actions */}
-            <DropdownMenuItem
-              onClick={() => {
-                if (editorInstance) {
-                  navigator.clipboard.writeText(editorInstance.getText());
-                }
-              }}
-              className="text-xs cursor-pointer gap-2 py-1.5"
-            >
-              <Copy className="h-3.5 w-3.5" /> Copy page contents
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => {
-                handleExport("md");
-              }}
-              className="text-xs cursor-pointer gap-2 py-1.5"
-            >
-              <CopyPlus className="h-3.5 w-3.5" /> Duplicate as Markdown
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={onBack}
-              className="text-xs cursor-pointer gap-2 py-1.5 text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Move to Trash
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            {/* 3. Canvas Layout Switches */}
-            <div
-              onClick={() => setIsSmallText(!isSmallText)}
-              className="flex items-center justify-between px-2 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-md cursor-pointer select-none transition-colors"
-            >
-              <span className="flex items-center gap-2 text-xs">
-                <span className="text-[10px] font-bold border border-current rounded px-0.5">A↓</span> Small text
-              </span>
-              <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
-            </div>
-
-            <div
-              onClick={() => setIsFullWidth(!isFullWidth)}
-              className="flex items-center justify-between px-2 py-1.5 text-xs text-txt-primary hover:bg-accent rounded-md cursor-pointer select-none transition-colors"
-            >
-              <span className="flex items-center gap-2 text-xs">
-                <Maximize2 className="h-3.5 w-3.5" /> Full width
-              </span>
-              <Switch checked={isFullWidth} onCheckedChange={setIsFullWidth} className="scale-75" />
-            </div>
-
-            <DropdownMenuSeparator />
-
-            {/* 4. Export Menu Sub-Header */}
-            <div className="px-2 py-0.5 text-[11px] font-semibold text-txt-muted capitalize">Export</div>
-            <DropdownMenuItem onClick={() => handleExport("pdf")} className="cursor-pointer text-xs py-1">
-              <FileType className="mr-2 h-3.5 w-3.5 text-red-500" /> Export to PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("docx")} className="cursor-pointer text-xs py-1">
-              <FileType className="mr-2 h-3.5 w-3.5 text-blue-500" /> Export to Word (.docx)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("md")} className="cursor-pointer text-xs py-1">
-              <FileCode className="mr-2 h-3.5 w-3.5 text-purple-500" /> Export to Markdown (.md)
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            {/* 5. Page Info Footer */}
-            <div className="px-2.5 py-1.5 text-[10px] text-txt-muted space-y-0.5 select-none bg-accent/30 rounded-lg">
-              <div className="font-semibold text-txt-secondary">{wordCount} words ({charCount} characters)</div>
-              <div>Last edited Today</div>
-            </div>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().setParagraph().run()} className="text-xs">Normal text</DropdownMenuItem>
+            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 1 }).run()} className="text-xs"><Heading1 className="mr-2 h-3.5 w-3.5" /> Heading 1</DropdownMenuItem>
+            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 2 }).run()} className="text-xs"><Heading2 className="mr-2 h-3.5 w-3.5" /> Heading 2</DropdownMenuItem>
+            <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleHeading({ level: 3 }).run()} className="text-xs"><Heading3 className="mr-2 h-3.5 w-3.5" /> Heading 3</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
 
-      {/* 3. Pure 100% Canvas Writing Space (Scrollable Area) */}
-      <div className="flex-1 overflow-y-auto w-full">
-        <div
-          data-full-width={isFullWidth ? "true" : undefined}
-          className={cn("py-10 mx-auto w-full transition-all duration-200", isFullWidth ? "max-w-none px-24" : "max-w-4xl px-16")}
-        >
-        {/* Dedicated Relative Wrapper for Editor Canvas & Side Handle Alignment */}
-        <div className="relative w-full">
-          {/* Notion Block Side Handle (+ and :: Grip) */}
-          {editorInstance && (
-            <>
-              <NotionBlockSideHandle
-                editor={editorInstance}
-                onOpenSlashMenu={() => {
-                  // Focus and trigger suggestion
-                }}
-              />
-              <NotionTocMinimap editor={editorInstance} />
-              <NotionTablePillHandles editor={editorInstance} workspacePath={workspacePath} />
-              <NotionLinkHoverCard editor={editorInstance} />
-            </>
-          )}
+        <Separator orientation="vertical" className="h-4 shrink-0 mx-1" />
 
-          {/* Novel Root */}
-          <EditorRoot>
-            <EditorContent
-              initialContent={initialContent as any}
-              extensions={defaultExtensions}
-              className={cn(
-                "prose dark:prose-invert max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:border-none text-txt-primary min-h-[500px]",
-                fontStyle === "serif" ? "font-serif" : fontStyle === "mono" ? "font-mono" : "font-sans",
-                isSmallText ? "text-sm leading-relaxed" : "text-base leading-relaxed"
-              )}
-              editorProps={{
-                handleDOMEvents: {
-                  keydown: (_view: unknown, event: KeyboardEvent) => {
-                    // 1. Undo / Redo
-                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-                      event.preventDefault();
-                      if (event.shiftKey) {
-                        editorInstance?.chain().focus().redo().scrollIntoView().run();
-                      } else {
-                        editorInstance?.chain().focus().undo().scrollIntoView().run();
-                      }
-                      return true;
-                    }
+        {/* Inline Formatting */}
+        <Button variant={editorInstance?.isActive("bold") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleBold().run()} title="Bold"><Bold className="h-3.5 w-3.5" /></Button>
+        <Button variant={editorInstance?.isActive("italic") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleItalic().run()} title="Italic"><Italic className="h-3.5 w-3.5" /></Button>
+        <Button variant={editorInstance?.isActive("strike") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleStrike().run()} title="Strikethrough"><Strikethrough className="h-3.5 w-3.5" /></Button>
+        <Button variant={editorInstance?.isActive("code") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().toggleCode().run()} title="Inline Code"><Code className="h-3.5 w-3.5" /></Button>
 
-                    // 2. Tab & Shift+Tab (Notion-Style Block Leveling & Indent)
-                    if (event.key === "Tab") {
-                      event.preventDefault();
-                      event.stopPropagation();
+        <Separator orientation="vertical" className="h-4 shrink-0 mx-1" />
 
-                      if (!editorInstance || editorInstance.isDestroyed) return true;
-
-                      // A. Inside Table -> navigate cells
-                      if (editorInstance.isActive("table")) {
-                        if (event.shiftKey) {
-                          editorInstance.chain().focus().goToPreviousCell().run();
-                        } else {
-                          editorInstance.chain().focus().goToNextCell().run();
-                        }
-                        return true;
-                      }
-
-                      // B. Inside List / Task -> sink / lift
-                      if (editorInstance.isActive("listItem") || editorInstance.isActive("taskItem")) {
-                        if (event.shiftKey) {
-                          editorInstance.chain().focus().liftListItem("listItem").liftListItem("taskItem").run();
-                        } else {
-                          editorInstance.chain().focus().sinkListItem("listItem").sinkListItem("taskItem").run();
-                        }
-                        return true;
-                      }
-
-                      // C. Inside CodeBlock -> insert 2 spaces
-                      if (editorInstance.isActive("codeBlock")) {
-                        editorInstance.chain().focus().insertContent("  ").run();
-                        return true;
-                      }
-
-                      // D. Paragraph, Heading, Blockquote -> Indent / Outdent
-                      const { selection } = editorInstance.state;
-                      const { $from } = selection;
-                      const currentBlock = $from.node($from.depth);
-                      if (currentBlock) {
-                        const currentIndent = currentBlock.attrs.indent || 0;
-                        if (event.shiftKey) {
-                          if (currentIndent > 0) {
-                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
-                              indent: currentIndent - 1,
-                            });
-                          }
-                        } else {
-                          if (currentIndent < 6) {
-                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
-                              indent: currentIndent + 1,
-                            });
-                          }
-                        }
-                        return true;
-                      }
-
-                      return true;
-                    }
-
-                    // 3. Backspace at beginning of indented block -> outdent
-                    if (event.key === "Backspace") {
-                      if (editorInstance && !editorInstance.isDestroyed) {
-                        const { selection } = editorInstance.state;
-                        if (selection.empty && selection.$from.parentOffset === 0) {
-                          const currentBlock = selection.$from.node(selection.$from.depth);
-                          if (currentBlock && (currentBlock.attrs.indent || 0) > 0) {
-                            event.preventDefault();
-                            editorInstance.commands.updateAttributes(currentBlock.type.name, {
-                              indent: currentBlock.attrs.indent - 1,
-                            });
-                            return true;
-                          }
-                        }
-                      }
-                    }
-
-                    // 4. Slash command navigation
-                    if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(event.key)) {
-                      return handleCommandNavigation(event);
-                    }
-                    return false;
-                  },
-                  click: (_view: unknown, event: MouseEvent) => {
-                    const target = event.target as HTMLElement;
-                    const link = target.closest("a");
-                    if (link && link.href) {
-                      if (event.metaKey || event.ctrlKey) {
-                        event.preventDefault();
-                        window.open(link.href, "_blank", "noopener,noreferrer");
-                        return true;
-                      }
-                    }
-                    return false;
-                  },
-                },
-              }}
-              onCreate={({ editor }) => {
-                setEditorInstance(editor);
-                if (initialContent) {
-                  try {
-                    editor.commands.setContent(initialContent, false, { preserveWhitespace: true });
-                  } catch (e) {
-                    console.error("Failed to parse initial markdown content:", e);
-                  }
-                }
-                const text = editor.getText();
-                setCharCount(text.length);
-                setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
-              }}
-              onUpdate={({ editor }) => {
-                if (!editorInstance) setEditorInstance(editor);
-                const text = editor.getText();
-                setCharCount(text.length);
-                setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
-
-                // Auto-sync document title if not explicitly edited
-                if (!isTitleCustom) {
-                  const firstLine = text.split("\n")[0]?.trim();
-                  if (firstLine) setTitle(firstLine.slice(0, 50));
-                }
-
-                const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
-                setContent(md);
-                scheduleAutoSave();
-              }}
+        {/* Lists Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={
+                editorInstance?.isActive("bulletList") ||
+                  editorInstance?.isActive("orderedList") ||
+                  editorInstance?.isActive("taskList") ||
+                  editorInstance?.isActive("blockquote")
+                  ? "secondary"
+                  : "ghost"
+              }
+              size="sm"
+              className="h-7 px-2 text-xs font-medium gap-1 text-txt-secondary shrink-0"
+              onMouseDown={(e) => e.preventDefault()}
+              title="Tipe List"
             >
-              {/* Notion Slash Commands Popup */}
-              <EditorCommand className="z-50 h-auto max-h-[330px] w-72 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl transition-all">
-                <EditorCommandEmpty className="p-2 text-xs text-txt-muted">
-                  No matching blocks found
-                </EditorCommandEmpty>
-                <EditorCommandList>
-                  {rawSlashItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <EditorCommandItem
-                        key={item.title}
-                        value={item.title}
-                        onCommand={(val) => item.command?.(val)}
-                        className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs text-txt-primary hover:bg-accent cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-7 w-7 items-center justify-center rounded border border-border bg-accent/40 text-txt-brand shrink-0">
-                            {Icon}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{item.title}</span>
-                            <span className="text-[10px] text-txt-muted">{item.description}</span>
-                          </div>
-                        </div>
+              {editorInstance?.isActive("orderedList") ? (
+                <ListOrdered className="h-3.5 w-3.5" />
+              ) : editorInstance?.isActive("taskList") ? (
+                <CheckSquare className="h-3.5 w-3.5" />
+              ) : editorInstance?.isActive("blockquote") ? (
+                <Quote className="h-3.5 w-3.5" />
+              ) : (
+                <List className="h-3.5 w-3.5" />
+              )}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Tipe List</div>
+            <DropdownMenuItem
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editorInstance?.chain().focus().toggleBulletList().run()}
+              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("bulletList") ? "bg-accent text-txt-primary font-medium" : ""}`}
+            >
+              <div className="flex items-center gap-2"><List className="h-3.5 w-3.5" /> Bullet List</div>
+              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">-</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editorInstance?.chain().focus().toggleOrderedList().run()}
+              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("orderedList") ? "bg-accent text-txt-primary font-medium" : ""}`}
+            >
+              <div className="flex items-center gap-2"><ListOrdered className="h-3.5 w-3.5" /> Numbered List</div>
+              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">1.</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editorInstance?.chain().focus().toggleTaskList().run()}
+              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("taskList") ? "bg-accent text-txt-primary font-medium" : ""}`}
+            >
+              <div className="flex items-center gap-2"><CheckSquare className="h-3.5 w-3.5" /> To-do List</div>
+              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">[]</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editorInstance?.chain().focus().toggleBlockquote().run()}
+              className={`cursor-pointer text-xs flex items-center justify-between ${editorInstance?.isActive("blockquote") ? "bg-accent text-txt-primary font-medium" : ""}`}
+            >
+              <div className="flex items-center gap-2"><Quote className="h-3.5 w-3.5" /> Quote</div>
+              <span className="text-[10px] font-mono text-txt-muted bg-accent/40 px-1 rounded">&gt;</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-                        {/* Markdown Hint Badge (Matching Notion UI) */}
-                        {item.badge && (
-                          <span className="text-[11px] font-mono text-txt-muted px-1.5 py-0.5 rounded border border-border/50 bg-accent/20 shrink-0">
-                            {item.badge}
-                          </span>
-                        )}
-                      </EditorCommandItem>
-                    );
-                  })}
-                </EditorCommandList>
-              </EditorCommand>
+        {/* Table */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant={editorInstance?.isActive("table") ? "secondary" : "ghost"} size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} title="Table"><TableIcon className="h-3.5 w-3.5" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-48">
+            {!editorInstance?.isActive("table") ? (
+              <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run()} className="cursor-pointer text-xs">Sisipkan Tabel 3x3</DropdownMenuItem>
+            ) : (
+              <>
+                <div className="px-2 py-1 text-[10px] font-semibold text-txt-muted capitalize">Kontrol Tabel</div>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowAfter().run()} className="cursor-pointer text-xs">+ Tambah Baris di Bawah</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addRowBefore().run()} className="cursor-pointer text-xs">+ Tambah Baris di Atas</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addColumnAfter().run()} className="cursor-pointer text-xs">+ Tambah Kolom Kanan</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().addColumnBefore().run()} className="cursor-pointer text-xs">+ Tambah Kolom Kiri</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().mergeOrSplit().run()} className="cursor-pointer text-xs text-purple-400 font-medium">Gabung / Pisahkan Sel</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteRow().run()} className="cursor-pointer text-xs text-amber-500">- Hapus Baris Ini</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteColumn().run()} className="cursor-pointer text-xs text-amber-500">- Hapus Kolom Ini</DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().deleteTable().run()} className="cursor-pointer text-xs text-red-500 font-semibold">Hapus Seluruh Tabel</DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-              {/* Notion-Grade Selection Popover (Turn Into, Formatting, Colors, and AI Skills) */}
-              <EditorBubble
-                tippyOptions={{ maxWidth: "none", placement: "top" }}
-                shouldShow={({ editor, state }) => {
-                  if (!editor || !state) return false;
-                  if (state.selection.empty || state.selection.from === state.selection.to) {
-                    return false;
-                  }
-                  if (editor.isActive("image")) {
-                    return false;
-                  }
-                  return true;
-                }}
-                className="z-50 p-0 border-none bg-transparent shadow-none w-fit"
-              >
-                {editorInstance && (
-                  <NotionSelectionPopover
-                    editor={editorInstance}
-                    workspacePath={workspacePath}
-                    noteId={noteId}
-                  />
-                )}
-              </EditorBubble>
-            </EditorContent>
-          </EditorRoot>
-        </div>
-        </div>
+        <Separator orientation="vertical" className="h-4 shrink-0 mx-1" />
+
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={() => editorInstance?.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Formatting">
+          <RemoveFormatting className="h-3.5 w-3.5 text-txt-muted" />
+        </Button>
       </div>
 
-      {/* 5. AI Summary Dialog */}
-      <AiSummaryDialog
-        isOpen={isAiDialogOpen}
-        onClose={() => setIsAiDialogOpen(false)}
-        noteId={noteId}
-        workspacePath={workspacePath}
-        noteTitle={title}
-        onInsertSummary={handleInsertSummary}
-      />
+      {/* 3. Main Split View Container */}
+      <div className="flex-1 flex overflow-hidden min-h-0 w-full">
+        {/* Left Side: Canvas & Editor Space */}
+        <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0">
+          <div className="flex-1 px-8 sm:px-14 py-8 max-w-4xl mx-auto w-full">
+            {/* Dedicated Relative Wrapper for Editor Canvas & Side Handle Alignment */}
+            <div className="relative w-full">
+              {/* Notion Block Side Handle (+ and :: Grip) */}
+              {editorInstance && (
+                <NotionBlockSideHandle
+                  editor={editorInstance}
+                  onOpenSlashMenu={() => {
+                    // Focus and trigger suggestion
+                  }}
+                />
+              )}
 
-      {/* 6. Image Dialog */}
-      <ImageDialog
-        isOpen={isImageDialogOpen}
-        onClose={() => setIsImageDialogOpen(false)}
-        onInsertImage={(src) => {
-          if (editorInstance) {
-            editorInstance.chain().focus().setImage({ src }).run();
-            scheduleAutoSave();
-          }
-        }}
-      />
+              {/* Novel Root */}
+              <EditorRoot>
+                <EditorContent
+                  initialContent={initialContent as any}
+                  extensions={defaultExtensions}
+                  className="prose dark:prose-invert max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:border-none text-txt-primary text-base leading-relaxed min-h-[500px]"
+                  editorProps={{
+                    handleDOMEvents: {
+                      keydown: (_view: unknown, event: KeyboardEvent) => handleCommandNavigation(event),
+                    },
+                  }}
+                  onCreate={({ editor }) => {
+                    setEditorInstance(editor);
+                    const text = editor.getText();
+                    setCharCount(text.length);
+                    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+                  }}
+                  onUpdate={({ editor }) => {
+                    if (!editorInstance) setEditorInstance(editor);
+                    const text = editor.getText();
+                    setCharCount(text.length);
+                    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+
+                    // Auto-sync document title if not explicitly edited
+                    if (!isTitleCustom) {
+                      const firstLine = text.split("\n")[0]?.trim();
+                      if (firstLine) setTitle(firstLine.slice(0, 50));
+                    }
+
+                    const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
+                    setContent(md);
+                    scheduleAutoSave();
+                  }}
+                >
+                  {/* Notion Slash Commands Popup */}
+                  <EditorCommand className="z-50 h-auto max-h-[330px] w-72 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-2xl transition-all">
+                    <EditorCommandEmpty className="p-2 text-xs text-txt-muted">
+                      Tidak ada blok yang cocok
+                    </EditorCommandEmpty>
+                    <EditorCommandList>
+                      {rawSlashItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <EditorCommandItem
+                            key={item.title}
+                            value={item.title}
+                            onCommand={(val) => item.command?.(val)}
+                            className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs text-txt-primary hover:bg-accent cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-7 w-7 items-center justify-center rounded border border-border bg-accent/40 text-txt-brand shrink-0">
+                                {Icon}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold">{item.title}</span>
+                                <span className="text-[10px] text-txt-muted">{item.description}</span>
+                              </div>
+                            </div>
+
+                            {/* Markdown Hint Badge (Matching Notion UI) */}
+                            {item.badge && (
+                              <span className="text-[11px] font-mono text-txt-muted px-1.5 py-0.5 rounded border border-border/50 bg-accent/20 shrink-0">
+                                {item.badge}
+                              </span>
+                            )}
+                          </EditorCommandItem>
+                        );
+                      })}
+                    </EditorCommandList>
+                  </EditorCommand>
+
+                  {/* Selection Bubble Toolbar */}
+                  <EditorBubble
+                    tippyOptions={{ maxWidth: "none" }}
+                    className="flex items-center gap-0.5 rounded-xl border border-border bg-popover p-1 shadow-xl backdrop-blur-sm z-50 text-txt-primary w-fit"
+                  >
+                    {editorInstance?.isActive("table") && (
+                      <>
+                        {/* +Col */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().addColumnAfter().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
+                            title="Tambah Kolom"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>Col</span>
+                          </Button>
+                        </EditorBubbleItem>
+
+                        {/* +Row */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().addRowAfter().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-txt-brand hover:bg-accent gap-1 cursor-pointer"
+                            title="Tambah Baris"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>Row</span>
+                          </Button>
+                        </EditorBubbleItem>
+
+                        <Separator orientation="vertical" className="h-4 mx-0.5" />
+
+                        {/* Merge/Split */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().mergeOrSplit().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-purple-400 hover:bg-accent gap-1 cursor-pointer"
+                            title="Merge / Split Sel"
+                          >
+                            <Combine className="h-3.5 w-3.5" />
+                          </Button>
+                        </EditorBubbleItem>
+
+                        {/* Delete Row */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteRow().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-amber-400 hover:text-amber-500 hover:bg-amber-500/10 gap-1 cursor-pointer"
+                            title="Hapus Baris"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Row</span>
+                          </Button>
+                        </EditorBubbleItem>
+
+                        {/* Delete Col */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteColumn().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-amber-400 hover:text-amber-500 hover:bg-amber-500/10 gap-1 cursor-pointer"
+                            title="Hapus Kolom"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Col</span>
+                          </Button>
+                        </EditorBubbleItem>
+
+                        {/* Delete Table */}
+                        <EditorBubbleItem onSelect={(editor) => editor.chain().focus().deleteTable().run()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-medium text-red-400 hover:text-red-500 hover:bg-red-500/10 gap-1 cursor-pointer"
+                            title="Hapus Seluruh Tabel"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Table</span>
+                          </Button>
+                        </EditorBubbleItem>
+
+                        <Separator orientation="vertical" className="h-4 mx-0.5" />
+                      </>
+                    )}
+
+                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleBold().run()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Bold className="h-3.5 w-3.5" />
+                      </Button>
+                    </EditorBubbleItem>
+                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleItalic().run()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Italic className="h-3.5 w-3.5" />
+                      </Button>
+                    </EditorBubbleItem>
+                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleStrike().run()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Strikethrough className="h-3.5 w-3.5" />
+                      </Button>
+                    </EditorBubbleItem>
+                    <EditorBubbleItem onSelect={(editor) => editor.chain().focus().toggleCode().run()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Code className="h-3.5 w-3.5" />
+                      </Button>
+                    </EditorBubbleItem>
+                  </EditorBubble>
+                </EditorContent>
+              </EditorRoot>
+            </div>
+          </div>
+
+          {/* 4. Footer Bar */}
+          <EditorFooter
+            wordCount={wordCount}
+            charCount={charCount}
+          />
+        </div>
+
+        {/* Right Side: Split Screen AI Summary Panel */}
+        <AiSummaryPanel
+          isOpen={isAiDialogOpen}
+          onClose={() => setIsAiDialogOpen(false)}
+          noteId={noteId}
+          workspacePath={workspacePath}
+          noteTitle={title}
+          onInsertSummary={handleInsertSummary}
+          onOpenSettings={onOpenSettings}
+        />
+      </div>
     </div>
   );
 }

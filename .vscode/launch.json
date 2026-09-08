@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Desktop App (Tauri Dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Run Web Frontend (Next.js)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm web:dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Debug Web Frontend (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/apps/desktop/src"
+    },
+    {
+      "name": "Debug Rust Backend (CodeLLDB)",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=./apps/desktop/src-tauri/Cargo.toml",
+          "--bin=markidown"
+        ]
+      },
+      "cwd": "${workspaceFolder}/apps/desktop/src-tauri"
+    }
+  ]
+}

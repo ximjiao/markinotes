@@ -146,6 +146,11 @@ struct GeminiError {
     message: String,
 }
 
+#[derive(Deserialize)]
+struct GeminiResponse {
+    candidates: Option<Vec<GeminiCandidate>>,
+}
+
 // ==========================================
 // Anthropic Structs
 // ==========================================
@@ -275,9 +280,31 @@ pub fn resolve_api_key(
         }
     }
     let _ = dotenvy::dotenv();
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut cur = Some(cwd.as_path());
+        while let Some(dir) = cur {
+            let env_file = dir.join(".env");
+            if env_file.exists() {
+                let _ = dotenvy::from_path(&env_file);
+            }
+            cur = dir.parent();
+        }
+    }
 
     let prov = provider.unwrap_or("gemini").to_lowercase();
     match prov.as_str() {
+        "system" | "cloud" => {
+            if let Some(key) = custom_api_key.filter(|k| !k.trim().is_empty()) {
+                return Ok(key.trim().to_string());
+            }
+            std::env::var("MARKINOTES_AI_KEY")
+                .or_else(|_| std::env::var("GEMINI_API_KEY"))
+                .or_else(|_| std::env::var("OPENAI_API_KEY"))
+                .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
+                .map_err(|_| {
+                    "Setup API Key AI bawaan sistem belum terpasang di file .env. Silakan isi GEMINI_API_KEY pada file .env atau beralih ke mode 'Token Sendiri' di Settings.".to_string()
+                })
+        }
         "anthropic" | "claude" => {
             std::env::var("ANTHROPIC_API_KEY").map_err(|_| {
                 "Anthropic API key not found. Please add your API key in Settings or set ANTHROPIC_API_KEY in .env".to_string()
@@ -320,6 +347,59 @@ pub async fn stream_ai_completion(
 ) -> Result<(), String> {
     let prov = provider.unwrap_or("gemini").to_lowercase();
     match prov.as_str() {
+        "system" | "cloud" => {
+            if let Ok(server_url) = std::env::var("MARKINOTES_SERVER_URL") {
+                let client = reqwest::Client::new();
+                let res = client
+                    .post(&server_url)
+                    .header("Authorization", format!("Bearer {api_key}"))
+                    .json(&serde_json::json!({
+                        "prompt": prompt,
+                        "model": model.unwrap_or("gemini-2.0-flash")
+                    }))
+                    .send()
+                    .await
+                    .map_err(|e| format!("Markinotes Cloud server error: {e}"))?;
+                if !res.status().is_success() {
+                    let status = res.status();
+                    let err = res.text().await.unwrap_or_default();
+                    return Err(format!("Cloud AI error (HTTP {status}): {err}"));
+                }
+                let text = res.text().await.unwrap_or_default();
+                let _ = on_chunk.send(text);
+                Ok(())
+            } else if let Ok(gemini_key) = std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("MARKINOTES_AI_KEY")) {
+                let env_model = std::env::var("GEMINI_MODEL").ok();
+                let chosen_model = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("gemini-2.0-flash");
+                stream_gemini_summary(&gemini_key, Some(chosen_model), prompt, on_chunk).await
+            } else if let Ok(openai_key) = std::env::var("OPENAI_API_KEY") {
+                let env_model = std::env::var("OPENAI_MODEL").ok();
+                let chosen_model = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("gpt-4o-mini");
+                stream_openai_summary(&openai_key, Some(chosen_model), prompt, on_chunk).await
+            } else if let Ok(claude_key) = std::env::var("ANTHROPIC_API_KEY") {
+                let env_model = std::env::var("ANTHROPIC_MODEL").ok();
+                let chosen_model = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("claude-3-5-sonnet-20241022");
+                stream_anthropic_summary(&claude_key, Some(chosen_model), prompt, on_chunk).await
+            } else if api_key.starts_with("AIzaSy") {
+                let env_model = std::env::var("GEMINI_MODEL").ok();
+                let chosen_model = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("gemini-2.0-flash");
+                stream_gemini_summary(api_key, Some(chosen_model), prompt, on_chunk).await
+            } else {
+                Err("API Key sistem di file .env belum terpasang. Harap tambahkan GEMINI_API_KEY di file .env".to_string())
+            }
+        }
         "anthropic" | "claude" => {
             stream_anthropic_summary(api_key, model, prompt, on_chunk).await
         }
@@ -343,7 +423,7 @@ pub async fn stream_gemini_summary(
     let model_name = model
         .filter(|m| !m.is_empty())
         .or(env_model.as_deref().filter(|m| !m.is_empty()))
-        .unwrap_or("gemini-1.5-flash");
+        .unwrap_or("gemini-2.0-flash");
 
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
@@ -584,6 +664,83 @@ pub async fn test_ai_connection(
     let start = Instant::now();
 
     match prov.as_str() {
+        "system" | "cloud" => {
+            if let Ok(server_url) = std::env::var("MARKINOTES_SERVER_URL") {
+                let latency = start.elapsed().as_millis() as u64;
+                Ok(TestAiConnectionResult {
+                    success: true,
+                    latency_ms: latency,
+                    message: format!("Terhubung ke server Markinotes Cloud ({server_url})"),
+                    model: "markinotes-smart-v2".to_string(),
+                })
+            } else if let Ok(gemini_key) = std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("MARKINOTES_AI_KEY")) {
+                let env_model = std::env::var("GEMINI_MODEL").ok();
+                let model_name = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("gemini-2.0-flash");
+                let url = format!(
+                    "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                    model_name, gemini_key
+                );
+                let client = reqwest::Client::new();
+                let body = GeminiRequest {
+                    contents: vec![GeminiContent {
+                        parts: vec![GeminiPart {
+                            text: "Reply with the single word 'Connected'.".to_string(),
+                        }],
+                    }],
+                    generation_config: GeminiGenerationConfig { temperature: 0.1 },
+                };
+                let response = client.post(&url).header("Content-Type", "application/json").json(&body).send().await
+                    .map_err(|e| format!("Koneksi AI sistem gagal: {e}"))?;
+                let latency = start.elapsed().as_millis() as u64;
+                if !response.status().is_success() {
+                    let status = response.status();
+                    let err_text = response.text().await.unwrap_or_default();
+                    return Err(format!("AI Bawaan Sistem (.env) error (HTTP {status}): {err_text}"));
+                }
+                Ok(TestAiConnectionResult {
+                    success: true,
+                    latency_ms: latency,
+                    message: format!("Terhubung ke AI Bawaan Sistem via .env ({model_name})"),
+                    model: model_name.to_string(),
+                })
+            } else if let Ok(openai_key) = std::env::var("OPENAI_API_KEY") {
+                let env_model = std::env::var("OPENAI_MODEL").ok();
+                let model_name = model
+                    .filter(|m| !m.is_empty())
+                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
+                    .unwrap_or("gpt-4o-mini");
+                let url = "https://api.openai.com/v1/chat/completions";
+                let client = reqwest::Client::new();
+                let body = OpenAiRequest {
+                    model: model_name.to_string(),
+                    stream: false,
+                    temperature: Some(0.1),
+                    messages: vec![OpenAiMessage {
+                        role: "user".to_string(),
+                        content: "Reply with the single word 'Connected'.".to_string(),
+                    }],
+                };
+                let response = client.post(url).header("Authorization", format!("Bearer {openai_key}")).header("Content-Type", "application/json").json(&body).send().await
+                    .map_err(|e| format!("Koneksi OpenAI sistem gagal: {e}"))?;
+                let latency = start.elapsed().as_millis() as u64;
+                if !response.status().is_success() {
+                    let status = response.status();
+                    let err_text = response.text().await.unwrap_or_default();
+                    return Err(format!("OpenAI sistem (.env) error (HTTP {status}): {err_text}"));
+                }
+                Ok(TestAiConnectionResult {
+                    success: true,
+                    latency_ms: latency,
+                    message: format!("Terhubung ke OpenAI sistem via .env ({model_name})"),
+                    model: model_name.to_string(),
+                })
+            } else {
+                Err("API Key sistem belum terpasang di file .env. Harap isi GEMINI_API_KEY pada file .env".to_string())
+            }
+        }
         "anthropic" | "claude" => {
             let model_name = model.filter(|m| !m.is_empty()).unwrap_or("claude-3-5-sonnet-20241022");
             let url = "https://api.anthropic.com/v1/messages";
@@ -662,7 +819,7 @@ pub async fn test_ai_connection(
             })
         }
         _ => {
-            let model_name = model.filter(|m| !m.is_empty()).unwrap_or("gemini-1.5-flash");
+            let model_name = model.filter(|m| !m.is_empty()).unwrap_or("gemini-2.0-flash");
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                 model_name, api_key
@@ -741,6 +898,46 @@ pub async fn organize_drafts(
 
     let prov = provider.unwrap_or("gemini").to_lowercase();
     match prov.as_str() {
+        "system" | "cloud" => {
+            let key = std::env::var("GEMINI_API_KEY")
+                .or_else(|_| std::env::var("MARKINOTES_AI_KEY"))
+                .unwrap_or_else(|_| api_key.to_string());
+            if key.starts_with("AIzaSy") {
+                let model_name = model.filter(|m| !m.is_empty()).unwrap_or("gemini-2.0-flash");
+                let url = format!(
+                    "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                    model_name, key
+                );
+                let client = reqwest::Client::new();
+                let body = GeminiRequest {
+                    contents: vec![GeminiContent {
+                        parts: vec![GeminiPart {
+                            text: prompt.to_string(),
+                        }],
+                    }],
+                    generation_config: GeminiGenerationConfig { temperature: 0.1 },
+                };
+                let response = client.post(&url).header("Content-Type", "application/json").json(&body).send().await.map_err(|e| e.to_string())?;
+                if response.status().is_success() {
+                    let gemini_resp: GeminiResponse = response.json().await.map_err(|e| e.to_string())?;
+                    if let Some(candidates) = gemini_resp.candidates {
+                        if let Some(first) = candidates.into_iter().next() {
+                            if let Some(content) = first.content {
+                                if let Some(parts) = content.parts {
+                                    if let Some(first_part) = parts.into_iter().next() {
+                                        if let Some(text) = first_part.text {
+                                            let clean_text = text.replace("```json", "").replace("```", "").trim().to_string();
+                                            return Ok(clean_text);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok("{\"moves\":{},\"creates\":{}}".to_string())
+        }
         "anthropic" | "claude" => {
             let model_name = model.filter(|m| !m.is_empty()).unwrap_or("claude-3-5-sonnet-20241022");
             let url = "https://api.anthropic.com/v1/messages";
@@ -839,7 +1036,7 @@ pub async fn organize_drafts(
             let model_name = model
                 .filter(|m| !m.is_empty())
                 .or(env_model.as_deref().filter(|m| !m.is_empty()))
-                .unwrap_or("gemini-1.5-flash");
+                .unwrap_or("gemini-2.0-flash");
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                 model_name, api_key
@@ -869,10 +1066,7 @@ pub async fn organize_drafts(
                 return Err(format!("Gemini API error (HTTP {status}): {error_body}"));
             }
 
-            #[derive(Deserialize)]
-            struct GeminiResponse {
-                candidates: Option<Vec<GeminiCandidate>>,
-            }
+            // GeminiResponse is defined at module level
 
             let parsed_res: GeminiResponse = response
                 .json()

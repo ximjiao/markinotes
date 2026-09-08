@@ -6,6 +6,7 @@ export { SlashCommandMenu } from "./_components/slash-command-menu";
 export { BubbleToolbar } from "./_components/bubble-toolbar";
 export { EditorFooter } from "./_components/editor-footer";
 export { AiSummaryDialog } from "./_components/ai-summary-dialog";
+export { AiSummaryPanel } from "./_components/ai-summary-panel";
 export { NotionTocMinimap } from "./_components/notion-toc-minimap";
 export { NotionTablePillHandles } from "./_components/notion-table-pill-handles";
 

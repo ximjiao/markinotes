@@ -20,7 +20,7 @@ import type { NoteFrontmatter } from "../_types/editor.types";
 
 const lowlight = createLowlight(common);
 
-export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "dirty" | "streaming" | "saving" | "saved" | "error";
 
 interface UseTiptapEditorOptions {
   initialContent?: string;

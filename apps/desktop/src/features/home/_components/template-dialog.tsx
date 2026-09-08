@@ -25,6 +25,7 @@ interface TemplateDialogProps {
   onClose: () => void;
   onSelectTemplate: (template: NoteTemplate) => void;
   workspacePath?: string | null;
+  onOpenSettings?: () => void;
 }
 
 // Visual "paper" preview per template id
@@ -202,7 +203,7 @@ const AI_PROMPT_SUGGESTIONS = [
   { label: "📐 Architecture RFC", prompt: "Architecture Decision Record (ADR) template covering context, decision, trade-offs, and alternatives." },
 ];
 
-export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePath }: TemplateDialogProps) {
+export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePath, onOpenSettings }: TemplateDialogProps) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMarkdown, setGeneratedMarkdown] = useState("");
@@ -225,6 +226,17 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
 
     try {
       const config = workspaceConfig.get();
+      const isSystemMode = config.aiMode === "system";
+
+      if (isSystemMode) {
+        const quota = workspaceConfig.checkSystemAiQuota();
+        if (!quota.allowed) {
+          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).");
+          setIsGenerating(false);
+          return;
+        }
+      }
+
       const wsPath = workspacePath || config.rootPath || "";
 
       const instruction = `Create a clean, well-structured, and professional Markdown document template tailored for: "${aiPrompt.trim()}".\n` +
@@ -243,10 +255,14 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
           fullOutput += chunk;
           setGeneratedMarkdown(fullOutput);
         },
-        config.aiApiKey || config.geminiApiKey,
-        config.aiModel || config.geminiModel,
-        config.aiProvider
+        isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
+        isSystemMode ? "gemini-2.0-flash" : (config.aiModel || config.geminiModel),
+        isSystemMode ? "system" : config.aiProvider
       );
+
+      if (isSystemMode) {
+        workspaceConfig.consumeSystemAiQuota(1);
+      }
 
       // Extract title from first line
       const firstLine = fullOutput.split("\n")[0]?.replace(/^#+\s*/, "").trim();
@@ -266,7 +282,12 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
       setGeneratedTitle("");
       onClose();
     } catch (err: any) {
-      setErrorMessage(typeof err === "string" ? err : err?.message || "Couldn't craft your template right now. Please check your connection and try again.");
+      const raw = typeof err === "string" ? err : err?.message || "";
+      if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden")) {
+        setErrorMessage("Gagal terhubung ke AI karena API Key belum terpasang atau tidak valid. Silakan periksa di menu Settings.");
+      } else {
+        setErrorMessage(raw || "Couldn't craft your template right now. Please check your connection and try again.");
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -344,9 +365,23 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
 
           {/* Error Message */}
           {errorMessage && (
-            <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-500 flex items-center gap-2">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="mt-2 p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-500 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{errorMessage}</span>
+              </div>
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenSettings();
+                  }}
+                  className="px-2 py-0.5 text-[11px] font-medium bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 rounded transition-colors shrink-0 cursor-pointer"
+                >
+                  Buka Settings
+                </button>
+              )}
             </div>
           )}
         </div>

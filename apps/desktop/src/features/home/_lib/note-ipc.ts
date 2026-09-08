@@ -7,6 +7,12 @@ export const isTauri = () => {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 };
 
+export interface BufferedNoteData {
+  content: string;
+  sizeBytes: number;
+  lineCount: number;
+}
+
 export const noteIpc = {
   list: async (workspacePath: string): Promise<NoteCardData[]> => {
     if (isTauri()) {
@@ -50,6 +56,24 @@ export const noteIpc = {
     return localStorage.getItem(`marki_content_${notePath}`) || "";
   },
 
+  readBuffered: async (notePath: string): Promise<BufferedNoteData> => {
+    if (isTauri()) {
+      const res: any = await invoke("note_read_buffered", { notePath });
+      return {
+        content: res.content || "",
+        sizeBytes: res.size_bytes ?? (res.content?.length || 0),
+        lineCount: res.line_count ?? 0,
+      };
+    }
+    // Web fallback
+    const content = localStorage.getItem(`marki_content_${notePath}`) || "";
+    return {
+      content,
+      sizeBytes: new Blob([content]).size,
+      lineCount: content.split("\n").length,
+    };
+  },
+
   update: async (workspacePath: string, notePath: string, title: string, content: string, tags: string[] = []): Promise<NoteCardData> => {
     if (isTauri()) {
       return invoke("note_update", { workspacePath, notePath, title, content, tags });
@@ -58,6 +82,15 @@ export const noteIpc = {
     // We just mock the update returning a new object and saving content
     localStorage.setItem(`marki_content_${notePath}`, content);
     return {} as NoteCardData;
+  },
+
+  saveStream: async (workspacePath: string, notePath: string, title: string, content: string, tags: string[] = []): Promise<number> => {
+    if (isTauri()) {
+      return invoke("note_save_stream", { workspacePath, notePath, title, content, tags });
+    }
+    // Web fallback
+    localStorage.setItem(`marki_content_${notePath}`, content);
+    return content.length;
   },
 
   move: async (workspacePath: string, notePath: string, newFolderPath: string): Promise<string> => {

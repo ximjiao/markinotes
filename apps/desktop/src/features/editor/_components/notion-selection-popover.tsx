@@ -177,17 +177,41 @@ export function NotionSelectionPopover({
 
     try {
       const config = workspaceConfig.get();
-      await noteIpc.editWithAiStream(
-        workspacePath || "",
-        selectedText,
-        instruction,
-        (chunk) => {
-          setAiResult((prev) => prev + chunk);
-        },
-        config.aiApiKey || config.geminiApiKey,
-        config.aiModel || config.geminiModel,
-        config.aiProvider
-      );
+      const isSystemMode = config.aiMode === "system";
+
+      if (isSystemMode) {
+        const quota = workspaceConfig.checkSystemAiQuota();
+        if (!quota.allowed) {
+          setAiStatus("error");
+          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).");
+          return;
+        }
+
+        await noteIpc.editWithAiStream(
+          workspacePath || "",
+          selectedText,
+          instruction,
+          (chunk) => {
+            setAiResult((prev) => prev + chunk);
+          },
+          undefined,
+          "gemini-2.0-flash",
+          "system"
+        );
+        workspaceConfig.consumeSystemAiQuota(1);
+      } else {
+        await noteIpc.editWithAiStream(
+          workspacePath || "",
+          selectedText,
+          instruction,
+          (chunk) => {
+            setAiResult((prev) => prev + chunk);
+          },
+          config.aiApiKey || config.geminiApiKey,
+          config.aiModel || config.geminiModel,
+          config.aiProvider
+        );
+      }
       setAiStatus("completed");
     } catch (err: any) {
       setAiStatus("error");

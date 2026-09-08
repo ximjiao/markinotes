@@ -18,11 +18,25 @@ import {
   CheckCircle2,
   XCircle,
   Zap,
+  Key,
+  Cloud,
+  Crown,
+  CreditCard,
+  ArrowRight,
+  ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { workspaceConfig, AiProvider } from "../../workspace/_lib/workspace-config";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { workspaceConfig, AiProvider, AiMode, SystemAiProfile } from "../../workspace/_lib/workspace-config";
 import { LocalFolderNode } from "../../workspace/_types/folder.types";
 import { isTauri, noteIpc } from "../../home/_lib/note-ipc";
 import { invoke } from "@tauri-apps/api/core";
@@ -57,11 +71,11 @@ const PROVIDER_OPTIONS: {
     label: "Google Gemini",
     badge: "Fast & High Context",
     keyPlaceholder: "AIzaSy...",
-    defaultModel: "gemini-1.5-flash",
+    defaultModel: "gemini-2.0-flash",
     models: [
-      { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Recommended · Fast & efficient" },
+      { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Recommended · Fast & state-of-the-art" },
+      { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Legacy fast model" },
       { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", desc: "Complex reasoning & deep analysis" },
-      { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Next-gen high speed" },
     ],
   },
   {
@@ -100,9 +114,9 @@ const PROVIDER_OPTIONS: {
   },
 ];
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function SectionHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className="text-[11px] font-semibold  capitalize text-txt-muted/70 px-1 mb-2 ">
+    <p className={cn("text-[11px] font-semibold capitalize text-txt-muted/70 px-1 mb-2", className)}>
       {children}
     </p>
   );
@@ -216,6 +230,11 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
   const [isCustomModelInput, setIsCustomModelInput] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testFeedback, setTestFeedback] = useState<{ message: string; latency_ms?: number; model?: string } | null>(null);
+  const [aiMode, setAiMode] = useState<AiMode>(config.aiMode || "byok");
+  const [systemAi, setSystemAi] = useState<SystemAiProfile>(
+    config.systemAi || { tier: "trial", quotaUsed: 0, quotaLimit: 25 }
+  );
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   const currentProvider = PROVIDER_OPTIONS.find((p) => p.id === aiProvider) || PROVIDER_OPTIONS[0];
@@ -236,6 +255,8 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
     const resolvedKey = currentConfig.aiApiKey || currentConfig.geminiApiKey || "";
     const resolvedModel = currentConfig.aiModel || currentConfig.geminiModel || "";
 
+    setAiMode(currentConfig.aiMode || "byok");
+    setSystemAi(currentConfig.systemAi || { tier: "trial", quotaUsed: 0, quotaLimit: 25 });
     setAiProvider(resolvedProvider);
     setAiApiKey(resolvedKey);
     setAiModel(resolvedModel);
@@ -251,6 +272,31 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
     document.documentElement.setAttribute("data-accent", savedAccent);
     setIsReady(true);
   }, []);
+
+  const handleUpgradeToPro = () => {
+    const updated: SystemAiProfile = {
+      ...systemAi,
+      tier: "pro",
+      quotaUsed: systemAi.quotaUsed,
+      quotaLimit: 999999,
+    };
+    setSystemAi(updated);
+    workspaceConfig.set({ systemAi: updated });
+    setShowUpgradeModal(false);
+    toast.success("Selamat! Akun Anda kini aktif sebagai Markinotes Pro.");
+  };
+
+  const handleResetTrial = () => {
+    const updated: SystemAiProfile = {
+      ...systemAi,
+      tier: "trial",
+      quotaUsed: 0,
+      quotaLimit: 25,
+    };
+    setSystemAi(updated);
+    workspaceConfig.set({ systemAi: updated });
+    toast.success("Kuota trial AI sistem berhasil direset ke 25 permintaan.");
+  };
 
   const handleTextSize = (idx: number) => {
     setTextSizeIdx(idx);
@@ -565,237 +611,560 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
 
       {/* ─── AI Configuration ─── */}
       <section>
-        <SectionHeader>AI Configuration</SectionHeader>
-        <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border/60">
-          
-          {/* Provider Selector */}
-          <div className="flex items-center justify-between gap-4 px-5 py-4">
-            <div>
-              <p className="text-sm font-medium text-txt-primary">AI Provider</p>
-              <p className="text-xs text-txt-muted mt-0.5">
-                Choose the model provider for AI summary and editing
-              </p>
-            </div>
-            <Select
-              value={aiProvider}
-              onValueChange={(val: AiProvider) => {
-                setAiProvider(val);
-                const provDef = PROVIDER_OPTIONS.find((p) => p.id === val);
-                const nextModel = provDef?.defaultModel || "";
-                setAiModel(nextModel);
-                setIsCustomModelInput(val === "custom");
-                workspaceConfig.set({ aiProvider: val, aiModel: nextModel });
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <SectionHeader className="mb-0">AI Configuration</SectionHeader>
+          <div className="inline-flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/70 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setAiMode("byok");
+                workspaceConfig.set({ aiMode: "byok" });
                 setTestStatus("idle");
                 setTestFeedback(null);
               }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
+                aiMode === "byok"
+                  ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
+                  : "text-txt-muted hover:text-txt-primary"
+              )}
             >
-              <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
-                <SelectValue placeholder="Select provider..." />
-              </SelectTrigger>
-              <SelectContent>
-                {PROVIDER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.id} value={opt.id} className="text-xs">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-3 w-3 text-txt-brand" />
-                      <span>{opt.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Key className="h-3.5 w-3.5 text-amber-500" />
+              <span>Token Sendiri (BYOK)</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
+                Gratis
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAiMode("system");
+                workspaceConfig.set({ aiMode: "system" });
+                setTestStatus("idle");
+                setTestFeedback(null);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
+                aiMode === "system"
+                  ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
+                  : "text-txt-muted hover:text-txt-primary"
+              )}
+            >
+              <Cloud className="h-3.5 w-3.5 text-purple-500" />
+              <span>AI Bawaan Sistem</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20">
+                Berbayar / Pro
+              </span>
+            </button>
           </div>
+        </div>
 
-          {/* Model Selector */}
-          <div className="flex items-center justify-between gap-4 px-5 py-4">
-            <div>
-              <p className="text-sm font-medium text-txt-primary">Model</p>
-              <p className="text-xs text-txt-muted mt-0.5">
-                {currentProvider?.badge || "Select model"}
-              </p>
+        {aiMode === "system" ? (
+          /* ─── Mode 2: AI Bawaan Sistem (Markinotes Cloud) ─── */
+          <div className="rounded-xl border border-purple-500/30 bg-card overflow-hidden divide-y divide-border/60 shadow-sm">
+            {/* Header info */}
+            <div className="px-5 py-4 bg-gradient-to-r from-purple-500/10 via-brand/5 to-transparent">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm font-semibold text-txt-primary">Markinotes Cloud AI Engine</span>
+                    {systemAi.tier === "pro" ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                        <Crown className="h-3 w-3" />
+                        PRO PLAN
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                        <Sparkles className="h-3 w-3" />
+                        FREE TRIAL
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-txt-muted">
+                    Fitur AI siap pakai langsung dari server Markinotes. Tanpa perlu setup API key pribadi, kartu kredit developer, atau akun Google AI Studio.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {!isCustomModelInput && aiProvider !== "custom" ? (
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={aiModel || currentProvider?.defaultModel || ""}
-                    onValueChange={(val) => {
-                      if (val === "__custom__") {
-                        setIsCustomModelInput(true);
+
+            {/* Quota & Usage Status */}
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-txt-primary">Status Pemakaian Kuota</span>
+                {systemAi.tier === "pro" ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Akses Tanpa Batas (Unlimited)</span>
+                ) : (
+                  <span className="text-txt-muted">
+                    <strong className="text-txt-primary">{systemAi.quotaUsed}</strong> / {systemAi.quotaLimit} permintaan terpakai
+                    ({Math.max(0, systemAi.quotaLimit - systemAi.quotaUsed)} tersisa)
+                  </span>
+                )}
+              </div>
+
+              {systemAi.tier !== "pro" && (
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-300",
+                      systemAi.quotaUsed >= systemAi.quotaLimit
+                        ? "bg-destructive"
+                        : systemAi.quotaUsed > systemAi.quotaLimit * 0.75
+                        ? "bg-amber-500"
+                        : "bg-purple-500"
+                    )}
+                    style={{
+                      width: `${Math.min(100, (systemAi.quotaUsed / systemAi.quotaLimit) * 100)}%`,
+                    }}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2 text-xs text-txt-muted">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Model: <strong>Markinotes Smart Engine (Gemini 2.0 Flash Cloud)</strong></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {systemAi.tier !== "pro" ? (
+                    <>
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                        onClick={() => setShowUpgradeModal(true)}
+                      >
+                        <Crown className="h-3.5 w-3.5 text-amber-300" />
+                        Upgrade ke Pro
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2"
+                        title="Simulasi aktivasi untuk pengujian"
+                        onClick={handleUpgradeToPro}
+                      >
+                        Simulasi Pro
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2"
+                        title="Reset kuota trial ke 25 permintaan"
+                        onClick={handleResetTrial}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Reset (25)
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs text-txt-muted hover:text-txt-primary"
+                      onClick={() => {
+                        handleResetTrial();
+                        toast.info("Status dikembalikan ke Free Trial");
+                      }}
+                    >
+                      Beralih ke Free Trial (Simulasi)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Test Connection */}
+            <div className="flex flex-col gap-3 px-5 py-4 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-txt-primary">Uji Koneksi Server Sistem</span>
+                  {testStatus === "success" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Connected ({testFeedback?.latency_ms}ms)
+                    </span>
+                  )}
+                  {testStatus === "error" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
+                      <XCircle className="h-3 w-3" />
+                      Connection Error
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  disabled={testStatus === "testing"}
+                  onClick={async () => {
+                    setTestStatus("testing");
+                    setTestFeedback(null);
+                    try {
+                      const res = await noteIpc.testAiConnection(
+                        rootPath,
+                        "system",
+                        undefined,
+                        "markinotes-smart-v2"
+                      );
+                      if (res.success) {
+                        setTestStatus("success");
+                        setTestFeedback(res);
+                        toast.success(`Terhubung ke Server Markinotes (${res.latency_ms}ms)`);
                       } else {
+                        setTestStatus("error");
+                        setTestFeedback(res);
+                        toast.error(res.message || "Gagal terhubung ke server cloud");
+                      }
+                    } catch (err: any) {
+                      setTestStatus("error");
+                      const msg = typeof err === "string" ? err : err?.message || "Gagal terhubung ke server cloud";
+                      setTestFeedback({ message: msg });
+                      toast.error(msg);
+                    }
+                  }}
+                >
+                  {testStatus === "testing" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Menguji...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-3.5 w-3.5 text-purple-500" />
+                      Uji Koneksi Server
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {testFeedback?.message && (
+                <p
+                  className={cn(
+                    "text-[11px] leading-relaxed rounded-lg p-2.5 border",
+                    testStatus === "success"
+                      ? "bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                      : testStatus === "error"
+                      ? "bg-destructive/5 text-destructive border-destructive/20"
+                      : "bg-muted text-txt-muted border-border"
+                  )}
+                >
+                  {testFeedback.message}
+                </p>
+              )}
+
+              <div className="pt-1 flex items-center justify-between text-[11px] text-txt-muted">
+                <span>Ingin menggunakan AI gratis tanpa batasan kuota selamanya?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMode("byok");
+                    workspaceConfig.set({ aiMode: "byok" });
+                  }}
+                  className="text-txt-brand hover:underline font-medium inline-flex items-center gap-1"
+                >
+                  Gunakan Token Sendiri (BYOK)
+                  <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ─── Mode 1: Token Sendiri (BYOK - Gratis) ─── */
+          <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border/60">
+            {/* BYOK Info Banner */}
+            <div className="px-5 py-3 bg-muted/30 flex items-center justify-between text-xs text-txt-muted">
+              <div className="flex items-center gap-2">
+                <Key className="h-3.5 w-3.5 text-amber-500" />
+                <span>
+                  <strong>100% Gratis dari Markinotes</strong>. Masukkan API key dari akun developer Anda sendiri (Google, OpenAI, Claude, atau Ollama).
+                </span>
+              </div>
+            </div>
+
+            {/* Provider Selector */}
+            <div className="flex items-center justify-between gap-4 px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-txt-primary">AI Provider</p>
+                <p className="text-xs text-txt-muted mt-0.5">
+                  Pilih penyedia model AI yang ingin Anda gunakan
+                </p>
+              </div>
+              <Select
+                value={aiProvider}
+                onValueChange={(val: AiProvider) => {
+                  setAiProvider(val);
+                  const provDef = PROVIDER_OPTIONS.find((p) => p.id === val);
+                  const nextModel = provDef?.defaultModel || "";
+                  setAiModel(nextModel);
+                  setIsCustomModelInput(val === "custom");
+                  workspaceConfig.set({ aiProvider: val, aiModel: nextModel });
+                  setTestStatus("idle");
+                  setTestFeedback(null);
+                }}
+              >
+                <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
+                  <SelectValue placeholder="Select provider..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3 w-3 text-txt-brand" />
+                        <span>{opt.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Model Selector */}
+            <div className="flex items-center justify-between gap-4 px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-txt-primary">Model</p>
+                <p className="text-xs text-txt-muted mt-0.5">
+                  {currentProvider?.badge || "Pilih model AI"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isCustomModelInput && aiProvider !== "custom" ? (
+                  <div className="flex items-center gap-1.5">
+                    <Select
+                      value={aiModel || currentProvider?.defaultModel || ""}
+                      onValueChange={(val) => {
+                        if (val === "__custom__") {
+                          setIsCustomModelInput(true);
+                        } else {
+                          setAiModel(val);
+                          workspaceConfig.set({ aiModel: val, geminiModel: val });
+                          setTestStatus("idle");
+                          setTestFeedback(null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
+                        <SelectValue placeholder="Select model..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentProvider?.models.map((m) => (
+                          <SelectItem key={m.id} value={m.id} className="text-xs">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{m.label}</span>
+                              {m.desc && <span className="text-[10px] text-txt-muted">{m.desc}</span>}
+                            </div>
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-xs text-txt-brand font-medium">
+                          Custom Model ID…
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="text"
+                      placeholder={currentProvider?.defaultModel || "Enter model ID..."}
+                      className="w-[150px] h-8 text-xs"
+                      value={aiModel}
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setAiModel(val);
                         workspaceConfig.set({ aiModel: val, geminiModel: val });
                         setTestStatus("idle");
                         setTestFeedback(null);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-[190px] h-8 text-xs bg-background">
-                      <SelectValue placeholder="Select model..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currentProvider?.models.map((m) => (
-                        <SelectItem key={m.id} value={m.id} className="text-xs">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{m.label}</span>
-                            {m.desc && <span className="text-[10px] text-txt-muted">{m.desc}</span>}
-                          </div>
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="__custom__" className="text-xs text-txt-brand font-medium">
-                        Custom Model ID…
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="text"
-                    placeholder={currentProvider?.defaultModel || "Enter model ID..."}
-                    className="w-[150px] h-8 text-xs"
-                    value={aiModel}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setAiModel(val);
-                      workspaceConfig.set({ aiModel: val, geminiModel: val });
-                      setTestStatus("idle");
-                      setTestFeedback(null);
-                    }}
-                  />
-                  {aiProvider !== "custom" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-txt-muted hover:text-txt-primary"
-                      onClick={() => {
-                        setIsCustomModelInput(false);
-                        const fallbackModel = currentProvider?.defaultModel || "";
-                        setAiModel(fallbackModel);
-                        workspaceConfig.set({ aiModel: fallbackModel, geminiModel: fallbackModel });
                       }}
-                    >
-                      Presets
-                    </Button>
+                    />
+                    {aiProvider !== "custom" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-txt-muted hover:text-txt-primary"
+                        onClick={() => {
+                          setIsCustomModelInput(false);
+                          const fallbackModel = currentProvider?.defaultModel || "";
+                          setAiModel(fallbackModel);
+                          workspaceConfig.set({ aiModel: fallbackModel, geminiModel: fallbackModel });
+                        }}
+                      >
+                        Presets
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* API Key */}
+            <div className="flex items-center justify-between gap-4 px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-txt-primary">API Key</p>
+                <p className="text-xs text-txt-muted mt-0.5">
+                  Kosongkan untuk menggunakan konfigurasi .env
+                </p>
+              </div>
+              <div className="relative flex items-center">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  placeholder={currentProvider?.keyPlaceholder || "API key..."}
+                  className="w-[200px] h-8 text-xs pr-8"
+                  value={aiApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAiApiKey(val);
+                    workspaceConfig.set({ aiApiKey: val, geminiApiKey: val });
+                    setTestStatus("idle");
+                    setTestFeedback(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-2 text-txt-muted hover:text-txt-primary focus:outline-none transition-colors"
+                  title={showApiKey ? "Hide API key" : "Show API key"}
+                >
+                  {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Test Connection & Live Status */}
+            <div className="flex flex-col gap-3 px-5 py-4 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-txt-primary">Connectivity Test</span>
+                  {testStatus === "success" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Connected ({testFeedback?.latency_ms}ms)
+                    </span>
+                  )}
+                  {testStatus === "error" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
+                      <XCircle className="h-3 w-3" />
+                      Connection Error
+                    </span>
                   )}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  disabled={testStatus === "testing"}
+                  onClick={async () => {
+                    setTestStatus("testing");
+                    setTestFeedback(null);
+                    try {
+                      const res = await noteIpc.testAiConnection(
+                        rootPath,
+                        aiProvider,
+                        aiApiKey.trim() || undefined,
+                        aiModel.trim() || undefined
+                      );
+                      if (res.success) {
+                        setTestStatus("success");
+                        setTestFeedback(res);
+                        toast.success(`Connected (${res.latency_ms}ms)`);
+                      } else {
+                        setTestStatus("error");
+                        setTestFeedback(res);
+                        toast.error(res.message || "Connection failed");
+                      }
+                    } catch (err: any) {
+                      setTestStatus("error");
+                      const msg = typeof err === "string" ? err : err?.message || "Failed to connect to AI provider";
+                      setTestFeedback({ message: msg });
+                      toast.error(msg);
+                    }
+                  }}
+                >
+                  {testStatus === "testing" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-3.5 w-3.5 text-amber-500" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {testFeedback?.message && (
+                <p
+                  className={cn(
+                    "text-[11px] leading-relaxed rounded-lg p-2.5 border",
+                    testStatus === "success"
+                      ? "bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                      : testStatus === "error"
+                      ? "bg-destructive/5 text-destructive border-destructive/20"
+                      : "bg-muted text-txt-muted border-border"
+                  )}
+                >
+                  {testFeedback.message}
+                </p>
               )}
             </div>
           </div>
+        )}
 
-          {/* API Key */}
-          <div className="flex items-center justify-between gap-4 px-5 py-4">
-            <div>
-              <p className="text-sm font-medium text-txt-primary">API Key</p>
-              <p className="text-xs text-txt-muted mt-0.5">
-                Leave blank to fallback to .env configuration
-              </p>
-            </div>
-            <div className="relative flex items-center">
-              <Input
-                type={showApiKey ? "text" : "password"}
-                placeholder={currentProvider?.keyPlaceholder || "API key..."}
-                className="w-[200px] h-8 text-xs pr-8"
-                value={aiApiKey}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setAiApiKey(val);
-                  workspaceConfig.set({ aiApiKey: val, geminiApiKey: val });
-                  setTestStatus("idle");
-                  setTestFeedback(null);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-2 text-txt-muted hover:text-txt-primary focus:outline-none transition-colors"
-                title={showApiKey ? "Hide API key" : "Show API key"}
-              >
-                {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Test Connection & Live Status */}
-          <div className="flex flex-col gap-3 px-5 py-4 bg-muted/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-txt-primary">Connectivity Test</span>
-                {testStatus === "success" && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Connected ({testFeedback?.latency_ms}ms)
-                  </span>
-                )}
-                {testStatus === "error" && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
-                    <XCircle className="h-3 w-3" />
-                    Connection Error
-                  </span>
-                )}
+        {/* Pro Upgrade Dialog Modal */}
+        <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+          <DialogContent className="max-w-md p-6 bg-card border border-border shadow-2xl rounded-2xl">
+            <DialogHeader className="space-y-2 text-left">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                <Crown className="w-5 h-5" />
               </div>
+              <DialogTitle className="text-lg font-bold text-txt-primary">
+                Tingkatkan ke Markinotes Pro
+              </DialogTitle>
+              <DialogDescription className="text-xs text-txt-muted">
+                Dapatkan akses tanpa batas ke server AI berkecepatan tinggi tanpa perlu memikirkan token dan API key pribadi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2.5 py-4 border-y border-border/60 my-2">
+              {[
+                { title: "Akses AI Tanpa Batas", desc: "Tidak ada kuota harian atau bulanan untuk ringkasan catatan." },
+                { title: "Prioritas Server Tercepat", desc: "Respons ultra cepat melalui dedicated cloud proxy." },
+                { title: "Multi-Model Reasoning", desc: "Akses fitur cerdas berbasis Gemini 2.0 Flash & Pro." },
+                { title: "Dukungan Penuh Pengembang", desc: "Mendukung pengembangan berkelanjutan aplikasi Markinotes." },
+              ].map((f, i) => (
+                <div key={i} className="flex items-start gap-2.5 text-xs">
+                  <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-txt-primary">{f.title}: </span>
+                    <span className="text-txt-muted">{f.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 text-xs shrink-0"
-                disabled={testStatus === "testing"}
-                onClick={async () => {
-                  setTestStatus("testing");
-                  setTestFeedback(null);
-                  try {
-                    const res = await noteIpc.testAiConnection(
-                      rootPath,
-                      aiProvider,
-                      aiApiKey.trim() || undefined,
-                      aiModel.trim() || undefined
-                    );
-                    if (res.success) {
-                      setTestStatus("success");
-                      setTestFeedback(res);
-                      toast.success(`Connected (${res.latency_ms}ms)`);
-                    } else {
-                      setTestStatus("error");
-                      setTestFeedback(res);
-                      toast.error(res.message || "Connection failed");
-                    }
-                  } catch (err: any) {
-                    setTestStatus("error");
-                    const msg = typeof err === "string" ? err : err?.message || "Failed to connect to AI provider";
-                    setTestFeedback({ message: msg });
-                    toast.error(msg);
-                  }
-                }}
+                className="text-xs"
+                onClick={() => setShowUpgradeModal(false)}
               >
-                {testStatus === "testing" ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-3.5 w-3.5 text-amber-500" />
-                    Test Connection
-                  </>
-                )}
+                Nanti Saja
+              </Button>
+              <Button
+                size="sm"
+                className="gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-md"
+                onClick={handleUpgradeToPro}
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-300" />
+                Aktifkan Pro (Simulasi)
               </Button>
             </div>
-
-            {testFeedback?.message && (
-              <p
-                className={cn(
-                  "text-[11px] leading-relaxed rounded-lg p-2.5 border",
-                  testStatus === "success"
-                    ? "bg-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-                    : testStatus === "error"
-                    ? "bg-destructive/5 text-destructive border-destructive/20"
-                    : "bg-muted text-txt-muted border-border"
-                )}
-              >
-                {testFeedback.message}
-              </p>
-            )}
-          </div>
-
-        </div>
+          </DialogContent>
+        </Dialog>
       </section>
 
       {/* ─── Danger Zone ─── */}

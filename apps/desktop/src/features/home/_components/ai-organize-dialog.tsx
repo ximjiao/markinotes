@@ -18,6 +18,8 @@ import {
   FileText,
   Check,
   ArrowRight,
+  AlertCircle,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AIOrganizeResponse } from "../_types/home.types";
@@ -29,6 +31,8 @@ interface AIOrganizeDialogProps {
   draftTitles: { id: string; title: string }[];
   onConfirm: (approvedMoves: AIOrganizeResponse) => void;
   isLoading?: boolean;
+  errorMessage?: string;
+  onOpenSettings?: () => void;
 }
 
 interface ItemRow {
@@ -46,6 +50,8 @@ export function AIOrganizeDialog({
   draftTitles,
   onConfirm,
   isLoading,
+  errorMessage,
+  onOpenSettings,
 }: AIOrganizeDialogProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
@@ -153,7 +159,9 @@ export function AIOrganizeDialog({
             Organize Notes with AI
           </DialogTitle>
           <DialogDescription className="text-xs text-txt-muted">
-            {isLoading
+            {errorMessage
+              ? "Konfigurasi API Key diperlukan untuk mengelompokkan catatan."
+              : isLoading
               ? "AI is analyzing your notes and categorizing folders..."
               : items.length > 0
               ? "Review suggested destinations below. Uncheck any notes you prefer to keep in Drafts."
@@ -161,7 +169,35 @@ export function AIOrganizeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
+        {errorMessage ? (
+          <div className="flex flex-col items-center justify-center py-6 px-3 text-center gap-3.5 my-2 rounded-xl bg-destructive/5 border border-destructive/20">
+            <div className="p-3 rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div className="space-y-1 max-w-sm">
+              <h3 className="text-xs font-semibold text-txt-primary">
+                API Key Belum Terpasang atau Tidak Valid
+              </h3>
+              <p className="text-[11px] text-txt-muted leading-relaxed">
+                {errorMessage}
+              </p>
+            </div>
+            {onOpenSettings && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  onClose();
+                  onOpenSettings();
+                }}
+                className="gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-xs cursor-pointer mt-1"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Buka Pengaturan (Settings)
+              </Button>
+            )}
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 text-txt-muted gap-3">
             <Loader2 className="h-7 w-7 animate-spin text-txt-brand" />
             <span className="text-xs font-medium">Categorizing your notes…</span>
@@ -255,10 +291,10 @@ export function AIOrganizeDialog({
             disabled={isProcessing || isLoading}
             className="text-xs h-8"
           >
-            Cancel
+            {errorMessage ? "Tutup" : "Cancel"}
           </Button>
 
-          {!isLoading && items.length > 0 && (
+          {!errorMessage && !isLoading && items.length > 0 && (
             <Button
               size="sm"
               onClick={handleConfirm}

@@ -10,6 +10,7 @@ interface UiState {
     isOpen: boolean;
     isLoading: boolean;
     suggestions: AIOrganizeResponse;
+    errorMessage?: string;
   };
 
   // Editor Preferences (Persistent)
@@ -20,7 +21,7 @@ interface UiState {
   // Actions
   setTemplateDialogOpen: (open: boolean) => void;
   setMovingNoteId: (id: string | null) => void;
-  setAiOrganizeDialog: (state: Partial<{ isOpen: boolean; isLoading: boolean; suggestions: AIOrganizeResponse }>) => void;
+  setAiOrganizeDialog: (state: Partial<{ isOpen: boolean; isLoading: boolean; suggestions: AIOrganizeResponse; errorMessage?: string }>) => void;
   setEditorFontStyle: (style: "default" | "serif" | "mono") => void;
   setEditorIsSmallText: (val: boolean) => void;
   setEditorIsFullWidth: (val: boolean) => void;

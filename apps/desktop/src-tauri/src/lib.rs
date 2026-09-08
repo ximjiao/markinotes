@@ -12,6 +12,7 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = dotenvy::dotenv();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -22,7 +23,9 @@ pub fn run() {
             note_create,
             note_get_all_tags,
             note_read,
+            note_read_buffered,
             note_update,
+            note_save_stream,
             note_delete,
             note_toggle_star,
             note_move,

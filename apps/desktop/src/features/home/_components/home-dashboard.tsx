@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { exportDocument } from "@features/editor/_lib/export-engine";
 import { AIOrganizeDialog } from "./ai-organize-dialog";
 import { noteIpc, isTauri } from "../_lib/note-ipc";
-import { workspaceConfig } from "@features/workspace/_lib/workspace-config";
+import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore, useNotesStore, useUiStore } from "@/stores";
 
@@ -111,6 +111,10 @@ export function HomeDashboard() {
           initialTags={(note as any)?.tags || []}
           allWorkspaceTags={allTags}
           onBack={closeNote}
+          onOpenSettings={() => {
+            closeNote();
+            setSelectedFolder("settings");
+          }}
           onSave={(title, content, tags) => {
             if (note && workspace?.path) {
               updateNote(workspace.path, note.path, title, content, tags);
@@ -121,11 +125,56 @@ export function HomeDashboard() {
     );
   }
 
-  // Show loading spinner while content loads
+  // Show rich buffered loader screen while content loads
   if (activeNoteRef && isContentLoading) {
+    const note = activeNote;
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-        <div className="text-sm text-txt-muted animate-pulse">Opening note…</div>
+      <div className="fixed inset-0 z-50 flex flex-col h-screen w-screen bg-background overflow-hidden animate-in fade-in duration-200">
+        {/* Top buffering progress bar */}
+        <div className="h-1 w-full bg-secondary overflow-hidden">
+          <div className="h-full bg-linear-to-r from-primary/50 via-primary to-purple-500 animate-pulse w-3/4 rounded-r" />
+        </div>
+
+        {/* Minimal header skeleton */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-border/60 bg-surface/40 backdrop-blur-xs">
+          <div className="flex items-center gap-3">
+            <div className="h-7 w-7 rounded-md bg-secondary/80 animate-pulse" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-txt-primary truncate max-w-[200px]">
+                {note?.title || activeNoteRef.title}
+              </span>
+              <span className="text-[10px] text-txt-muted flex items-center gap-1.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500 animate-ping" />
+                Buffering markdown note...
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-16 rounded-full bg-secondary/80 animate-pulse" />
+            <div className="h-6 w-20 rounded-full bg-secondary/80 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Document Body Skeleton Shimmer */}
+        <div className="flex-1 overflow-hidden p-8 max-w-3xl mx-auto w-full flex flex-col gap-6">
+          <div className="h-9 w-3/5 rounded-lg bg-secondary/70 animate-pulse" />
+          <div className="flex flex-col gap-2.5 pt-2">
+            <div className="h-4 w-full rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-11/12 rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-4/5 rounded bg-secondary/40 animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-2.5 pt-4">
+            <div className="h-6 w-2/5 rounded bg-secondary/60 animate-pulse" />
+            <div className="h-4 w-full rounded bg-secondary/50 animate-pulse" />
+            <div className="h-4 w-5/6 rounded bg-secondary/50 animate-pulse" />
+          </div>
+          <div className="h-32 w-full rounded-xl bg-secondary/30 border border-border/40 p-4 flex flex-col gap-2">
+            <div className="h-3 w-1/4 rounded bg-secondary/60 animate-pulse" />
+            <div className="h-3 w-2/3 rounded bg-secondary/40 animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-secondary/40 animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -213,27 +262,60 @@ export function HomeDashboard() {
 
   const handleOrganizeAI = async () => {
     if (notes.length === 0 || !workspace) return;
-    setAiOrganizeDialog({ isOpen: true, isLoading: true, suggestions: {} });
+
+    const config = workspaceConfig.get();
+    const isSystemMode = config.aiMode === "system";
+
+    if (isSystemMode) {
+      const quota = workspaceConfig.checkSystemAiQuota();
+      if (!quota.allowed) {
+        setAiOrganizeDialog({
+          isOpen: true,
+          isLoading: false,
+          suggestions: {},
+          errorMessage: "Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).",
+        });
+        return;
+      }
+    }
+
+    setAiOrganizeDialog({ isOpen: true, isLoading: true, suggestions: {}, errorMessage: undefined });
     try {
       const draftTitles = notes.map((n) => ({ id: n.id, title: n.title }));
       const availableFolders = workspace?.folders?.map((f) => ({ id: f.id, name: f.name, path: f.path })) || [];
 
-      const config = workspaceConfig.get();
       const suggestionsStr = await noteIpc.organizeDrafts(
         workspace.path,
         JSON.stringify(draftTitles),
         JSON.stringify(availableFolders),
-        config.aiApiKey || config.geminiApiKey,
-        config.aiModel || config.geminiModel,
-        config.aiProvider
+        isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
+        isSystemMode ? "gemini-2.0-flash" : (config.aiModel || config.geminiModel),
+        isSystemMode ? "system" : config.aiProvider
       );
 
+      if (isSystemMode) {
+        workspaceConfig.consumeSystemAiQuota(1);
+      }
+
       const suggestions = JSON.parse(suggestionsStr);
-      setAiOrganizeDialog({ isOpen: true, isLoading: false, suggestions });
+      setAiOrganizeDialog({ isOpen: true, isLoading: false, suggestions, errorMessage: undefined });
     } catch (error: any) {
       console.error(error);
-      setAiOrganizeDialog({ isOpen: false, isLoading: false, suggestions: {} });
-      alert(error.toString() || "Failed to get suggestions.");
+      const raw = typeof error === "string" ? error : error?.message || "";
+      const isKeyError =
+        raw.toLowerCase().includes("api key") ||
+        raw.toLowerCase().includes("unauthorized") ||
+        raw.toLowerCase().includes("forbidden") ||
+        raw.toLowerCase().includes("not found");
+
+      setAiOrganizeDialog({
+        isOpen: true,
+        isLoading: false,
+        suggestions: {},
+        errorMessage: isKeyError
+          ? "Gagal terhubung ke AI karena API Key belum terpasang atau tidak valid. Silakan periksa konfigurasi di menu Settings."
+          : (raw || "Gagal mengorganisasi draf dengan AI."),
+      });
     }
   };
 
@@ -397,6 +479,10 @@ export function HomeDashboard() {
         onClose={() => setTemplateDialogOpen(false)}
         onSelectTemplate={handleUseTemplate}
         workspacePath={workspace?.path}
+        onOpenSettings={() => {
+          setTemplateDialogOpen(false);
+          setSelectedFolder("settings");
+        }}
       />
 
       {movingNoteId && movingNote && (
@@ -415,9 +501,13 @@ export function HomeDashboard() {
 
       <AIOrganizeDialog
         isOpen={aiOrganizeDialog.isOpen}
-        onClose={() => setAiOrganizeDialog({ isOpen: false })}
+        onClose={() => setAiOrganizeDialog({ isOpen: false, errorMessage: undefined })}
         isLoading={aiOrganizeDialog.isLoading}
         suggestions={aiOrganizeDialog.suggestions}
+        errorMessage={aiOrganizeDialog.errorMessage}
+        onOpenSettings={() => {
+          setSelectedFolder("settings");
+        }}
         draftTitles={notes.map((n) => ({ id: n.id, title: n.title }))}
         onConfirm={handleConfirmOrganize}
       />
