@@ -32,6 +32,7 @@ pub fn run() {
             reveal_in_finder,
             folder_rename,
             note_summarize_stream,
+            note_chat_stream,
             note_edit_with_ai_stream,
             note_organize_drafts,
             test_ai_connection,

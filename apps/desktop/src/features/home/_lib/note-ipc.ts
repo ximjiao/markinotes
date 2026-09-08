@@ -181,6 +181,37 @@ export const noteIpc = {
     }
   },
 
+  chatStream: async (
+    workspacePath: string,
+    noteId: string,
+    messages: Array<{ role: "user" | "assistant"; content: string }>,
+    onChunk: (chunk: string) => void,
+    customApiKey?: string,
+    customModel?: string,
+    provider?: string
+  ): Promise<void> => {
+    if (isTauri()) {
+      const channel = new Channel<string>();
+      channel.onmessage = onChunk;
+      return invoke("note_chat_stream", {
+        workspacePath,
+        noteId,
+        messagesJson: JSON.stringify(messages),
+        provider,
+        customApiKey,
+        customModel,
+        onChunk: channel,
+      });
+    }
+
+    // Web fallback mock
+    const sampleWords = [" Based", " on", " the", " note,", " here", " is", " the", " detailed", " response."];
+    for (const w of sampleWords) {
+      await new Promise((r) => setTimeout(r, 40));
+      onChunk(w);
+    }
+  },
+
   editWithAiStream: async (
     workspacePath: string,
     selectedText: string,

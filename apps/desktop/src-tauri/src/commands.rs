@@ -416,6 +416,76 @@ pub async fn note_edit_with_ai_stream(
 }
 
 #[tauri::command]
+pub async fn note_chat_stream(
+    workspace_path: String,
+    note_id: String,
+    messages_json: String,
+    provider: Option<String>,
+    custom_api_key: Option<String>,
+    custom_model: Option<String>,
+    on_chunk: tauri::ipc::Channel<String>,
+) -> Result<(), String> {
+    let api_key = crate::ai::resolve_api_key(
+        provider.as_deref(),
+        Some(&workspace_path),
+        custom_api_key.as_deref(),
+    )?;
+
+    let db_path = get_db_path(&workspace_path);
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let (path, title): (String, String) = conn
+        .query_row(
+            "SELECT path, title FROM notes WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| format!("Note with ID '{note_id}' was not found: {e}"))?;
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Unable to read note file at '{path}': {e}"))?;
+
+    #[derive(serde::Deserialize)]
+    struct ChatMessage {
+        role: String,
+        content: String,
+    }
+
+    let history: Vec<ChatMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+    let mut history_str = String::new();
+    for msg in &history {
+        let label = if msg.role == "user" { "User" } else { "Assistant" };
+        history_str.push_str(&format!("{label}: {}\n\n", msg.content));
+    }
+
+    let prompt = format!(
+        "You are an intelligent, helpful AI assistant built directly into Markinotes (a modern markdown editor).\n\
+        The user is reviewing or chatting about the following note.\n\n\
+        [NOTE CONTEXT]:\n\
+        Title: {title}\n\
+        Content:\n\
+        ---\n\
+        {content}\n\
+        ---\n\n\
+        [CONVERSATION HISTORY]:\n\
+        {history_str}\n\
+        [INSTRUCTIONS]:\n\
+        1. Answer the user's latest request clearly and directly based on the note context and conversation.\n\
+        2. Format responses using clean, structured Markdown (with bullet points, bold keywords, headers, or code blocks where appropriate).\n\
+        3. Match the language used by the user (English or Indonesian).\n\
+        Assistant:"
+    );
+
+    crate::ai::stream_ai_completion(
+        provider.as_deref(),
+        &api_key,
+        custom_model.as_deref(),
+        &prompt,
+        on_chunk,
+    ).await
+}
+
+#[tauri::command]
 pub async fn note_organize_drafts(
     workspace_path: String,
     drafts_json: String,

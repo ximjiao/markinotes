@@ -1099,8 +1099,8 @@ export function NovelEditor({
             className={cn(
               "h-6 px-2 text-[10px] gap-1.5 font-medium transition-colors shadow-xs rounded-full cursor-pointer",
               isAiDialogOpen
-                ? "text-white bg-purple-600 border-purple-600 hover:bg-purple-700"
-                : "text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300"
+                ? "text-primary-foreground bg-primary border-primary hover:bg-primary/90"
+                : "text-primary border-primary/30 bg-primary/10 hover:bg-primary/20 hover:text-primary"
             )}
           >
             <Sparkles className="h-3 w-3" />
