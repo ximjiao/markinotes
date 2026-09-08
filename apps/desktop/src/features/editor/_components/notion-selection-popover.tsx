@@ -92,7 +92,15 @@ export function NotionSelectionPopover({
   const [linkUrl, setLinkUrl] = useState("");
   const [isColorOpen, setIsColorOpen] = useState(false);
 
-  const isInTable = editor.isActive("table") || editor.isActive("tableCell") || editor.isActive("tableHeader");
+  const isInTable = (() => {
+    if (!editor || !editor.state) return false;
+    const { $from } = editor.state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      const name = $from.node(d).type.name;
+      if (name === "table" || name === "tableCell" || name === "tableHeader") return true;
+    }
+    return editor.isActive("table") || editor.isActive("tableCell") || editor.isActive("tableHeader");
+  })();
 
   const handleApplyTextColor = (color: string) => {
     if (!editor) return;
@@ -114,17 +122,51 @@ export function NotionSelectionPopover({
     setIsColorOpen(false);
   };
 
-  // Determine current active block type
+  // Determine current active block type by inspecting the ProseMirror ancestor tree at selection start
   const getCurrentBlockInfo = () => {
-    if (isInTable) return { label: "Table Cell", icon: <Type className="h-3.5 w-3.5" /> };
-    if (editor.isActive("heading", { level: 1 })) return { label: "Heading 1", icon: <Heading1 className="h-3.5 w-3.5" /> };
-    if (editor.isActive("heading", { level: 2 })) return { label: "Heading 2", icon: <Heading2 className="h-3.5 w-3.5" /> };
-    if (editor.isActive("heading", { level: 3 })) return { label: "Heading 3", icon: <Heading3 className="h-3.5 w-3.5" /> };
-    if (editor.isActive("bulletList")) return { label: "Bulleted list", icon: <List className="h-3.5 w-3.5" /> };
-    if (editor.isActive("orderedList")) return { label: "Numbered list", icon: <ListOrdered className="h-3.5 w-3.5" /> };
-    if (editor.isActive("taskList")) return { label: "To-do list", icon: <CheckSquare className="h-3.5 w-3.5" /> };
-    if (editor.isActive("blockquote")) return { label: "Quote", icon: <Quote className="h-3.5 w-3.5" /> };
-    if (editor.isActive("codeBlock")) return { label: "Code", icon: <Code className="h-3.5 w-3.5" /> };
+    if (!editor || !editor.state) return { label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
+
+    const { selection } = editor.state;
+    const { $from } = selection;
+
+    let inTable = false;
+    let headingLevel: number | null = null;
+    let inTaskList = false;
+    let inBulletList = false;
+    let inOrderedList = false;
+    let inBlockquote = false;
+    let inCodeBlock = false;
+
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d);
+      const name = node.type.name;
+      if (name === "table" || name === "tableCell" || name === "tableHeader") {
+        inTable = true;
+      } else if (name === "heading") {
+        headingLevel = node.attrs.level;
+      } else if (name === "taskList" || name === "taskItem") {
+        inTaskList = true;
+      } else if (name === "bulletList") {
+        inBulletList = true;
+      } else if (name === "orderedList") {
+        inOrderedList = true;
+      } else if (name === "blockquote") {
+        inBlockquote = true;
+      } else if (name === "codeBlock") {
+        inCodeBlock = true;
+      }
+    }
+
+    if (inTable) return { label: "Table Cell", icon: <Type className="h-3.5 w-3.5" /> };
+    if (headingLevel === 1) return { label: "Heading 1", icon: <Heading1 className="h-3.5 w-3.5" /> };
+    if (headingLevel === 2) return { label: "Heading 2", icon: <Heading2 className="h-3.5 w-3.5" /> };
+    if (headingLevel === 3) return { label: "Heading 3", icon: <Heading3 className="h-3.5 w-3.5" /> };
+    if (inTaskList) return { label: "To-do list", icon: <CheckSquare className="h-3.5 w-3.5" /> };
+    if (inBulletList) return { label: "Bulleted list", icon: <List className="h-3.5 w-3.5" /> };
+    if (inOrderedList) return { label: "Numbered list", icon: <ListOrdered className="h-3.5 w-3.5" /> };
+    if (inBlockquote) return { label: "Quote", icon: <Quote className="h-3.5 w-3.5" /> };
+    if (inCodeBlock) return { label: "Code", icon: <Code className="h-3.5 w-3.5" /> };
+
     return { label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
   };
 
@@ -183,7 +225,7 @@ export function NotionSelectionPopover({
         const quota = workspaceConfig.checkSystemAiQuota();
         if (!quota.allowed) {
           setAiStatus("error");
-          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).");
+          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
           return;
         }
 
@@ -195,7 +237,7 @@ export function NotionSelectionPopover({
             setAiResult((prev) => prev + chunk);
           },
           undefined,
-          "gemini-2.0-flash",
+          "gemini-3.6-flash",
           "system"
         );
         workspaceConfig.consumeSystemAiQuota(1);
@@ -208,7 +250,7 @@ export function NotionSelectionPopover({
             setAiResult((prev) => prev + chunk);
           },
           config.aiApiKey || config.geminiApiKey,
-          config.aiModel || config.geminiModel,
+          config.aiModel || config.geminiModel || "gemini-3.6-flash",
           config.aiProvider
         );
       }
@@ -260,19 +302,19 @@ export function NotionSelectionPopover({
   };
 
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-popover text-txt-primary shadow-2xl backdrop-blur-md z-50 text-xs w-[320px] overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
+    <div className="flex flex-col rounded-xl border border-border bg-popover text-txt-primary shadow-2xl backdrop-blur-md z-50 text-xs w-[348px] overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100">
       {/* ─── 1. Top Bar: Turn into & Inline Formatting Icons ─── */}
-      <div className="flex items-center justify-between p-1.5 border-b border-border/50 bg-accent/20">
+      <div className="flex items-center justify-between p-1.5 border-b border-border/50 bg-accent/20 gap-1">
         {/* Turn into Dropdown */}
         <Popover open={activeSubmenu === "turnInto"} onOpenChange={(open) => setActiveSubmenu(open ? "turnInto" : null)}>
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1.5 font-medium hover:bg-accent rounded-lg"
+              className="h-7 px-2 text-xs flex items-center gap-1 font-medium hover:bg-accent rounded-lg shrink-0 cursor-pointer"
             >
               {blockInfo.icon}
-              <span className="truncate max-w-[100px]">{blockInfo.label}</span>
+              <span className="truncate max-w-[85px]">{blockInfo.label}</span>
               <ChevronDown className="h-3 w-3 text-txt-muted shrink-0 ml-0.5" />
             </Button>
           </PopoverTrigger>
@@ -360,8 +402,8 @@ export function NotionSelectionPopover({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn("h-7 w-7 rounded-md", editor.isActive("link") && "bg-accent text-txt-brand")}
-                title="Tautan / Link (⌘K)"
+                className={cn("h-7 w-7 rounded-md cursor-pointer", editor.isActive("link") && "bg-accent text-txt-brand")}
+                title="Link (⌘K)"
               >
                 <LinkIcon className="h-3.5 w-3.5" />
               </Button>
@@ -391,10 +433,10 @@ export function NotionSelectionPopover({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-7 w-7 rounded-md relative flex items-center justify-center font-bold text-xs",
+                  "h-7 w-7 rounded-md relative flex items-center justify-center font-bold text-xs cursor-pointer",
                   (editor.isActive("textColor") || editor.isActive("textHighlight")) && "bg-accent text-txt-brand"
                 )}
-                title="Warna teks & Highlight"
+                title="Text Color & Highlight"
               >
                 <div className="flex flex-col items-center justify-center leading-none">
                   <span 
@@ -425,7 +467,7 @@ export function NotionSelectionPopover({
               align="end" 
               className="w-56 p-1 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs max-h-[300px] overflow-y-auto space-y-1"
             >
-              <NotionMenuSectionHeader>Warna teks</NotionMenuSectionHeader>
+              <NotionMenuSectionHeader>Text color</NotionMenuSectionHeader>
               <div className="space-y-0.5">
                 {TEXT_COLORS.map((c) => {
                   const activeColor = editor.getAttributes("textColor").color || "inherit";
@@ -482,8 +524,8 @@ export function NotionSelectionPopover({
               <Button
                 variant={(editor.isActive({ textAlign: "center" }) || editor.isActive({ textAlign: "right" }) || editor.isActive({ textAlign: "justify" })) ? "secondary" : "ghost"}
                 size="icon"
-                className="h-7 w-7 rounded-md"
-                title="Perataan teks (Align)"
+                className="h-7 w-7 rounded-md shrink-0 cursor-pointer"
+                title="Text alignment"
               >
                 {editor.isActive({ textAlign: "center" }) ? (
                   <AlignCenter className="h-3.5 w-3.5" />
@@ -497,34 +539,34 @@ export function NotionSelectionPopover({
               </Button>
             </PopoverTrigger>
             <PopoverContent side="bottom" align="end" className="w-40 p-1 bg-popover border border-border rounded-xl shadow-2xl z-50 text-xs space-y-0.5">
-              <NotionMenuSectionHeader>Perataan teks</NotionMenuSectionHeader>
+              <NotionMenuSectionHeader>Text alignment</NotionMenuSectionHeader>
               <NotionMenuItem
                 icon={<AlignLeft className="h-3.5 w-3.5" />}
                 active={!editor.isActive({ textAlign: "center" }) && !editor.isActive({ textAlign: "right" }) && !editor.isActive({ textAlign: "justify" })}
                 onClick={() => editor.chain().focus().setTextAlign("left").run()}
               >
-                Rata kiri
+                Align left
               </NotionMenuItem>
               <NotionMenuItem
                 icon={<AlignCenter className="h-3.5 w-3.5" />}
                 active={editor.isActive({ textAlign: "center" })}
                 onClick={() => editor.chain().focus().setTextAlign("center").run()}
               >
-                Rata tengah
+                Align center
               </NotionMenuItem>
               <NotionMenuItem
                 icon={<AlignRight className="h-3.5 w-3.5" />}
                 active={editor.isActive({ textAlign: "right" })}
                 onClick={() => editor.chain().focus().setTextAlign("right").run()}
               >
-                Rata kanan
+                Align right
               </NotionMenuItem>
               <NotionMenuItem
                 icon={<AlignJustify className="h-3.5 w-3.5" />}
                 active={editor.isActive({ textAlign: "justify" })}
                 onClick={() => editor.chain().focus().setTextAlign("justify").run()}
               >
-                Rata justify
+                Justify
               </NotionMenuItem>
             </PopoverContent>
           </Popover>
@@ -540,7 +582,7 @@ export function NotionSelectionPopover({
 
           <NotionMenuItem
             icon={<Wand2 className="h-3.5 w-3.5 text-purple-500" />}
-            onClick={() => handleRunAi("Poles dan tingkatkan kualitas penulisan (improve writing) teks ini agar lebih jelas, natural, dan profesional tanpa mengubah maknanya.")}
+            onClick={() => handleRunAi("Polish and improve the writing quality of this text to make it more articulate, clear, and engaging without altering its core meaning.")}
           >
             Improve writing
           </NotionMenuItem>
@@ -611,14 +653,14 @@ export function NotionSelectionPopover({
           <div className="flex items-center justify-between text-[11px] font-semibold text-txt-brand">
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              {aiStatus === "streaming" ? "AI sedang menulis..." : "Hasil AI"}
+              {aiStatus === "streaming" ? "AI writing..." : "AI Result"}
             </div>
             {aiStatus === "streaming" && <Loader2 className="h-3 w-3 animate-spin text-txt-brand" />}
           </div>
 
           {/* AI Result Body */}
           <div className="p-2 rounded-lg bg-accent/40 border border-border/50 text-xs text-txt-primary font-sans whitespace-pre-wrap leading-relaxed">
-            {aiResult || (aiStatus === "streaming" ? "Memproses..." : "")}
+            {aiResult || (aiStatus === "streaming" ? "Generating..." : "")}
             {aiErrorMessage && <span className="text-destructive font-medium">{aiErrorMessage}</span>}
           </div>
 
@@ -628,7 +670,7 @@ export function NotionSelectionPopover({
               size="sm"
               onClick={handleReplaceSelection}
               disabled={aiStatus === "streaming" || !aiResult}
-              className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 flex-1"
+              className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 flex-1 cursor-pointer"
             >
               Replace selection
             </Button>
@@ -637,8 +679,8 @@ export function NotionSelectionPopover({
               size="sm"
               onClick={handleInsertBelow}
               disabled={aiStatus === "streaming" || !aiResult}
-              className="h-7 text-xs px-2"
-              title="Sisipkan di bawah"
+              className="h-7 text-xs px-2 cursor-pointer"
+              title="Insert below"
             >
               <ArrowDownToLine className="h-3.5 w-3.5" />
             </Button>
@@ -647,8 +689,8 @@ export function NotionSelectionPopover({
               size="icon"
               onClick={handleCopyAiResult}
               disabled={!aiResult}
-              className="h-7 w-7"
-              title="Salin hasil"
+              className="h-7 w-7 cursor-pointer"
+              title="Copy result"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
             </Button>
@@ -656,8 +698,8 @@ export function NotionSelectionPopover({
               variant="ghost"
               size="icon"
               onClick={handleResetAi}
-              className="h-7 w-7 text-txt-muted hover:text-destructive"
-              title="Tutup / Batal"
+              className="h-7 w-7 text-txt-muted hover:text-destructive cursor-pointer"
+              title="Dismiss"
             >
               <X className="h-3.5 w-3.5" />
             </Button>

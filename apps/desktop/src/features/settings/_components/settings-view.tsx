@@ -71,9 +71,10 @@ const PROVIDER_OPTIONS: {
     label: "Google Gemini",
     badge: "Fast & High Context",
     keyPlaceholder: "AIzaSy...",
-    defaultModel: "gemini-2.0-flash",
+    defaultModel: "gemini-3.6-flash",
     models: [
-      { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", desc: "Recommended · Fast & state-of-the-art" },
+      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", desc: "Recommended · Fast & state-of-the-art" },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "High efficiency & reasoning" },
       { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Legacy fast model" },
       { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", desc: "Complex reasoning & deep analysis" },
     ],
@@ -623,16 +624,16 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                 setTestFeedback(null);
               }}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer",
                 aiMode === "byok"
                   ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
                   : "text-txt-muted hover:text-txt-primary"
               )}
             >
               <Key className="h-3.5 w-3.5 text-amber-500" />
-              <span>Token Sendiri (BYOK)</span>
+              <span>Custom API Key (BYOK)</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
-                Gratis
+                Free
               </span>
             </button>
             <button
@@ -644,16 +645,16 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                 setTestFeedback(null);
               }}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer",
                 aiMode === "system"
                   ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
                   : "text-txt-muted hover:text-txt-primary"
               )}
             >
               <Cloud className="h-3.5 w-3.5 text-purple-500" />
-              <span>AI Bawaan Sistem</span>
+              <span>Built-in System AI</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20">
-                Berbayar / Pro
+                Pro / Trial
               </span>
             </button>
           </div>
@@ -682,7 +683,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                     )}
                   </div>
                   <p className="text-xs text-txt-muted">
-                    Fitur AI siap pakai langsung dari server Markinotes. Tanpa perlu setup API key pribadi, kartu kredit developer, atau akun Google AI Studio.
+                    Ready-to-use AI directly powered by Markinotes. No need to register developer API keys or billing accounts.
                   </p>
                 </div>
               </div>
@@ -691,13 +692,13 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
             {/* Quota & Usage Status */}
             <div className="px-5 py-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-txt-primary">Status Pemakaian Kuota</span>
+                <span className="font-medium text-txt-primary">Quota & Usage Status</span>
                 {systemAi.tier === "pro" ? (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Akses Tanpa Batas (Unlimited)</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Unlimited Access (Pro)</span>
                 ) : (
                   <span className="text-txt-muted">
-                    <strong className="text-txt-primary">{systemAi.quotaUsed}</strong> / {systemAi.quotaLimit} permintaan terpakai
-                    ({Math.max(0, systemAi.quotaLimit - systemAi.quotaUsed)} tersisa)
+                    <strong className="text-txt-primary">{systemAi.quotaUsed}</strong> / {systemAi.quotaLimit} requests used
+                    ({Math.max(0, systemAi.quotaLimit - systemAi.quotaUsed)} remaining)
                   </span>
                 )}
               </div>
@@ -723,7 +724,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-2 text-xs text-txt-muted">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Model: <strong>Markinotes Smart Engine (Gemini 2.0 Flash Cloud)</strong></span>
+                  <span>Model: <strong>Markinotes Smart Engine (Gemini 3.6 Flash Cloud)</strong></span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -731,26 +732,26 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                     <>
                       <Button
                         size="sm"
-                        className="h-8 gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                        className="h-8 gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-sm cursor-pointer"
                         onClick={() => setShowUpgradeModal(true)}
                       >
                         <Crown className="h-3.5 w-3.5 text-amber-300" />
-                        Upgrade ke Pro
+                        Upgrade to Pro
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2"
-                        title="Simulasi aktivasi untuk pengujian"
+                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2 cursor-pointer"
+                        title="Simulate Pro plan for testing"
                         onClick={handleUpgradeToPro}
                       >
-                        Simulasi Pro
+                        Simulate Pro
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2"
-                        title="Reset kuota trial ke 25 permintaan"
+                        className="h-8 text-[11px] text-txt-muted hover:text-txt-primary px-2 cursor-pointer"
+                        title="Reset trial quota to 25 requests"
                         onClick={handleResetTrial}
                       >
                         <RotateCcw className="h-3 w-3 mr-1" />
@@ -761,13 +762,13 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 text-xs text-txt-muted hover:text-txt-primary"
+                      className="h-8 text-xs text-txt-muted hover:text-txt-primary cursor-pointer"
                       onClick={() => {
                         handleResetTrial();
-                        toast.info("Status dikembalikan ke Free Trial");
+                        toast.info("Status reverted to Free Trial");
                       }}
                     >
-                      Beralih ke Free Trial (Simulasi)
+                      Switch to Free Trial (Simulate)
                     </Button>
                   )}
                 </div>
@@ -778,7 +779,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
             <div className="flex flex-col gap-3 px-5 py-4 bg-muted/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-txt-primary">Uji Koneksi Server Sistem</span>
+                  <span className="text-xs font-medium text-txt-primary">Test System Server Connection</span>
                   {testStatus === "success" && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                       <CheckCircle2 className="h-3 w-3" />
@@ -795,7 +796,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-1.5 text-xs shrink-0"
+                  className="h-8 gap-1.5 text-xs shrink-0 cursor-pointer"
                   disabled={testStatus === "testing"}
                   onClick={async () => {
                     setTestStatus("testing");
@@ -805,20 +806,20 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                         rootPath,
                         "system",
                         undefined,
-                        "markinotes-smart-v2"
+                        "gemini-3.6-flash"
                       );
                       if (res.success) {
                         setTestStatus("success");
                         setTestFeedback(res);
-                        toast.success(`Terhubung ke Server Markinotes (${res.latency_ms}ms)`);
+                        toast.success(`Connected to Server (${res.latency_ms}ms)`);
                       } else {
                         setTestStatus("error");
                         setTestFeedback(res);
-                        toast.error(res.message || "Gagal terhubung ke server cloud");
+                        toast.error(res.message || "Failed to connect to cloud server");
                       }
                     } catch (err: any) {
                       setTestStatus("error");
-                      const msg = typeof err === "string" ? err : err?.message || "Gagal terhubung ke server cloud";
+                      const msg = typeof err === "string" ? err : err?.message || "Failed to connect to cloud server";
                       setTestFeedback({ message: msg });
                       toast.error(msg);
                     }
@@ -827,12 +828,12 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                   {testStatus === "testing" ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Menguji...
+                      Testing...
                     </>
                   ) : (
                     <>
                       <Zap className="h-3.5 w-3.5 text-purple-500" />
-                      Uji Koneksi Server
+                      Test Connection
                     </>
                   )}
                 </Button>
@@ -854,16 +855,16 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               )}
 
               <div className="pt-1 flex items-center justify-between text-[11px] text-txt-muted">
-                <span>Ingin menggunakan AI gratis tanpa batasan kuota selamanya?</span>
+                <span>Want unlimited free AI with your personal developer key?</span>
                 <button
                   type="button"
                   onClick={() => {
                     setAiMode("byok");
                     workspaceConfig.set({ aiMode: "byok" });
                   }}
-                  className="text-txt-brand hover:underline font-medium inline-flex items-center gap-1"
+                  className="text-txt-brand hover:underline font-medium inline-flex items-center gap-1 cursor-pointer"
                 >
-                  Gunakan Token Sendiri (BYOK)
+                  Switch to Custom API Key (BYOK)
                   <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
@@ -877,7 +878,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <div className="flex items-center gap-2">
                 <Key className="h-3.5 w-3.5 text-amber-500" />
                 <span>
-                  <strong>100% Gratis dari Markinotes</strong>. Masukkan API key dari akun developer Anda sendiri (Google, OpenAI, Claude, atau Ollama).
+                  <strong>100% Free from Markinotes</strong>. Enter your own developer API key (Google, OpenAI, Claude, or Ollama/Custom).
                 </span>
               </div>
             </div>
@@ -887,7 +888,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <div>
                 <p className="text-sm font-medium text-txt-primary">AI Provider</p>
                 <p className="text-xs text-txt-muted mt-0.5">
-                  Pilih penyedia model AI yang ingin Anda gunakan
+                  Select your preferred AI model provider
                 </p>
               </div>
               <Select
@@ -924,7 +925,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <div>
                 <p className="text-sm font-medium text-txt-primary">Model</p>
                 <p className="text-xs text-txt-muted mt-0.5">
-                  {currentProvider?.badge || "Pilih model AI"}
+                  {currentProvider?.badge || "Select AI model"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1001,7 +1002,7 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <div>
                 <p className="text-sm font-medium text-txt-primary">API Key</p>
                 <p className="text-xs text-txt-muted mt-0.5">
-                  Kosongkan untuk menggunakan konfigurasi .env
+                  Leave blank to use environment variable from .env
                 </p>
               </div>
               <div className="relative flex items-center">
@@ -1119,19 +1120,19 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                 <Crown className="w-5 h-5" />
               </div>
               <DialogTitle className="text-lg font-bold text-txt-primary">
-                Tingkatkan ke Markinotes Pro
+                Upgrade to Markinotes Pro
               </DialogTitle>
               <DialogDescription className="text-xs text-txt-muted">
-                Dapatkan akses tanpa batas ke server AI berkecepatan tinggi tanpa perlu memikirkan token dan API key pribadi.
+                Get unlimited access to high-speed AI servers without worrying about personal API keys or rate limits.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2.5 py-4 border-y border-border/60 my-2">
               {[
-                { title: "Akses AI Tanpa Batas", desc: "Tidak ada kuota harian atau bulanan untuk ringkasan catatan." },
-                { title: "Prioritas Server Tercepat", desc: "Respons ultra cepat melalui dedicated cloud proxy." },
-                { title: "Multi-Model Reasoning", desc: "Akses fitur cerdas berbasis Gemini 2.0 Flash & Pro." },
-                { title: "Dukungan Penuh Pengembang", desc: "Mendukung pengembangan berkelanjutan aplikasi Markinotes." },
+                { title: "Unlimited AI Access", desc: "No daily or monthly quota limits for note summarization." },
+                { title: "Fastest Server Priority", desc: "Ultra-fast response times via dedicated cloud proxy." },
+                { title: "Multi-Model Reasoning", desc: "Access intelligence powered by Gemini 3.6 Flash & Pro." },
+                { title: "Support Development", desc: "Directly support ongoing development of Markinotes." },
               ].map((f, i) => (
                 <div key={i} className="flex items-start gap-2.5 text-xs">
                   <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
@@ -1149,18 +1150,18 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs"
+                className="text-xs cursor-pointer"
                 onClick={() => setShowUpgradeModal(false)}
               >
-                Nanti Saja
+                Maybe Later
               </Button>
               <Button
                 size="sm"
-                className="gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-md"
+                className="gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-md cursor-pointer"
                 onClick={handleUpgradeToPro}
               >
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
-                Aktifkan Pro (Simulasi)
+                Activate Pro (Simulate)
               </Button>
             </div>
           </DialogContent>

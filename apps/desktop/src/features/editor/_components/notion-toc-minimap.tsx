@@ -13,9 +13,11 @@ interface HeadingItem {
 
 interface NotionTocMinimapProps {
   editor: Editor | null;
+  className?: string;
+  isAiOpen?: boolean;
 }
 
-export function NotionTocMinimap({ editor }: NotionTocMinimapProps) {
+export function NotionTocMinimap({ editor, className, isAiOpen }: NotionTocMinimapProps) {
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const [activePos, setActivePos] = useState<number | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -129,7 +131,10 @@ export function NotionTocMinimap({ editor }: NotionTocMinimapProps) {
 
   return (
     <div
-      className="fixed right-5 top-[20%] z-30 select-none"
+      className={cn(
+        "absolute right-4 top-24 z-30 select-none transition-all duration-200",
+        className
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

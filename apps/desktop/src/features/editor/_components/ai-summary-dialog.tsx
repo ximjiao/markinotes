@@ -86,7 +86,7 @@ export function AiSummaryDialog({
         const quota = workspaceConfig.checkSystemAiQuota();
         if (!quota.allowed) {
           setStatus("error");
-          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau beralih ke mode 'Token Sendiri' (Gratis).");
+          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
           return;
         }
 
@@ -97,7 +97,7 @@ export function AiSummaryDialog({
             setSummary((prev) => prev + chunk);
           },
           undefined,
-          "gemini-2.0-flash",
+          "gemini-3.6-flash",
           "system"
         );
         workspaceConfig.consumeSystemAiQuota(1);
@@ -112,7 +112,7 @@ export function AiSummaryDialog({
             setSummary((prev) => prev + chunk);
           },
           apiKey,
-          config.aiModel || config.geminiModel,
+          config.aiModel || config.geminiModel || "gemini-3.6-flash",
           config.aiProvider
         );
         setStatus("completed");
@@ -121,7 +121,7 @@ export function AiSummaryDialog({
       setStatus("error");
       const raw = typeof err === "string" ? err : err?.message || "";
       if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden") || raw.toLowerCase().includes("not found")) {
-        setErrorMessage("Gagal terhubung ke AI. API Key belum terpasang atau tidak valid. Silakan atur di file .env atau menu Settings.");
+        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please configure in .env or Settings.");
       } else {
         setErrorMessage(raw || "Couldn't generate summary. Please check your AI configuration in Settings and try again.");
       }
@@ -189,7 +189,7 @@ export function AiSummaryDialog({
               <div className="p-3.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold">Gagal memproses ringkasan:</p>
+                  <p className="font-semibold">Failed to generate summary:</p>
                   <p className="text-[11px] mt-1 opacity-90 leading-normal">{errorMessage}</p>
                   {onOpenSettings && (
                     <Button
@@ -202,7 +202,7 @@ export function AiSummaryDialog({
                       className="gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-xs cursor-pointer mt-2.5 h-7"
                     >
                       <Settings className="h-3.5 w-3.5" />
-                      Buka Settings
+                      Open Settings
                     </Button>
                   )}
                 </div>

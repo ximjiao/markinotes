@@ -16,6 +16,7 @@ import {
   Bot,
   Settings,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
 
@@ -30,60 +31,80 @@ interface AiSummaryPanelProps {
 }
 
 function FormattedInline({ text }: { text: string }) {
+  if (!text) return null;
+
+  // Unescape markdown characters often escaped by LLMs (e.g. \`code\` -> `code`)
+  const normalized = text.replace(/\\([`*_~[\]()])/g, "$1");
+
   const parts: React.ReactNode[] = [];
-  let remaining = text;
+  let remaining = normalized;
   let key = 0;
 
   while (remaining.length > 0) {
-    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)$/s);
-    const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)$/s);
-    const italicMatch = remaining.match(/^(.*?)\*([^*]+)\*(.*)$/s);
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    const codeMatch = remaining.match(/`([^`]+)`/);
+    const italicMatch = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
+    const strikeMatch = remaining.match(/~~([^~]+)~~/);
+    const markMatch = remaining.match(/==([^=]+)==/);
 
-    const matches = [
-      boldMatch ? { type: "bold", index: boldMatch[1].length, match: boldMatch } : null,
-      codeMatch ? { type: "code", index: codeMatch[1].length, match: codeMatch } : null,
-      italicMatch ? { type: "italic", index: italicMatch[1].length, match: italicMatch } : null,
+    const candidates = [
+      boldMatch && boldMatch.index !== undefined ? { type: "bold", index: boldMatch.index, match: boldMatch } : null,
+      codeMatch && codeMatch.index !== undefined ? { type: "code", index: codeMatch.index, match: codeMatch } : null,
+      italicMatch && italicMatch.index !== undefined ? { type: "italic", index: italicMatch.index, match: italicMatch } : null,
+      strikeMatch && strikeMatch.index !== undefined ? { type: "strike", index: strikeMatch.index, match: strikeMatch } : null,
+      markMatch && markMatch.index !== undefined ? { type: "mark", index: markMatch.index, match: markMatch } : null,
     ]
-      .filter(Boolean)
-      .sort((a: any, b: any) => a.index - b.index);
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .sort((a, b) => a.index - b.index);
 
-    if (matches.length === 0) {
+    if (candidates.length === 0) {
       parts.push(remaining);
       break;
     }
 
-    const first = matches[0]!;
+    const first = candidates[0]!;
+    const before = remaining.slice(0, first.index);
+    if (before) parts.push(before);
+
+    const fullMatchLength = first.match[0].length;
+    const innerContent = first.match[1];
+
     if (first.type === "bold") {
-      const [, before, content, after] = first.match;
-      if (before) parts.push(before);
       parts.push(
         <strong key={key++} className="font-semibold text-txt-primary">
-          {content}
+          <FormattedInline text={innerContent} />
         </strong>
       );
-      remaining = after;
     } else if (first.type === "code") {
-      const [, before, content, after] = first.match;
-      if (before) parts.push(before);
       parts.push(
         <code
           key={key++}
-          className="px-1.5 py-0.5 mx-0.5 rounded bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono text-[11px] border border-purple-500/20"
+          className="px-1.5 py-0.5 mx-0.5 rounded bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono text-[11px] border border-purple-500/20 font-medium"
         >
-          {content}
+          {innerContent}
         </code>
       );
-      remaining = after;
     } else if (first.type === "italic") {
-      const [, before, content, after] = first.match;
-      if (before) parts.push(before);
       parts.push(
         <em key={key++} className="italic text-txt-secondary">
-          {content}
+          <FormattedInline text={innerContent} />
         </em>
       );
-      remaining = after;
+    } else if (first.type === "strike") {
+      parts.push(
+        <del key={key++} className="line-through text-txt-secondary opacity-70">
+          <FormattedInline text={innerContent} />
+        </del>
+      );
+    } else if (first.type === "mark") {
+      parts.push(
+        <mark key={key++} className="bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 px-1 py-0.5 rounded">
+          <FormattedInline text={innerContent} />
+        </mark>
+      );
     }
+
+    remaining = remaining.slice(first.index + fullMatchLength);
   }
 
   return <>{parts}</>;
@@ -126,6 +147,15 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
       return;
     }
 
+    // Horizontal Rule: --- or *** or ___
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      elements.push(
+        <hr key={`hr-${idx}`} className="my-3 border-t border-border/70" />
+      );
+      return;
+    }
+
+    // Headings
     if (trimmed.startsWith("# ")) {
       elements.push(
         <div key={`h1-${idx}`} className="flex items-center gap-2 pt-3 pb-1 border-b border-border/60 text-sm font-bold text-txt-primary">
@@ -139,7 +169,7 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
     if (trimmed.startsWith("## ")) {
       elements.push(
         <div key={`h2-${idx}`} className="flex items-center gap-1.5 pt-3 pb-1 text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
-          <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+          <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" />
           <FormattedInline text={trimmed.slice(3)} />
         </div>
       );
@@ -148,13 +178,34 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
 
     if (trimmed.startsWith("### ")) {
       elements.push(
-        <div key={`h3-${idx}`} className="text-xs font-semibold text-txt-primary pt-2 pb-0.5">
+        <div key={`h3-${idx}`} className="text-xs font-semibold text-txt-primary pt-2.5 pb-0.5 flex items-center gap-1.5">
           <FormattedInline text={trimmed.slice(4)} />
         </div>
       );
       return;
     }
 
+    if (trimmed.startsWith("#### ")) {
+      elements.push(
+        <div key={`h4-${idx}`} className="text-xs font-semibold text-txt-primary pt-2 pb-0.5 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-[2px] bg-purple-500/70 shrink-0" />
+          <FormattedInline text={trimmed.slice(5)} />
+        </div>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith("##### ") || trimmed.startsWith("###### ")) {
+      const content = trimmed.replace(/^#+\s+/, "");
+      elements.push(
+        <div key={`h5-${idx}`} className="text-[11px] font-semibold text-txt-secondary uppercase tracking-wider pt-2 pb-0.5">
+          <FormattedInline text={content} />
+        </div>
+      );
+      return;
+    }
+
+    // Blockquotes
     if (trimmed.startsWith("> ")) {
       elements.push(
         <div key={`quote-${idx}`} className="p-2.5 my-1.5 rounded-r-lg bg-purple-500/5 border-l-2 border-purple-500 text-xs text-txt-secondary italic">
@@ -164,7 +215,29 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
       return;
     }
 
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+    // Task list items: - [ ] or - [x] or * [ ] or * [x]
+    const taskMatch = trimmed.match(/^[-*]\s+\[([ xX])\]\s+(.*)$/);
+    if (taskMatch) {
+      const isChecked = taskMatch[1].toLowerCase() === "x";
+      elements.push(
+        <div key={`task-${idx}`} className="flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5 pl-1">
+          <span className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 text-[10px] ${
+            isChecked
+              ? "bg-purple-600 border-purple-600 text-white"
+              : "border-border bg-background"
+          }`}>
+            {isChecked && "✓"}
+          </span>
+          <div className={`flex-1 ${isChecked ? "line-through opacity-70" : ""}`}>
+            <FormattedInline text={taskMatch[2]} />
+          </div>
+        </div>
+      );
+      return;
+    }
+
+    // Bullet lists: - item, * item, + item
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ")) {
       elements.push(
         <div key={`bullet-${idx}`} className="flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5 pl-1">
           <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0 mt-1.5" />
@@ -176,6 +249,7 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
       return;
     }
 
+    // Numbered lists: 1. item
     const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (numMatch) {
       elements.push(
@@ -191,6 +265,7 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
       return;
     }
 
+    // Paragraph fallback
     elements.push(
       <p key={`p-${idx}`} className="text-xs leading-relaxed text-txt-primary py-0.5">
         <FormattedInline text={trimmed} />
@@ -221,7 +296,7 @@ export function AiSummaryPanel({
   onClose,
   noteId,
   workspacePath,
-  noteTitle = "Catatan",
+  noteTitle = "Note",
   onInsertSummary,
   onOpenSettings,
 }: AiSummaryPanelProps) {
@@ -239,6 +314,25 @@ export function AiSummaryPanel({
     }
   }, [summary]);
 
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      const timer = setTimeout(() => {
+        setIsAnimating(true);
+      }, 20);
+      return () => clearTimeout(timer);
+    } else {
+      setIsAnimating(false);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   // Reset state and trigger auto-summarize when opened if empty
   useEffect(() => {
     if (isOpen && !summary && status === "idle") {
@@ -248,7 +342,7 @@ export function AiSummaryPanel({
 
   const handleStartSummarize = async () => {
     if (!noteId || !workspacePath) {
-      setErrorMessage("ID catatan atau path workspace tidak ditemukan.");
+      setErrorMessage("Note ID or workspace path not found.");
       setStatus("error");
       return;
     }
@@ -265,7 +359,7 @@ export function AiSummaryPanel({
         const quota = workspaceConfig.checkSystemAiQuota();
         if (!quota.allowed) {
           setStatus("error");
-          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Pengaturan (Settings) untuk upgrade ke Markinotes Pro atau beralih ke mode 'Token Sendiri' (Gratis).");
+          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
           return;
         }
 
@@ -276,7 +370,7 @@ export function AiSummaryPanel({
             setSummary((prev) => prev + chunk);
           },
           undefined,
-          "gemini-2.0-flash",
+          "gemini-3.6-flash",
           "system"
         );
         workspaceConfig.consumeSystemAiQuota(1);
@@ -291,7 +385,7 @@ export function AiSummaryPanel({
             setSummary((prev) => prev + chunk);
           },
           apiKey,
-          config.aiModel || config.geminiModel,
+          config.aiModel || config.geminiModel || "gemini-3.6-flash",
           config.aiProvider
         );
         setStatus("completed");
@@ -300,9 +394,9 @@ export function AiSummaryPanel({
       setStatus("error");
       const raw = typeof err === "string" ? err : err?.message || "";
       if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden") || raw.toLowerCase().includes("not found")) {
-        setErrorMessage("Gagal terhubung ke AI. API Key belum terpasang atau tidak valid. Silakan atur di file .env atau menu Settings.");
+        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please configure in .env or Settings.");
       } else {
-        setErrorMessage(raw || "Terjadi kesalahan saat memproses ringkasan.");
+        setErrorMessage(raw || "An error occurred while generating summary.");
       }
     }
   };
@@ -319,10 +413,18 @@ export function AiSummaryPanel({
     onInsertSummary?.(summary);
   };
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   return (
-    <aside className="w-96 sm:w-[420px] h-full border-l border-border/80 bg-surface/50 backdrop-blur-md flex flex-col shrink-0 animate-in slide-in-from-right duration-200 select-none overflow-hidden z-20">
+    <aside
+      className={cn(
+        "h-full border-border/80 bg-surface/50 backdrop-blur-md flex flex-col shrink-0 select-none overflow-hidden z-20 transition-all duration-250 ease-in-out",
+        isAnimating
+          ? "w-96 sm:w-[420px] border-l opacity-100 translate-x-0"
+          : "w-0 border-l-0 opacity-0 translate-x-8 pointer-events-none"
+      )}
+    >
+      <div className="w-96 sm:w-[420px] h-full flex flex-col min-w-[384px] sm:min-w-[420px]">
       {/* Panel Header */}
       <div className="px-4 py-3 border-b border-border/70 flex items-center justify-between gap-2 bg-background/80 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -347,7 +449,7 @@ export function AiSummaryPanel({
           )}
           {status === "completed" && (
             <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 text-emerald-600 border-emerald-500/30 bg-emerald-500/10">
-              <Check className="h-2.5 w-2.5" /> Selesai
+              <Check className="h-2.5 w-2.5" /> Done
             </Badge>
           )}
           <Button
@@ -355,7 +457,7 @@ export function AiSummaryPanel({
             size="icon"
             onClick={onClose}
             className="h-7 w-7 text-txt-muted hover:text-txt-primary"
-            title="Tutup Panel Summary"
+            title="Close Summary Panel"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -394,7 +496,7 @@ export function AiSummaryPanel({
 
           {summary && (
             <span className="text-[10px]">
-              {summary.split(/\s+/).filter(Boolean).length} kata
+              {summary.split(/\s+/).filter(Boolean).length} words
             </span>
           )}
         </div>
@@ -406,7 +508,7 @@ export function AiSummaryPanel({
                 <Sparkles className="h-6 w-6" />
               </div>
               <p className="max-w-[240px]">
-                Tekan tombol <strong>&ldquo;Mulai Ringkas&rdquo;</strong> untuk mengekstrak poin penting catatan ini dengan Gemini AI.
+                Click <strong>&ldquo;Start Summarizing&rdquo;</strong> to extract key takeaways from this note using AI.
               </p>
               <Button
                 variant="default"
@@ -414,7 +516,7 @@ export function AiSummaryPanel({
                 onClick={handleStartSummarize}
                 className="h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-xs mt-1"
               >
-                <Sparkles className="h-3.5 w-3.5" /> Mulai Ringkas
+                <Sparkles className="h-3.5 w-3.5" /> Start Summarizing
               </Button>
             </div>
           )}
@@ -423,7 +525,7 @@ export function AiSummaryPanel({
             <div className="p-3.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2.5 my-2">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold">Gagal memproses ringkasan:</p>
+                <p className="font-semibold">Failed to generate summary:</p>
                 <p className="text-[11px] mt-1 opacity-90 leading-normal">{errorMessage}</p>
                 <div className="flex items-center gap-2 mt-2.5">
                   <Button
@@ -432,7 +534,7 @@ export function AiSummaryPanel({
                     onClick={handleStartSummarize}
                     className="h-7 text-xs gap-1.5 border-destructive/30 hover:bg-destructive/10 text-destructive cursor-pointer"
                   >
-                    <RefreshCw className="h-3 w-3" /> Coba Lagi
+                    <RefreshCw className="h-3 w-3" /> Retry
                   </Button>
                   {onOpenSettings && (
                     <Button
@@ -441,7 +543,7 @@ export function AiSummaryPanel({
                       onClick={onOpenSettings}
                       className="h-7 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-xs cursor-pointer"
                     >
-                      <Settings className="h-3 w-3" /> Buka Settings
+                      <Settings className="h-3 w-3" /> Open Settings
                     </Button>
                   )}
                 </div>
@@ -467,18 +569,28 @@ export function AiSummaryPanel({
       {/* Footer Actions */}
       <div className="p-3 border-t border-border/70 bg-background flex flex-col gap-2 shrink-0">
         <div className="flex items-center gap-2">
-          {summary && (
+          {summary && (isCopied ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="flex-1 h-8 text-xs gap-1.5 text-emerald-600 border-emerald-500/30 bg-emerald-500/10"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Copied!
+            </Button>
+          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopy}
-              disabled={status === "streaming"}
+              disabled={!summary}
               className="flex-1 h-8 text-xs gap-1.5"
             >
-              {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-              {isCopied ? "Tersalin!" : "Salin Teks"}
+              <Copy className="h-3.5 w-3.5" />
+              Copy
             </Button>
-          )}
+          ))}
 
           {summary && onInsertSummary && (
             <Button
@@ -489,7 +601,7 @@ export function AiSummaryPanel({
               className="flex-1 h-8 text-xs gap-1.5 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/10"
             >
               <FileDown className="h-3.5 w-3.5" />
-              Sisipkan
+              Insert into Note
             </Button>
           )}
         </div>
@@ -508,20 +620,21 @@ export function AiSummaryPanel({
           {status === "streaming" ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Merangkum...
+              Summarizing...
             </>
           ) : summary ? (
             <>
               <RefreshCw className="h-3.5 w-3.5" />
-              Ringkas Ulang
+              Regenerate
             </>
           ) : (
             <>
               <Sparkles className="h-3.5 w-3.5" />
-              Mulai Ringkas
+              Start Summarizing
             </>
           )}
         </Button>
+      </div>
       </div>
     </aside>
   );

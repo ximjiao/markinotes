@@ -231,7 +231,7 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
       if (isSystemMode) {
         const quota = workspaceConfig.checkSystemAiQuota();
         if (!quota.allowed) {
-          setErrorMessage("Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).");
+          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
           setIsGenerating(false);
           return;
         }
@@ -256,7 +256,7 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
           setGeneratedMarkdown(fullOutput);
         },
         isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
-        isSystemMode ? "gemini-2.0-flash" : (config.aiModel || config.geminiModel),
+        isSystemMode ? "gemini-3.6-flash" : (config.aiModel || config.geminiModel || "gemini-3.6-flash"),
         isSystemMode ? "system" : config.aiProvider
       );
 
@@ -284,7 +284,7 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
     } catch (err: any) {
       const raw = typeof err === "string" ? err : err?.message || "";
       if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden")) {
-        setErrorMessage("Gagal terhubung ke AI karena API Key belum terpasang atau tidak valid. Silakan periksa di menu Settings.");
+        setErrorMessage("Failed to connect to AI because API Key is missing or invalid. Please check in Settings.");
       } else {
         setErrorMessage(raw || "Couldn't craft your template right now. Please check your connection and try again.");
       }
@@ -379,7 +379,7 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
                   }}
                   className="px-2 py-0.5 text-[11px] font-medium bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 rounded transition-colors shrink-0 cursor-pointer"
                 >
-                  Buka Settings
+                  Open Settings
                 </button>
               )}
             </div>

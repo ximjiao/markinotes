@@ -160,7 +160,7 @@ export function AIOrganizeDialog({
           </DialogTitle>
           <DialogDescription className="text-xs text-txt-muted">
             {errorMessage
-              ? "Konfigurasi API Key diperlukan untuk mengelompokkan catatan."
+              ? "API Key configuration required to organize notes."
               : isLoading
               ? "AI is analyzing your notes and categorizing folders..."
               : items.length > 0
@@ -176,7 +176,7 @@ export function AIOrganizeDialog({
             </div>
             <div className="space-y-1 max-w-sm">
               <h3 className="text-xs font-semibold text-txt-primary">
-                API Key Belum Terpasang atau Tidak Valid
+                API Key Missing or Invalid
               </h3>
               <p className="text-[11px] text-txt-muted leading-relaxed">
                 {errorMessage}
@@ -193,7 +193,7 @@ export function AIOrganizeDialog({
                 className="gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-xs cursor-pointer mt-1"
               >
                 <Settings className="h-3.5 w-3.5" />
-                Buka Pengaturan (Settings)
+                Open Settings
               </Button>
             )}
           </div>
@@ -291,7 +291,7 @@ export function AIOrganizeDialog({
             disabled={isProcessing || isLoading}
             className="text-xs h-8"
           >
-            {errorMessage ? "Tutup" : "Cancel"}
+            {errorMessage ? "Close" : "Cancel"}
           </Button>
 
           {!errorMessage && !isLoading && items.length > 0 && (

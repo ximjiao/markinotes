@@ -273,7 +273,7 @@ export function HomeDashboard() {
           isOpen: true,
           isLoading: false,
           suggestions: {},
-          errorMessage: "Kuota AI Bawaan Sistem telah habis. Silakan buka Settings untuk upgrade ke Markinotes Pro atau gunakan mode 'Token Sendiri' (Gratis).",
+          errorMessage: "System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.",
         });
         return;
       }
@@ -289,7 +289,7 @@ export function HomeDashboard() {
         JSON.stringify(draftTitles),
         JSON.stringify(availableFolders),
         isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
-        isSystemMode ? "gemini-2.0-flash" : (config.aiModel || config.geminiModel),
+        isSystemMode ? "gemini-3.6-flash" : (config.aiModel || config.geminiModel || "gemini-3.6-flash"),
         isSystemMode ? "system" : config.aiProvider
       );
 
@@ -313,8 +313,8 @@ export function HomeDashboard() {
         isLoading: false,
         suggestions: {},
         errorMessage: isKeyError
-          ? "Gagal terhubung ke AI karena API Key belum terpasang atau tidak valid. Silakan periksa konfigurasi di menu Settings."
-          : (raw || "Gagal mengorganisasi draf dengan AI."),
+          ? "Failed to connect to AI because API Key is missing or invalid. Please check configuration in Settings."
+          : (raw || "Failed to organize drafts with AI."),
       });
     }
   };
