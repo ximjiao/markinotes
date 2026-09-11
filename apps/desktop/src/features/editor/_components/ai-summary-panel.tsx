@@ -1,48 +1,42 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { noteIpc } from "@/features/home/_lib/note-ipc";
+import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
+import { cn } from "@/lib/utils";
 import {
-  Sparkles,
-  Loader2,
-  Copy,
-  Check,
-  FileDown,
   AlertCircle,
-  RefreshCw,
-  X,
-  Bot,
-  Settings,
-  Send,
-  User,
-  Trash2,
-  CheckSquare,
-  Lightbulb,
-  HelpCircle,
-  CornerDownLeft,
-  LucideCircleUser,
-  Atom,
-  SquareArrowLeft,
   ArrowRightToLine,
+  Atom,
+  Check,
+  CheckSquare,
+  Copy,
+  HelpCircle,
   History,
+  Lightbulb,
+  Loader2,
+  MessageSquare,
   MoreHorizontal,
   Pencil,
   Plus,
-  MessageSquare,
+  RefreshCw,
+  Send,
+  Settings,
+  Sparkles,
+  SquareArrowLeft,
+  Trash2,
+  X
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { noteIpc } from "@/features/home/_lib/note-ipc";
-import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
+import React, { useEffect, useRef, useState } from "react";
 
 interface AiSummaryPanelProps {
   isOpen: boolean;

@@ -19,7 +19,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { NoteCardData } from "../_types/home.types";
-import { cn, formatRelativeTime, stripMarkdown } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { NotePreviewRenderer } from "./note-preview-renderer";
 
 interface NoteCardProps {
   note: NoteCardData;
@@ -98,16 +99,16 @@ export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExpor
       </CardHeader>
 
       {/* Main Content Preview Block with Fade-Out Gradient */}
-      <CardContent className="relative p-4 pt-1 flex-1 flex flex-col justify-start gap-2 overflow-hidden">
+      <CardContent className="relative p-4 pt-1 flex-1 flex flex-col justify-start gap-1.5 overflow-hidden">
         <CardTitle className="text-sm font-semibold text-txt-primary line-clamp-2 leading-tight group-hover:text-txt-brand transition-colors shrink-0">
           {note.title}
         </CardTitle>
-        <p className="text-xs text-txt-secondary leading-relaxed font-normal overflow-hidden">
-          {stripMarkdown(note.excerpt)}
-        </p>
+        <div className="overflow-hidden w-full flex-1">
+          <NotePreviewRenderer content={note.excerpt} title={note.title} />
+        </div>
 
         {/* Bottom Fade Gradient Mask */}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card via-card/85 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-card via-card/85 to-transparent pointer-events-none" />
       </CardContent>
 
       {/* Footer Meta: Tags & Timestamp */}

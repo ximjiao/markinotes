@@ -137,7 +137,7 @@ export const useNotesStore = create<NotesState>()(
                 ? {
                     ...n,
                     title,
-                    excerpt: stripMarkdown(content).substring(0, 600),
+                    excerpt: content.substring(0, 600),
                     tags: tags.length > 0 ? tags : n.tags,
                   }
                 : n
