@@ -1,0 +1,74 @@
+name: Build App (Windows & macOS)
+
+on:
+  workflow_dispatch: # Bisa di-trigger manual lewat tombol "Run workflow" di GitHub
+  push:
+    tags:
+      - 'v*'
+
+# Beri permission untuk membuat release jika diperlukan
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+            artifact-name: 'Markidown-Windows-Setup'
+            artifact-path: 'apps/desktop/src-tauri/target/release/bundle/nsis/*.exe'
+          - platform: 'macos-latest'
+            args: ''
+            artifact-name: 'Markidown-macOS-DMG'
+            artifact-path: 'apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11.1.3
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './apps/desktop/src-tauri -> target'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Frontend & Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Markidown ${{ github.ref_name }}'
+          releaseBody: 'See attached assets to download and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      # Simpan file .exe / .dmg ke menu Artifacts agar bisa langsung di-download
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: warn

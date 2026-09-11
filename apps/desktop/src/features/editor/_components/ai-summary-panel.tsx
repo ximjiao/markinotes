@@ -4,6 +4,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import {
   Sparkles,
   Loader2,
@@ -22,6 +30,15 @@ import {
   Lightbulb,
   HelpCircle,
   CornerDownLeft,
+  LucideCircleUser,
+  Atom,
+  SquareArrowLeft,
+  ArrowRightToLine,
+  History,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
@@ -56,18 +73,22 @@ function FormattedInline({ text }: { text: string }) {
   let key = 0;
 
   while (remaining.length > 0) {
+    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
     const codeMatch = remaining.match(/`([^`]+)`/);
     const italicMatch = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
     const strikeMatch = remaining.match(/~~([^~]+)~~/);
     const markMatch = remaining.match(/==([^=]+)==/);
+    const mathMatch = remaining.match(/\$([^$]+)\$/);
 
     const candidates = [
+      linkMatch && linkMatch.index !== undefined ? { type: "link", index: linkMatch.index, match: linkMatch } : null,
       boldMatch && boldMatch.index !== undefined ? { type: "bold", index: boldMatch.index, match: boldMatch } : null,
       codeMatch && codeMatch.index !== undefined ? { type: "code", index: codeMatch.index, match: codeMatch } : null,
       italicMatch && italicMatch.index !== undefined ? { type: "italic", index: italicMatch.index, match: italicMatch } : null,
       strikeMatch && strikeMatch.index !== undefined ? { type: "strike", index: strikeMatch.index, match: strikeMatch } : null,
       markMatch && markMatch.index !== undefined ? { type: "mark", index: markMatch.index, match: markMatch } : null,
+      mathMatch && mathMatch.index !== undefined ? { type: "math", index: mathMatch.index, match: mathMatch } : null,
     ]
       .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => a.index - b.index);
@@ -84,7 +105,19 @@ function FormattedInline({ text }: { text: string }) {
     const fullMatchLength = first.match[0].length;
     const innerContent = first.match[1];
 
-    if (first.type === "bold") {
+    if (first.type === "link") {
+      parts.push(
+        <a
+          key={key++}
+          href={first.match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:opacity-80 transition-opacity font-medium"
+        >
+          <FormattedInline text={innerContent} />
+        </a>
+      );
+    } else if (first.type === "bold") {
       parts.push(
         <strong key={key++} className="font-semibold text-txt-primary">
           <FormattedInline text={innerContent} />
@@ -117,6 +150,15 @@ function FormattedInline({ text }: { text: string }) {
           <FormattedInline text={innerContent} />
         </mark>
       );
+    } else if (first.type === "math") {
+      parts.push(
+        <span
+          key={key++}
+          className="px-1.5 py-0.5 mx-0.5 rounded bg-secondary/80 text-txt-primary font-mono text-[11px] border border-border/50"
+        >
+          {innerContent}
+        </span>
+      );
     }
 
     remaining = remaining.slice(first.index + fullMatchLength);
@@ -125,178 +167,329 @@ function FormattedInline({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
+function parseTableRow(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    if (char === "\\" && !escaped) {
+      escaped = true;
+      current += char;
+    } else if (char === "|" && !escaped) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      escaped = false;
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function isTableSeparatorRow(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.includes("-")) return false;
+  const cells = parseTableRow(trimmed);
+  return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c.trim()));
+}
+
+function parseTableAlignments(separatorLine: string): ("left" | "center" | "right")[] {
+  const cells = parseTableRow(separatorLine);
+  return cells.map((cell) => {
+    const c = cell.trim();
+    if (c.startsWith(":") && c.endsWith(":")) return "center";
+    if (c.endsWith(":")) return "right";
+    return "left";
+  });
+}
+
 export function PrettifiedSummary({ content, isStreaming }: { content: string; isStreaming: boolean }) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeBuffer: string[] = [];
+  let i = 0;
 
-  lines.forEach((line, idx) => {
+  while (i < lines.length) {
+    const line = lines[i];
     const trimmed = line.trim();
 
+    // 1. Code Block
     if (trimmed.startsWith("```")) {
-      if (inCodeBlock) {
-        elements.push(
-          <pre
-            key={`code-${idx}`}
-            className="p-3 rounded-lg bg-secondary/80 border border-border text-[11px] font-mono overflow-x-auto text-txt-primary my-2"
-          >
-            <code>{codeBuffer.join("\n")}</code>
-          </pre>
-        );
-        codeBuffer = [];
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
+      const lang = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
       }
-      return;
-    }
-
-    if (inCodeBlock) {
-      codeBuffer.push(line);
-      return;
-    }
-
-    if (!trimmed) {
-      // Small natural paragraph gap (collapse multiple consecutive empty lines)
-      const prevLine = idx > 0 ? lines[idx - 1]?.trim() : "";
-      if (prevLine && !prevLine.startsWith("#") && !/^(-{3,}|\*{3,}|_{3,})$/.test(prevLine)) {
-        elements.push(<div key={`space-${idx}`} className="h-1.5" />);
-      }
-      return;
-    }
-
-    // Horizontal Rule: --- or *** or ___
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      if (i < lines.length) i++; // skip closing ```
       elements.push(
-        <hr key={`hr-${idx}`} className="my-2 border-t border-border/40" />
+        <div key={`code-${i}`} className="my-2 rounded-lg border border-border/70 overflow-hidden bg-secondary/50 shadow-2xs">
+          {lang && (
+            <div className="px-3 py-1 bg-secondary/80 border-b border-border/50 text-[10px] font-mono text-txt-muted flex items-center justify-between">
+              <span>{lang}</span>
+            </div>
+          )}
+          <pre className="p-3 text-[11px] font-mono overflow-x-auto text-txt-primary">
+            <code>{codeLines.join("\n")}</code>
+          </pre>
+        </div>
       );
-      return;
+      continue;
     }
 
-    // Headings
+    // 2. Table Block
+    if (trimmed.includes("|") && (trimmed.startsWith("|") || (i + 1 < lines.length && isTableSeparatorRow(lines[i + 1])))) {
+      const tableLines: string[] = [];
+      const tableStartIdx = i;
+      while (i < lines.length && lines[i].trim().includes("|")) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+
+      if (tableLines.length >= 2) {
+        const headerCells = parseTableRow(tableLines[0]);
+        let alignments: ("left" | "center" | "right")[] = [];
+        let bodyStartIndex = 1;
+
+        if (isTableSeparatorRow(tableLines[1])) {
+          alignments = parseTableAlignments(tableLines[1]);
+          bodyStartIndex = 2;
+        }
+
+        const bodyRows = tableLines.slice(bodyStartIndex).map((l) => parseTableRow(l));
+
+        elements.push(
+          <div key={`table-${tableStartIdx}`} className="my-2.5 overflow-x-auto rounded-lg border border-border/70 bg-surface/40 shadow-2xs">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-secondary/70 border-b border-border/60">
+                  {headerCells.map((h, hIdx) => (
+                    <th
+                      key={hIdx}
+                      className={cn(
+                        "px-3 py-2 font-semibold text-txt-primary text-[11px] whitespace-nowrap",
+                        alignments[hIdx] === "center" ? "text-center" : alignments[hIdx] === "right" ? "text-right" : "text-left"
+                      )}
+                    >
+                      <FormattedInline text={h} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {bodyRows.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-accent/30 transition-colors">
+                    {row.map((cell, cIdx) => (
+                      <td
+                        key={cIdx}
+                        className={cn(
+                          "px-3 py-2 text-txt-primary text-xs leading-relaxed",
+                          alignments[cIdx] === "center" ? "text-center" : alignments[cIdx] === "right" ? "text-right" : "text-left"
+                        )}
+                      >
+                        <FormattedInline text={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      } else {
+        // Backtrack single line with pipe that isn't a full table
+        i = tableStartIdx;
+      }
+    }
+
+    // 3. Blockquotes (multi-line grouped)
+    if (trimmed.startsWith(">")) {
+      const quoteLines: string[] = [];
+      const quoteStartIdx = i;
+      while (i < lines.length && lines[i].trim().startsWith(">")) {
+        quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
+        i++;
+      }
+      elements.push(
+        <div key={`quote-${quoteStartIdx}`} className="my-1.5 p-2.5 rounded-r-lg bg-primary/5 border-l-2 border-primary text-xs text-txt-secondary space-y-1">
+          {quoteLines.map((ql, qIdx) => (
+            <p key={qIdx} className="leading-relaxed">
+              <FormattedInline text={ql} />
+            </p>
+          ))}
+        </div>
+      );
+      continue;
+    }
+
+    // 4. Empty line
+    if (!trimmed) {
+      elements.push(<div key={`space-${i}`} className="h-1.5" />);
+      i++;
+      continue;
+    }
+
+    // 5. Horizontal Rule: --- or *** or ___
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      elements.push(<hr key={`hr-${i}`} className="my-2 border-t border-border/40" />);
+      i++;
+      continue;
+    }
+
+    // 6. Math Block ($$ ... $$)
+    if (trimmed.startsWith("$$")) {
+      const mathLines: string[] = [];
+      const mathStartIdx = i;
+      if (trimmed.endsWith("$$") && trimmed.length > 2) {
+        mathLines.push(trimmed.slice(2, -2).trim());
+        i++;
+      } else {
+        mathLines.push(trimmed.slice(2));
+        i++;
+        while (i < lines.length && !lines[i].trim().endsWith("$$")) {
+          mathLines.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) {
+          mathLines.push(lines[i].trim().replace(/\$\$$/, ""));
+          i++;
+        }
+      }
+      elements.push(
+        <div key={`math-${mathStartIdx}`} className="my-2 p-2.5 rounded-lg bg-secondary/60 text-center font-mono text-xs text-primary border border-border/50 overflow-x-auto">
+          {mathLines.join("\n")}
+        </div>
+      );
+      continue;
+    }
+
+    // 7. Headings
     if (trimmed.startsWith("# ")) {
       elements.push(
-        <div key={`h1-${idx}`} className="flex items-center gap-2 pt-2 pb-0.5 border-b border-border/40 text-sm font-bold text-txt-primary">
+        <div key={`h1-${i}`} className="flex items-center gap-2 pt-2 pb-0.5 border-b border-border/40 text-sm font-bold text-txt-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           <FormattedInline text={trimmed.slice(2)} />
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
     if (trimmed.startsWith("## ")) {
       elements.push(
-        <div key={`h2-${idx}`} className="flex items-center gap-1.5 pt-2 pb-0.5 text-xs font-bold text-primary uppercase tracking-wider">
+        <div key={`h2-${i}`} className="flex items-center gap-1.5 pt-2 pb-0.5 text-xs font-bold text-primary uppercase tracking-wider">
           <Sparkles className="h-3 w-3 text-primary shrink-0" />
           <FormattedInline text={trimmed.slice(3)} />
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
     if (trimmed.startsWith("### ")) {
       elements.push(
-        <div key={`h3-${idx}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
+        <div key={`h3-${i}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
           <FormattedInline text={trimmed.slice(4)} />
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
     if (trimmed.startsWith("#### ")) {
       elements.push(
-        <div key={`h4-${idx}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
+        <div key={`h4-${i}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
           <span className="h-1 w-1 rounded-[1px] bg-primary/70 shrink-0" />
           <FormattedInline text={trimmed.slice(5)} />
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
     if (trimmed.startsWith("##### ") || trimmed.startsWith("###### ")) {
       const content = trimmed.replace(/^#+\s+/, "");
       elements.push(
-        <div key={`h5-${idx}`} className="text-[11px] font-semibold text-txt-secondary uppercase tracking-wider pt-1.5 pb-0.5">
+        <div key={`h5-${i}`} className="text-[11px] font-semibold text-txt-secondary uppercase tracking-wider pt-1.5 pb-0.5">
           <FormattedInline text={content} />
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
-    // Blockquotes
-    if (trimmed.startsWith("> ")) {
-      elements.push(
-        <div key={`quote-${idx}`} className="p-2 my-1 rounded-r-md bg-primary/5 border-l-2 border-primary text-xs text-txt-secondary italic">
-          <FormattedInline text={trimmed.slice(2)} />
-        </div>
-      );
-      return;
-    }
-
-    // Task list items: - [ ] or - [x] or * [ ] or * [x]
+    // 8. Task list items: - [ ] or - [x] or * [ ] or * [x]
     const taskMatch = trimmed.match(/^[-*]\s+\[([ xX])\]\s+(.*)$/);
     if (taskMatch) {
       const isChecked = taskMatch[1].toLowerCase() === "x";
       elements.push(
-        <div key={`task-${idx}`} className="flex items-start gap-1.5 text-xs leading-relaxed text-txt-primary py-0.5 pl-0.5">
-          <span className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 text-[10px] ${isChecked
-              ? "bg-primary border-primary text-primary-foreground"
-              : "border-border bg-background"
-            }`}>
+        <div key={`task-${i}`} className="flex items-start gap-1.5 text-xs leading-relaxed text-txt-primary py-0.5 pl-0.5">
+          <span className={cn(
+            "h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 text-[10px]",
+            isChecked ? "bg-primary border-primary text-primary-foreground" : "border-border bg-background"
+          )}>
             {isChecked && "✓"}
           </span>
-          <div className={`flex-1 ${isChecked ? "line-through opacity-70" : ""}`}>
+          <div className={cn("flex-1", isChecked && "line-through opacity-70")}>
             <FormattedInline text={taskMatch[2]} />
           </div>
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
-    // Bullet lists: - item, * item, + item
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ")) {
+    // 9. Bullet lists: - item, * item, + item (with nested indentation support)
+    const bulletMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
+    if (bulletMatch) {
+      const indentSpaces = bulletMatch[1].length;
+      const paddingLeft = indentSpaces >= 4 ? "pl-5" : indentSpaces >= 2 ? "pl-3" : "pl-0.5";
       elements.push(
-        <div key={`bullet-${idx}`} className="flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5 pl-0.5">
+        <div key={`bullet-${i}`} className={cn("flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5", paddingLeft)}>
           <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
           <div className="flex-1">
-            <FormattedInline text={trimmed.slice(2)} />
+            <FormattedInline text={bulletMatch[3]} />
           </div>
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
-    // Numbered lists: 1. item
-    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    // 10. Numbered lists: 1. item (with nested indentation support)
+    const numMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
     if (numMatch) {
+      const indentSpaces = numMatch[1].length;
+      const paddingLeft = indentSpaces >= 4 ? "pl-5" : indentSpaces >= 2 ? "pl-3" : "pl-0.5";
       elements.push(
-        <div key={`num-${idx}`} className="flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5 pl-0.5">
+        <div key={`num-${i}`} className={cn("flex items-start gap-2 text-xs leading-relaxed text-txt-primary py-0.5", paddingLeft)}>
           <span className="text-[10px] font-bold text-primary bg-primary/10 h-4 min-w-4 px-1 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-            {numMatch[1]}
+            {numMatch[2]}
           </span>
           <div className="flex-1">
-            <FormattedInline text={numMatch[2]} />
+            <FormattedInline text={numMatch[3]} />
           </div>
         </div>
       );
-      return;
+      i++;
+      continue;
     }
 
-    // Paragraph fallback
+    // 11. Paragraph fallback
     elements.push(
-      <p key={`p-${idx}`} className="text-xs leading-relaxed text-txt-primary py-0.5">
+      <p key={`p-${i}`} className="text-xs leading-relaxed text-txt-primary py-0.5">
         <FormattedInline text={trimmed} />
       </p>
     );
-  });
-
-  if (inCodeBlock && codeBuffer.length > 0) {
-    elements.push(
-      <pre key="code-ongoing" className="p-2.5 rounded-lg bg-secondary/80 border border-border text-[11px] font-mono overflow-x-auto text-txt-primary my-1.5">
-        <code>{codeBuffer.join("\n")}</code>
-      </pre>
-    );
+    i++;
   }
 
   return (
@@ -307,6 +500,28 @@ export function PrettifiedSummary({ content, isStreaming }: { content: string; i
       )}
     </div>
   );
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+}
+
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = Math.max(0, now - timestamp);
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function getChatStorageKey(workspacePath?: string | null, noteId?: string) {
@@ -322,7 +537,11 @@ export function AiSummaryPanel({
   onInsertSummary,
   onOpenSettings,
 }: AiSummaryPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>("");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const [inputPrompt, setInputPrompt] = useState("");
   const [status, setStatus] = useState<"idle" | "streaming" | "completed" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -331,48 +550,83 @@ export function AiSummaryPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Active session and messages
+  const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0] || null;
+  const messages = activeSession?.messages || [];
+
   // Load saved chat history per note
   useEffect(() => {
     if (!noteId) {
-      setMessages([]);
+      const defaultSession: ChatSession = {
+        id: crypto.randomUUID(),
+        title: "New Conversation",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [],
+      };
+      setSessions([defaultSession]);
+      setActiveSessionId(defaultSession.id);
       setStatus("idle");
       return;
     }
+
     const key = getChatStorageKey(workspacePath, noteId);
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
-          setStatus("completed");
-          return;
+          // Check if old format (array of ChatMessage)
+          if ("role" in parsed[0] && !("messages" in parsed[0])) {
+            const firstUserMsg = (parsed as ChatMessage[]).find((m) => m.role === "user")?.content || "Conversation";
+            const migratedSession: ChatSession = {
+              id: crypto.randomUUID(),
+              title: firstUserMsg.length > 32 ? firstUserMsg.slice(0, 32) + "..." : firstUserMsg,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              messages: parsed as ChatMessage[],
+            };
+            setSessions([migratedSession]);
+            setActiveSessionId(migratedSession.id);
+            setStatus("completed");
+            return;
+          } else if ("messages" in parsed[0]) {
+            const sessionList = parsed as ChatSession[];
+            setSessions(sessionList);
+            setActiveSessionId(sessionList[0].id);
+            setStatus(sessionList[0].messages.length > 0 ? "completed" : "idle");
+            return;
+          }
         }
       }
     } catch (e) {
       console.error("Failed to load chat history", e);
     }
-    setMessages([]);
+
+    const defaultSession: ChatSession = {
+      id: crypto.randomUUID(),
+      title: "New Conversation",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions([defaultSession]);
+    setActiveSessionId(defaultSession.id);
     setStatus("idle");
   }, [noteId, workspacePath]);
 
-  // Sync messages to localStorage whenever messages change
+  // Sync sessions to localStorage whenever sessions change
   useEffect(() => {
-    if (!noteId) return;
+    if (!noteId || sessions.length === 0) return;
     const key = getChatStorageKey(workspacePath, noteId);
-    if (messages.length > 0) {
-      const validMessages = messages.filter(
-        (m) => m.role === "user" || (m.role === "assistant" && m.content.trim().length > 0)
-      );
-      if (validMessages.length > 0) {
-        try {
-          localStorage.setItem(key, JSON.stringify(validMessages));
-        } catch (e) {
-          console.error("Failed to save chat history", e);
-        }
-      }
+    const nonEmpty = sessions.filter((s) => s.messages.length > 0);
+    const toSave = nonEmpty.length > 0 ? nonEmpty : sessions;
+    try {
+      localStorage.setItem(key, JSON.stringify(toSave));
+    } catch (e) {
+      console.error("Failed to save chat sessions", e);
     }
-  }, [messages, noteId, workspacePath]);
+  }, [sessions, noteId, workspacePath]);
 
   // Auto-scroll when new chunks arrive
   useEffect(() => {
@@ -398,7 +652,87 @@ export function AiSummaryPanel({
     }
   }, [isOpen]);
 
-  // Send a message (either custom prompt or quick suggestion)
+  // Handle New Chat CTA
+  const handleNewChat = () => {
+    if (activeSession && activeSession.messages.length === 0) {
+      setIsHistoryOpen(false);
+      inputRef.current?.focus();
+      return;
+    }
+    const newSession: ChatSession = {
+      id: crypto.randomUUID(),
+      title: "New Conversation",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+    setStatus("idle");
+    setErrorMessage("");
+    setIsHistoryOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  // Handle Rename
+  const handleSaveRename = (sessionId: string) => {
+    const trimmed = editingTitle.trim();
+    if (trimmed) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, title: trimmed } : s))
+      );
+    }
+    setEditingSessionId(null);
+  };
+
+  // Handle Delete Session
+  const handleDeleteSession = (sessionId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const remaining = sessions.filter((s) => s.id !== sessionId);
+    if (remaining.length === 0) {
+      const fresh: ChatSession = {
+        id: crypto.randomUUID(),
+        title: "New Conversation",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [],
+      };
+      setSessions([fresh]);
+      setActiveSessionId(fresh.id);
+      setStatus("idle");
+    } else {
+      setSessions(remaining);
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(remaining[0].id);
+        setStatus(remaining[0].messages.length > 0 ? "completed" : "idle");
+      }
+    }
+  };
+
+  // Handle Clear All History
+  const handleClearAllHistory = () => {
+    if (noteId) {
+      try {
+        localStorage.removeItem(getChatStorageKey(workspacePath, noteId));
+      } catch (e) {
+        console.error("Failed to clear chat history", e);
+      }
+    }
+    const fresh: ChatSession = {
+      id: crypto.randomUUID(),
+      title: "New Conversation",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions([fresh]);
+    setActiveSessionId(fresh.id);
+    setStatus("idle");
+    setErrorMessage("");
+    setIsHistoryOpen(false);
+  };
+
+  // Send a message
   const handleSendMessage = async (promptToSend?: string) => {
     const text = (promptToSend ?? inputPrompt).trim();
     if (!text || status === "streaming") return;
@@ -423,8 +757,38 @@ export function AiSummaryPanel({
       viewMode: "prettified",
     };
 
-    const newHistory = [...messages, userMsg];
-    setMessages([...newHistory, assistantPlaceholder]);
+    const currentMessages = activeSession?.messages || [];
+    const newHistory = [...currentMessages, userMsg];
+    const sessionTitle =
+      (!currentMessages.length || activeSession?.title === "New Conversation")
+        ? (text.length > 32 ? text.slice(0, 32) + "..." : text)
+        : activeSession.title;
+
+    const currentSessionId = activeSessionId;
+
+    setSessions((prev) => {
+      const idx = prev.findIndex((s) => s.id === currentSessionId);
+      const updatedMessages = [...newHistory, assistantPlaceholder];
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          title: sessionTitle,
+          updatedAt: Date.now(),
+          messages: updatedMessages,
+        };
+        return updated;
+      }
+      const newSess: ChatSession = {
+        id: currentSessionId,
+        title: sessionTitle,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: updatedMessages,
+      };
+      return [newSess, ...prev];
+    });
+
     setInputPrompt("");
     setErrorMessage("");
     setStatus("streaming");
@@ -451,11 +815,19 @@ export function AiSummaryPanel({
           noteId,
           chatPayload,
           (chunk) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId
-                  ? { ...msg, content: msg.content + chunk }
-                  : msg
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId
+                  ? {
+                    ...s,
+                    updatedAt: Date.now(),
+                    messages: s.messages.map((msg) =>
+                      msg.id === assistantMsgId
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    ),
+                  }
+                  : s
               )
             );
           },
@@ -477,11 +849,19 @@ export function AiSummaryPanel({
           noteId,
           chatPayload,
           (chunk) => {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId
-                  ? { ...msg, content: msg.content + chunk }
-                  : msg
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId
+                  ? {
+                    ...s,
+                    updatedAt: Date.now(),
+                    messages: s.messages.map((msg) =>
+                      msg.id === assistantMsgId
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    ),
+                  }
+                  : s
               )
             );
           },
@@ -512,33 +892,47 @@ export function AiSummaryPanel({
   const handleCopyMessage = async (msgId: string, content: string) => {
     if (!content) return;
     await navigator.clipboard.writeText(content);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, copied: true } : m))
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === activeSessionId
+          ? {
+            ...s,
+            messages: s.messages.map((m) =>
+              m.id === msgId ? { ...m, copied: true } : m
+            ),
+          }
+          : s
+      )
     );
     setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, copied: false } : m))
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSessionId
+            ? {
+              ...s,
+              messages: s.messages.map((m) =>
+                m.id === msgId ? { ...m, copied: false } : m
+              ),
+            }
+            : s
+        )
       );
     }, 2000);
   };
 
   const handleToggleViewMode = (msgId: string, mode: "prettified" | "raw") => {
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, viewMode: mode } : m))
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === activeSessionId
+          ? {
+            ...s,
+            messages: s.messages.map((m) =>
+              m.id === msgId ? { ...m, viewMode: mode } : m
+            ),
+          }
+          : s
+      )
     );
-  };
-
-  const handleClearChat = () => {
-    if (noteId) {
-      try {
-        localStorage.removeItem(getChatStorageKey(workspacePath, noteId));
-      } catch (e) {
-        console.error("Failed to clear chat history", e);
-      }
-    }
-    setMessages([]);
-    setErrorMessage("");
-    setStatus("idle");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -591,7 +985,7 @@ export function AiSummaryPanel({
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-txt-primary truncate">
-                AI Summary & Chat
+                MarkAI
               </span>
               <span className="text-[10px] text-txt-muted truncate">
                 {noteTitle}
@@ -605,17 +999,169 @@ export function AiSummaryPanel({
                 <Loader2 className="h-2.5 w-2.5 animate-spin" /> Thinking
               </Badge>
             )}
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClearChat}
-                className="h-7 w-7 text-txt-muted hover:text-txt-primary cursor-pointer"
-                title="Clear chat history"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
+
+            {/* 1. Chat History Popover */}
+            <Popover open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-7 w-7 text-txt-muted hover:text-txt-primary cursor-pointer relative",
+                    isHistoryOpen && "bg-accent text-txt-primary"
+                  )}
+                  title="Chat History"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  {sessions.filter((s) => s.messages.length > 0).length > 1 && (
+                    <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0 shadow-lg border-border/80 bg-surface/95 backdrop-blur-md rounded-xl overflow-hidden z-50">
+                {/* Popover Header */}
+                <div className="p-3 border-b border-border/60 flex items-center justify-between gap-2 bg-background/60">
+                  <div className="flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-semibold text-txt-primary">Chat History</span>
+                    <span className="text-[10px] text-txt-muted font-medium">
+                      ({sessions.filter((s) => s.messages.length > 0).length})
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNewChat}
+                    className="h-6 px-2 text-[11px] gap-1 text-primary hover:bg-primary/10 cursor-pointer font-medium"
+                  >
+                    <Plus className="h-3 w-3" /> New Chat
+                  </Button>
+                </div>
+
+                {/* Popover History List */}
+                <div className="max-h-72 overflow-y-auto p-1.5 space-y-1">
+                  {sessions.map((session) => {
+                    const isActive = session.id === activeSessionId;
+                    const isEditing = session.id === editingSessionId;
+                    const messageCount = session.messages.length;
+
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          if (!isEditing) {
+                            setActiveSessionId(session.id);
+                            setStatus(session.messages.length > 0 ? "completed" : "idle");
+                            setIsHistoryOpen(false);
+                          }
+                        }}
+                        className={cn(
+                          "group relative flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer",
+                          isActive
+                            ? "bg-primary/15 text-primary font-medium border border-primary/30 shadow-2xs"
+                            : "hover:bg-accent/60 text-txt-secondary hover:text-txt-primary border border-transparent"
+                        )}
+                      >
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5 w-full" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveRename(session.id);
+                                if (e.key === "Escape") setEditingSessionId(null);
+                              }}
+                              autoFocus
+                              className="flex-1 bg-background border border-primary/50 rounded px-1.5 py-0.5 text-xs text-txt-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <button
+                              onClick={() => handleSaveRename(session.id)}
+                              className="p-1 text-primary hover:bg-primary/20 rounded cursor-pointer"
+                              title="Save title"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setEditingSessionId(null)}
+                              className="p-1 text-txt-muted hover:bg-secondary rounded cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start gap-2 min-w-0 flex-1">
+                              <MessageSquare className={cn("h-3.5 w-3.5 shrink-0 mt-0.5", isActive ? "text-primary" : "text-txt-muted")} />
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <span className="truncate text-xs leading-tight font-medium">
+                                  {session.title || "New Conversation"}
+                                </span>
+                                <div className="flex items-center gap-1.5 text-[10px] text-txt-muted mt-0.5">
+                                  <span>{formatRelativeTime(session.updatedAt)}</span>
+                                  {messageCount > 0 && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{messageCount} {messageCount === 1 ? "msg" : "msgs"}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    className="h-6 w-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 text-txt-muted hover:text-txt-primary hover:bg-accent/80 transition-opacity cursor-pointer"
+                                  >
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-32 text-xs z-50">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingSessionId(session.id);
+                                      setEditingTitle(session.title);
+                                    }}
+                                    className="cursor-pointer gap-2"
+                                  >
+                                    <Pencil className="h-3 w-3" /> Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleDeleteSession(session.id, e)}
+                                    className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-3 w-3" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Popover Footer (Clear All History) */}
+                {sessions.some((s) => s.messages.length > 0) && (
+                  <div className="p-2 border-t border-border/50 bg-background/40 flex justify-between items-center">
+                    <button
+                      onClick={handleClearAllHistory}
+                      className="text-[10px] text-destructive hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-destructive/10 cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" /> Clear all history
+                    </button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* 2. Close Panel */}
             <Button
               variant="ghost"
               size="icon"
@@ -623,13 +1169,13 @@ export function AiSummaryPanel({
               className="h-7 w-7 text-txt-muted hover:text-txt-primary cursor-pointer"
               title="Close AI Panel"
             >
-              <X className="h-4 w-4" />
+              <ArrowRightToLine className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         {/* Scrollable Conversation Stream */}
-        <ScrollArea ref={scrollRef} className="flex-1 p-3.5 overflow-y-auto bg-background/50">
+        <div ref={scrollRef} className="flex-1 p-3.5 overflow-y-auto bg-background/50">
           {/* 1. Empty Hero State */}
           {messages.length === 0 && (
             <div className="h-full min-h-[320px] flex flex-col items-center justify-center text-center p-3 gap-3.5">
@@ -687,12 +1233,10 @@ export function AiSummaryPanel({
                 if (isUser) {
                   return (
                     <div key={msg.id} className="flex justify-end gap-2 pl-8">
-                      <div className="rounded-2xl rounded-tr-xs bg-primary text-primary-foreground px-3.5 py-2 text-xs leading-relaxed shadow-xs max-w-[88%] select-text">
+                      <div className="rounded-2xl rounded-tr-xs bg-primary/50 text-primary-foreground px-2.5 py-1 text-xs leading-relaxed shadow-xs max-w-[88%] select-text border border-primary/20">
                         {msg.content}
                       </div>
-                      <div className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                        <User className="h-3.5 w-3.5" />
-                      </div>
+
                     </div>
                   );
                 }
@@ -702,35 +1246,19 @@ export function AiSummaryPanel({
                   <div key={msg.id} className="flex flex-col gap-1.5 pr-1">
                     <div className="flex items-center justify-between gap-1 text-[10px] text-txt-muted px-1">
                       <div className="flex items-center gap-1.5 font-medium text-primary">
-                        <Bot className="h-3.5 w-3.5" />
-                        <span>AI Assistant</span>
+                        <Atom className="h-3.5 w-3.5" />
                       </div>
 
                       {/* View mode switcher */}
-                      <div className="flex items-center bg-secondary/80 p-0.5 rounded border border-border/50 text-[10px]">
-                        <button
-                          onClick={() => handleToggleViewMode(msg.id, "prettified")}
-                          className={cn(
-                            "px-1.5 py-0.5 rounded font-medium transition-colors cursor-pointer",
-                            viewMode === "prettified"
-                              ? "bg-background text-primary shadow-2xs"
-                              : "text-txt-muted hover:text-txt-primary"
-                          )}
-                        >
-                          Prettified
-                        </button>
-                        <button
-                          onClick={() => handleToggleViewMode(msg.id, "raw")}
-                          className={cn(
-                            "px-1.5 py-0.5 rounded font-medium transition-colors cursor-pointer",
-                            viewMode === "raw"
-                              ? "bg-background text-primary shadow-2xs"
-                              : "text-txt-muted hover:text-txt-primary"
-                          )}
-                        >
-                          Raw MD
-                        </button>
-                      </div>
+                      <SegmentedTabs
+                        size="xs"
+                        value={viewMode}
+                        onValueChange={(val) => handleToggleViewMode(msg.id, val)}
+                        options={[
+                          { value: "prettified", label: "Prettified" },
+                          { value: "raw", label: "Raw MD" },
+                        ]}
+                      />
                     </div>
 
                     {/* Content Box */}
@@ -781,7 +1309,7 @@ export function AiSummaryPanel({
                             onClick={() => onInsertSummary(msg.content)}
                             className="h-6 px-2 text-[10px] gap-1 text-primary hover:bg-primary/10 cursor-pointer"
                           >
-                            <FileDown className="h-3 w-3" />
+                            <SquareArrowLeft className="h-3 w-3" />
                             <span>Insert into Note</span>
                           </Button>
                         )}
@@ -845,7 +1373,7 @@ export function AiSummaryPanel({
               </div>
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Bottom Interactive Chat Input Bar */}
         <div className="p-3 border-t border-border/70 bg-background/90 flex flex-col gap-2 shrink-0">

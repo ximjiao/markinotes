@@ -13,6 +13,7 @@ import { MoveNoteDialog } from "./move-note-dialog";
 import { TemplateDialog } from "./template-dialog";
 import type { NoteTemplate } from "../_lib/templates-data";
 import { Button } from "@/components/ui/button";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { exportDocument } from "@features/editor/_lib/export-engine";
 import { AIOrganizeDialog } from "./ai-organize-dialog";
 import { noteIpc, isTauri } from "../_lib/note-ipc";
@@ -422,24 +423,15 @@ export function HomeDashboard() {
                 Organize with AI
               </Button>
             )}
-            <div className="flex items-center border border-border rounded-lg p-0.5 bg-accent/30">
-              <Button
-                variant={viewMode === "grid" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setViewMode("grid")}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setViewMode("list")}
-              >
-                <List className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            <SegmentedTabs
+              size="sm"
+              value={viewMode}
+              onValueChange={setViewMode}
+              options={[
+                { value: "grid", icon: <LayoutGrid className="h-3.5 w-3.5" /> },
+                { value: "list", icon: <List className="h-3.5 w-3.5" /> },
+              ]}
+            />
           </div>
         </div>
 

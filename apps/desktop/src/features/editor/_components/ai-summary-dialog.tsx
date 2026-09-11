@@ -258,7 +258,7 @@ export function AiSummaryDialog({
               size="sm"
               onClick={handleStartSummarize}
               disabled={status === "streaming"}
-              className=" text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
+              className="h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
             >
               {status === "streaming" ? (
                 <>

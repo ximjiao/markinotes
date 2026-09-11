@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import {
   Dialog,
   DialogContent,
@@ -553,25 +554,15 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
                 <p className="text-sm font-medium text-txt-primary">Contrast</p>
                 <p className="text-xs text-txt-muted mt-0.5">Increase contrast for better readability</p>
               </div>
-              <div className="flex items-center rounded-lg border border-border overflow-hidden">
-                {["Standard", "High"].map((label, i) => {
-                  const val = label.toLowerCase();
-                  const active = contrast === val;
-                  return (
-                    <button
-                      key={val}
-                      onClick={() => handleContrast(val)}
-                      className={cn(
-                        "px-4 py-1.5 text-xs font-medium transition-colors",
-                        i === 0 ? "border-r border-border" : "",
-                        active ? "bg-txt-primary text-background" : "text-txt-secondary hover:text-txt-primary"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+              <SegmentedTabs
+                size="sm"
+                value={contrast}
+                onValueChange={(val) => handleContrast(val)}
+                options={[
+                  { value: "standard", label: "Standard" },
+                  { value: "high", label: "High" },
+                ]}
+              />
             </div>
           </div>
 
@@ -614,50 +605,39 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <SectionHeader className="mb-0">AI Configuration</SectionHeader>
-          <div className="inline-flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/70 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setAiMode("byok");
-                workspaceConfig.set({ aiMode: "byok" });
-                setTestStatus("idle");
-                setTestFeedback(null);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer",
-                aiMode === "byok"
-                  ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
-                  : "text-txt-muted hover:text-txt-primary"
-              )}
-            >
-              <Key className="h-3.5 w-3.5 text-amber-500" />
-              <span>Custom API Key (BYOK)</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
-                Free
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAiMode("system");
-                workspaceConfig.set({ aiMode: "system" });
-                setTestStatus("idle");
-                setTestFeedback(null);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer",
-                aiMode === "system"
-                  ? "bg-background text-txt-primary shadow-sm border border-border/80 font-semibold"
-                  : "text-txt-muted hover:text-txt-primary"
-              )}
-            >
-              <Cloud className="h-3.5 w-3.5 text-purple-500" />
-              <span>Built-in System AI</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20">
-                Pro / Trial
-              </span>
-            </button>
-          </div>
+          <SegmentedTabs
+            size="sm"
+            value={aiMode}
+            onValueChange={(val) => {
+              setAiMode(val);
+              workspaceConfig.set({ aiMode: val });
+              setTestStatus("idle");
+              setTestFeedback(null);
+            }}
+            className="self-start sm:self-auto"
+            options={[
+              {
+                value: "byok",
+                icon: <Key className="h-3.5 w-3.5 text-amber-500" />,
+                label: "Custom API Key (BYOK)",
+                badge: (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20 ml-1">
+                    Free
+                  </span>
+                ),
+              },
+              {
+                value: "system",
+                icon: <Cloud className="h-3.5 w-3.5 text-purple-500" />,
+                label: "Built-in System AI",
+                badge: (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20 ml-1">
+                    Pro / Trial
+                  </span>
+                ),
+              },
+            ]}
+          />
         </div>
 
         {aiMode === "system" ? (

@@ -7,7 +7,6 @@ import { EditorToolbar } from "./editor-toolbar";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { SlashCommandMenu } from "./slash-command-menu";
 import { BubbleToolbar } from "./bubble-toolbar";
-import { EditorFooter } from "./editor-footer";
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { ImageDialog } from "./image-dialog";
 import type { NoteDocument } from "../_types/editor.types";
@@ -104,13 +103,7 @@ export function TiptapEditor({
         </div>
       </div>
 
-      {/* 3. Footer Bar */}
-      <EditorFooter
-        wordCount={wordCount}
-        charCount={charCount}
-      />
-
-      {/* 4. AI Summary Dialog */}
+      {/* 3. AI Summary Dialog */}
       <AiSummaryDialog
         isOpen={isAiDialogOpen}
         onClose={() => setIsAiDialogOpen(false)}

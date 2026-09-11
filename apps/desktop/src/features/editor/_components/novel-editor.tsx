@@ -93,7 +93,6 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { exportDocument } from "../_lib/export-engine";
 import type { ExportType, NoteDocument } from "../_types/editor.types";
-import { EditorFooter } from "./editor-footer";
 import { AiSummaryPanel } from "./ai-summary-panel";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { NotionTocMinimap } from "./notion-toc-minimap";
@@ -1476,12 +1475,6 @@ export function NovelEditor({
               </div>
             </div>
           </div>
-
-          {/* 4. Footer Bar */}
-          <EditorFooter
-            wordCount={wordCount}
-            charCount={charCount}
-          />
         </div>
 
         {/* Right Side: Split Screen AI Summary Panel */}
