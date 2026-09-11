@@ -9,10 +9,7 @@ import { Label } from "@/components/ui/label";
 import { isTauri } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { invoke } from "@tauri-apps/api/core";
-
-interface OnboardingViewProps {
-  onSelectFolder: () => void;
-}
+import type { OnboardingViewProps } from "../_types/home.types";
 
 export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
   const [step, setStep] = useState(1);

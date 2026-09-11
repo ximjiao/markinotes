@@ -6,10 +6,7 @@ import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, Link as LinkIcon
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface BubbleToolbarProps {
-  editor: Editor | null;
-}
+import type { BubbleToolbarProps } from "../_types/editor.types";
 
 export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);

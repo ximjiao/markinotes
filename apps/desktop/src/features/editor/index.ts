@@ -9,8 +9,10 @@ export { AiSummaryDialog } from "./_components/ai-summary-dialog";
 export { AiSummaryPanel } from "./_components/ai-summary-panel";
 export { NotionTocMinimap } from "./_components/notion-toc-minimap";
 export { NotionTablePillHandles } from "./_components/notion-table-pill-handles";
+export { PrettifiedSummary } from "./_components/prettified-summary";
 
 export { useTiptapEditor } from "./_hooks/use-tiptap-editor";
 export { exportDocument } from "./_lib/export-engine";
 export { parseNoteMarkdown, serializeNoteMarkdown } from "./_lib/markdown-serializer";
 export type { NoteDocument, NoteFrontmatter, ExportType, SlashCommandItem } from "./_types/editor.types";
+export type { ChatMessage, ChatSession, AiStatus, AiActionType, AiSummaryPanelProps } from "./_types/ai-chat.types";

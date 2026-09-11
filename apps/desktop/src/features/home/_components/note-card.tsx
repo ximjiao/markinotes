@@ -18,18 +18,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { NoteCardData } from "../_types/home.types";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import type { NoteCardData, NoteCardProps } from "../_types/home.types";
+import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/formatters";
 import { NotePreviewRenderer } from "./note-preview-renderer";
-
-interface NoteCardProps {
-  note: NoteCardData;
-  onOpen?: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onToggleStar?: (id: string) => void;
-  onMove?: (id: string) => void;
-  onExport?: (id: string) => void;
-}
 
 export function NoteCard({ note, onOpen, onDelete, onToggleStar, onMove, onExport }: NoteCardProps) {
   const tags = note.tags || [];

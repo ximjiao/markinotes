@@ -3,19 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
-
-interface HeadingItem {
-  id: string;
-  level: number;
-  text: string;
-  pos: number;
-}
-
-interface NotionTocMinimapProps {
-  editor: Editor | null;
-  className?: string;
-  isAiOpen?: boolean;
-}
+import type { HeadingItem, NotionTocMinimapProps } from "../_types/editor.types";
 
 export function NotionTocMinimap({ editor, className, isAiOpen }: NotionTocMinimapProps) {
   const [headings, setHeadings] = useState<HeadingItem[]>([]);

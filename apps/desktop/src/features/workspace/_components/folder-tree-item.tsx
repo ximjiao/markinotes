@@ -16,18 +16,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, ChevronRight, Edit3, ExternalLink, FilePlus, Folder, FolderPlus, MoreHorizontal, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { isTauri } from "../../home/_lib/note-ipc";
-import type { LocalFolderNode } from "../_types/folder.types";
-
-interface FolderTreeItemProps {
-  folder: LocalFolderNode;
-  activeId: string | null;
-  onSelect: (id: string) => void;
-  onToggleExpand: (id: string) => void;
-  onCreateSubfolder: (parentId: string, name: string) => void;
-  onCreateNote?: (folderPath: string) => void;
-  onRenameFolder?: (folderId: string, newName: string) => void;
-  depth?: number;
-}
+import type { LocalFolderNode, FolderTreeItemProps } from "../_types/folder.types";
 
 export function FolderTreeItem({
   folder,

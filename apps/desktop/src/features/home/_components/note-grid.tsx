@@ -2,8 +2,8 @@
 
 import React from "react";
 import { NoteCard } from "./note-card";
-import type { NoteCardData, ViewMode } from "../_types/home.types";
-import { formatRelativeTime } from "@/lib/utils";
+import type { NoteCardData, ViewMode, NoteGridProps } from "../_types/home.types";
+import { formatRelativeTime } from "@/lib/formatters";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,16 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-interface NoteGridProps {
-  notes: NoteCardData[];
-  viewMode: ViewMode;
-  onOpenNote?: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onToggleStar?: (id: string) => void;
-  onMove?: (id: string) => void;
-  onExport?: (id: string) => void;
-}
 
 export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, onMove, onExport }: NoteGridProps) {
   if (notes.length === 0) {

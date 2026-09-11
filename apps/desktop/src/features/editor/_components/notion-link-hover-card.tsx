@@ -6,16 +6,7 @@ import { Link as LinkIcon, ExternalLink, Copy, Check, Pencil, Unlink, X } from "
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-
-interface NotionLinkHoverCardProps {
-  editor: Editor | null;
-}
-
-interface ActiveLinkData {
-  href: string;
-  element: HTMLElement;
-  rect: DOMRect;
-}
+import type { ActiveLinkData, NotionLinkHoverCardProps } from "../_types/editor.types";
 
 export function NotionLinkHoverCard({ editor }: NotionLinkHoverCardProps) {
   const [activeLink, setActiveLink] = useState<ActiveLinkData | null>(null);

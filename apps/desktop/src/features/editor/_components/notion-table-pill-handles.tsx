@@ -32,11 +32,7 @@ import {
   NOTION_TEXT_COLORS,
   NOTION_BG_HIGHLIGHTS,
 } from "./notion-popover-primitives";
-
-interface NotionTablePillHandlesProps {
-  editor: Editor | null;
-  workspacePath?: string | null;
-}
+import type { NotionTablePillHandlesProps } from "../_types/editor.types";
 
 interface ActiveCellInfo {
   cellElem: HTMLTableCellElement;
@@ -64,17 +60,7 @@ interface GhostRowData {
   cellTexts: string[];
 }
 
-const TABLE_HEADER_COLORS = [
-  { label: "Default", value: "default", bg: "hsl(var(--accent) / 0.6)" },
-  { label: "Gray", value: "gray", bg: "rgba(156, 163, 175, 0.25)" },
-  { label: "Blue", value: "blue", bg: "rgba(59, 130, 246, 0.22)" },
-  { label: "Green", value: "green", bg: "rgba(34, 197, 94, 0.22)" },
-  { label: "Yellow", value: "yellow", bg: "rgba(234, 179, 8, 0.25)" },
-  { label: "Pink", value: "pink", bg: "rgba(236, 72, 153, 0.22)" },
-  { label: "Orange", value: "orange", bg: "rgba(249, 115, 22, 0.22)" },
-  { label: "Purple", value: "purple", bg: "rgba(168, 85, 247, 0.22)" },
-  { label: "Red", value: "red", bg: "rgba(239, 68, 68, 0.22)" },
-];
+import { TABLE_HEADER_COLORS } from "../_lib/editor-constants";
 
 export function NotionTablePillHandles({ editor, workspacePath }: NotionTablePillHandlesProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);

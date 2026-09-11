@@ -22,26 +22,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AIOrganizeResponse } from "../_types/home.types";
-
-interface AIOrganizeDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  suggestions: AIOrganizeResponse;
-  draftTitles: { id: string; title: string }[];
-  onConfirm: (approvedMoves: AIOrganizeResponse) => void;
-  isLoading?: boolean;
-  errorMessage?: string;
-  onOpenSettings?: () => void;
-}
-
-interface ItemRow {
-  noteId: string;
-  noteTitle: string;
-  type: "move" | "create";
-  folderDisplayName: string;
-  rawTarget: string;
-}
+import type { AIOrganizeResponse, AIOrganizeDialogProps, AIOrganizeItemRow as ItemRow } from "../_types/home.types";
 
 export function AIOrganizeDialog({
   isOpen,

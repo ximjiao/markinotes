@@ -16,10 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FolderTreeItem } from "@features/workspace";
 import { useWorkspaceStore, useNotesStore, useUiStore } from "@/stores";
-
-interface HomeSidebarProps {
-  onCreateNote?: (folderPath: string) => void;
-}
+import type { HomeSidebarProps } from "../_types/home.types";
 
 export function HomeSidebar({ onCreateNote }: HomeSidebarProps) {
   const folders = useWorkspaceStore((s) => s.folders);

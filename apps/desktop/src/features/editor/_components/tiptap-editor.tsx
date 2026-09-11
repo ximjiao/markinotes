@@ -9,15 +9,7 @@ import { SlashCommandMenu } from "./slash-command-menu";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { AiSummaryDialog } from "./ai-summary-dialog";
 import { ImageDialog } from "./image-dialog";
-import type { NoteDocument } from "../_types/editor.types";
-
-interface TiptapEditorProps {
-  initialContent?: string;
-  initialTitle?: string;
-  onSave?: (markdown: string, doc: NoteDocument) => void;
-  noteId?: string;
-  workspacePath?: string | null;
-}
+import type { NoteDocument, TiptapEditorProps } from "../_types/editor.types";
 
 export function TiptapEditor({
   initialContent,

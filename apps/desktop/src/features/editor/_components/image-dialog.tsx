@@ -5,12 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Upload, Link as LinkIcon, Image as ImageIcon, X } from "lucide-react";
-
-interface ImageDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onInsertImage: (src: string) => void;
-}
+import type { ImageDialogProps } from "../_types/editor.types";
 
 export function ImageDialog({ isOpen, onClose, onInsertImage }: ImageDialogProps) {
   const [imageUrl, setImageUrl] = useState("");

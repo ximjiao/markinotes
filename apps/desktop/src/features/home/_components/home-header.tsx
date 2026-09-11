@@ -6,10 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNotesStore, useUiStore } from "@/stores";
-
-interface HomeHeaderProps {
-  onNewNote: () => void;
-}
+import type { HomeHeaderProps } from "../_types/home.types";
 
 export function HomeHeader({ onNewNote }: HomeHeaderProps) {
   const searchQuery = useNotesStore((s) => s.searchQuery);

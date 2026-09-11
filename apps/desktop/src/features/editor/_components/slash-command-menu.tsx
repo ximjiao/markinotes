@@ -4,13 +4,7 @@ import React, { useEffect } from "react";
 import type { Editor } from "@tiptap/react";
 import { Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Code, Table, Quote, Minus, Image as ImageIcon } from "lucide-react";
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-
-interface SlashCommandMenuProps {
-  editor: Editor | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onOpenImageDialog?: () => void;
-}
+import type { SlashCommandMenuProps } from "../_types/editor.types";
 
 export function SlashCommandMenu({ editor, isOpen, onClose, onOpenImageDialog }: SlashCommandMenuProps) {
   useEffect(() => {

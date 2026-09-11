@@ -92,7 +92,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { exportDocument } from "../_lib/export-engine";
-import type { ExportType, NoteDocument } from "../_types/editor.types";
+import type { ExportType, NoteDocument, NovelEditorProps, CustomSlashItem } from "../_types/editor.types";
+import { TABLE_TEXT_COLORS, TABLE_BG_COLORS, TABLE_HEADER_COLORS } from "../_lib/editor-constants";
 import { AiSummaryPanel } from "./ai-summary-panel";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import { NotionTocMinimap } from "./notion-toc-minimap";
@@ -102,27 +103,6 @@ import { NotionLinkHoverCard } from "./notion-link-hover-card";
 import { ImageDialog } from "./image-dialog";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 import { useUiStore } from "@/stores";
-
-interface NovelEditorProps {
-  initialTitle?: string;
-  initialContent?: string;
-  initialTags?: string[];
-  allWorkspaceTags?: string[];
-  onBack?: () => void;
-  onSave?: (title: string, content: string, tags: string[]) => void;
-  onOpenSettings?: () => void;
-  noteId?: string;
-  workspacePath?: string | null;
-}
-
-interface CustomSlashItem {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  badge?: string;
-  searchTerms: string[];
-  command: (props: any) => void;
-}
 
 const rawSlashItems: CustomSlashItem[] = [
   {
@@ -570,44 +550,6 @@ const IndentExtension = Extension.create({
     ];
   },
 });
-
-const TABLE_TEXT_COLORS = [
-  { label: "Default", value: "inherit" },
-  { label: "Gray", value: "#9ca3af" },
-  { label: "Brown", value: "#b45309" },
-  { label: "Orange", value: "#f97316" },
-  { label: "Yellow", value: "#eab308" },
-  { label: "Green", value: "#22c55e" },
-  { label: "Blue", value: "#3b82f6" },
-  { label: "Purple", value: "#a855f7" },
-  { label: "Pink", value: "#ec4899" },
-  { label: "Red", value: "#ef4444" },
-];
-
-const TABLE_BG_COLORS = [
-  { label: "Default", value: "transparent" },
-  { label: "Gray", value: "rgba(156, 163, 175, 0.2)" },
-  { label: "Brown", value: "rgba(180, 83, 9, 0.2)" },
-  { label: "Orange", value: "rgba(249, 115, 22, 0.2)" },
-  { label: "Yellow", value: "rgba(234, 179, 8, 0.2)" },
-  { label: "Green", value: "rgba(34, 197, 94, 0.2)" },
-  { label: "Blue", value: "rgba(59, 130, 246, 0.2)" },
-  { label: "Purple", value: "rgba(168, 85, 247, 0.2)" },
-  { label: "Pink", value: "rgba(236, 72, 153, 0.2)" },
-  { label: "Red", value: "rgba(239, 68, 68, 0.2)" },
-];
-
-const TABLE_HEADER_COLORS = [
-  { label: "Default", value: "default", bg: "hsl(var(--accent) / 0.6)" },
-  { label: "Gray", value: "gray", bg: "rgba(156, 163, 175, 0.25)" },
-  { label: "Blue", value: "blue", bg: "rgba(59, 130, 246, 0.22)" },
-  { label: "Green", value: "green", bg: "rgba(34, 197, 94, 0.22)" },
-  { label: "Yellow", value: "yellow", bg: "rgba(234, 179, 8, 0.25)" },
-  { label: "Pink", value: "pink", bg: "rgba(236, 72, 153, 0.22)" },
-  { label: "Orange", value: "orange", bg: "rgba(249, 115, 22, 0.22)" },
-  { label: "Purple", value: "purple", bg: "rgba(168, 85, 247, 0.22)" },
-  { label: "Red", value: "red", bg: "rgba(239, 68, 68, 0.22)" },
-];
 
 const lowlight = createLowlight(common);
 

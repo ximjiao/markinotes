@@ -16,17 +16,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { noteIpc } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
-
-interface TemplateDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectTemplate: (template: NoteTemplate) => void;
-  workspacePath?: string | null;
-  onOpenSettings?: () => void;
-}
+import { cn } from "@/lib/utils";
+import type { TemplateDialogProps } from "../_types/home.types";
 
 // Visual "paper" preview per template id
 function TemplatePreview({ templateId }: { templateId: string }) {

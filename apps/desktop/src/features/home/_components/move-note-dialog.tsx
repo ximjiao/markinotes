@@ -11,14 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { LocalFolderNode } from "../../workspace/_types/folder.types";
 import { cn } from "@/lib/utils";
-
-interface MoveNoteDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  noteTitle: string;
-  folders: LocalFolderNode[];
-  onMove: (folderPath: string) => Promise<void>;
-}
+import type { MoveNoteDialogProps } from "../_types/home.types";
 
 export function MoveNoteDialog({ isOpen, onClose, noteTitle, folders, onMove }: MoveNoteDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");

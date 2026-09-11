@@ -44,38 +44,8 @@ import {
 } from "./notion-popover-primitives";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
-
-const TEXT_COLORS = [
-  { id: "default", label: "Default color", color: "inherit" },
-  { id: "gray", label: "Gray", color: "#9ca3af" },
-  { id: "brown", label: "Brown", color: "#b45309" },
-  { id: "orange", label: "Orange", color: "#f97316" },
-  { id: "yellow", label: "Yellow", color: "#eab308" },
-  { id: "green", label: "Green", color: "#22c55e" },
-  { id: "blue", label: "Blue", color: "#3b82f6" },
-  { id: "purple", label: "Purple", color: "#a855f7" },
-  { id: "pink", label: "Pink", color: "#ec4899" },
-  { id: "red", label: "Red", color: "#ef4444" },
-];
-
-const BG_HIGHLIGHTS = [
-  { id: "default", label: "Default background", bg: "transparent" },
-  { id: "gray_background", label: "Gray background", bg: "rgba(156, 163, 175, 0.25)" },
-  { id: "brown_background", label: "Brown background", bg: "rgba(180, 83, 9, 0.25)" },
-  { id: "orange_background", label: "Orange background", bg: "rgba(249, 115, 22, 0.25)" },
-  { id: "yellow_background", label: "Yellow background", bg: "rgba(234, 179, 8, 0.25)" },
-  { id: "green_background", label: "Green background", bg: "rgba(34, 197, 94, 0.25)" },
-  { id: "blue_background", label: "Blue background", bg: "rgba(59, 130, 246, 0.25)" },
-  { id: "purple_background", label: "Purple background", bg: "rgba(168, 85, 247, 0.25)" },
-  { id: "pink_background", label: "Pink background", bg: "rgba(236, 72, 153, 0.25)" },
-  { id: "red_background", label: "Red background", bg: "rgba(239, 68, 68, 0.25)" },
-];
-
-interface NotionSelectionPopoverProps {
-  editor: Editor;
-  workspacePath?: string | null;
-  noteId?: string;
-}
+import type { NotionSelectionPopoverProps } from "../_types/editor.types";
+import { TEXT_COLORS, BG_HIGHLIGHTS } from "../_lib/editor-constants";
 
 export function NotionSelectionPopover({
   editor,

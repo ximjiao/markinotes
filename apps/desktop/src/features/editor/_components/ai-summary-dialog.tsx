@@ -23,18 +23,9 @@ import {
   Settings,
 } from "lucide-react";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
-import { PrettifiedSummary } from "./ai-summary-panel";
+import { PrettifiedSummary } from "./prettified-summary";
 import { workspaceConfig } from "@/features/workspace/_lib/workspace-config";
-
-interface AiSummaryDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  noteId?: string;
-  workspacePath?: string | null;
-  noteTitle?: string;
-  onInsertSummary?: (summaryText: string) => void;
-  onOpenSettings?: () => void;
-}
+import type { AiSummaryDialogProps } from "../_types/editor.types";
 
 export function AiSummaryDialog({
   isOpen,
