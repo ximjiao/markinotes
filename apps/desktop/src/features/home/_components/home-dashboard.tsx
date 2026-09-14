@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { ArrowLeft, LayoutGrid, List, Sparkles } from "lucide-react";
 import { HomeHeader } from "./home-header";
 import { HomeSidebar } from "./home-sidebar";
@@ -21,8 +21,11 @@ import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore, useNotesStore, useUiStore } from "@/stores";
 
+import type { LocalFolderNode } from "../../workspace/_types/folder.types";
+
 export function HomeDashboard() {
   const workspace = useWorkspaceStore((s) => s.workspace);
+  const folders = useWorkspaceStore((s) => s.folders);
   const isConfigLoaded = useWorkspaceStore((s) => s.isConfigLoaded);
   const allTags = useWorkspaceStore((s) => s.allTags);
   const initWorkspace = useWorkspaceStore((s) => s.initWorkspace);
@@ -60,7 +63,7 @@ export function HomeDashboard() {
     initWorkspace();
   }, [initWorkspace]);
 
-  // Load notes whenever workspace path changes
+  // Load notes once workspace path is available
   useEffect(() => {
     if (workspace?.path) {
       loadNotes(workspace.path);
@@ -69,6 +72,39 @@ export function HomeDashboard() {
 
   const movingNote = movingNoteId ? notes.find((n) => n.id === movingNoteId) : undefined;
   const activeNote = activeNoteRef ? (notes.find((n) => n.id === activeNoteRef.id) ?? activeNoteRef) : undefined;
+
+  const getSelectedFolderNode = useCallback(() => {
+    const list: LocalFolderNode[] =
+      folders && folders.length > 0
+        ? folders
+        : workspace?.folders && workspace.folders.length > 0
+        ? workspace.folders
+        : workspaceConfig.get().folders || [];
+
+    const normSelected = (selectedFolder || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+
+    let foundFolder: LocalFolderNode | null = null;
+    const findRecursive = (items: LocalFolderNode[]) => {
+      for (const f of items) {
+        const normPath = (f.path || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+        const normName = (f.name || "").trim().toLowerCase();
+
+        if (
+          f.id === selectedFolder ||
+          normPath === normSelected ||
+          normName === normSelected
+        ) {
+          foundFolder = f;
+          return;
+        }
+        if (f.children && f.children.length > 0) {
+          findRecursive(f.children);
+        }
+      }
+    };
+    findRecursive(list);
+    return foundFolder;
+  }, [folders, workspace?.folders, selectedFolder]);
 
   // Filter notes based on current view & search query
   const filteredNotes = notes.filter((note) => {
@@ -82,12 +118,43 @@ export function HomeDashboard() {
     if (selectedFolder === "recents") return true;
     if (selectedFolder === "starred") return !!note.isStarred;
     if (selectedFolder === "settings") return false;
-    if (selectedFolder === "drafts") return note.path.startsWith(`${workspace?.path}/Drafts`);
+
+    const normNotePath = (note.path || "").replace(/\\/g, "/").toLowerCase();
+    const noteGroup = ((note as any).groupName || (note as any).group_name || "").trim().toLowerCase();
+
+    if (selectedFolder === "drafts") {
+      const normWs = (workspace?.path || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+      const isDraftPath = normNotePath.startsWith(`${normWs}/drafts/`) || normNotePath.includes("/drafts/");
+      const isDraftTag = note.tags?.some((t) => t.toLowerCase() === "draft");
+      const isDraftGroup = noteGroup === "drafts";
+      return isDraftPath || isDraftTag || isDraftGroup;
+    }
+
     if (selectedFolder.startsWith("tag:")) {
       const targetTag = selectedFolder.split(":")[1]?.toLowerCase();
       return note.tags?.some((t) => t.toLowerCase() === targetTag);
     }
-    return note.path.startsWith(selectedFolder);
+
+    const folderNode = getSelectedFolderNode();
+
+    if (folderNode) {
+      const normFolderPath = (folderNode.path || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+      const normFolderName = (folderNode.name || "").trim().toLowerCase();
+
+      const matchPrefix = normNotePath.startsWith(`${normFolderPath}/`);
+      const matchGroup = noteGroup === normFolderName;
+      const matchSegment = normNotePath.includes(`/${normFolderName}/`);
+
+      return matchPrefix || matchGroup || matchSegment;
+    }
+
+    // Fallback: match by selectedFolder directly
+    const normSelected = (selectedFolder || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    const matchPrefix = normNotePath.startsWith(`${normSelected}/`);
+    const matchGroup = noteGroup === normSelected;
+    const matchSegment = normNotePath.includes(`/${normSelected}/`);
+
+    return matchPrefix || matchGroup || matchSegment;
   });
 
   if (!isConfigLoaded) {
@@ -111,14 +178,23 @@ export function HomeDashboard() {
           initialContent={activeNoteContent || `# ${note?.title || "Untitled"}\n\n`}
           initialTags={(note as any)?.tags || []}
           allWorkspaceTags={allTags}
-          onBack={closeNote}
+          onBack={() => {
+            closeNote();
+            if (workspace?.path) {
+              loadNotes(workspace.path);
+            }
+          }}
           onOpenSettings={() => {
             closeNote();
+            if (workspace?.path) {
+              loadNotes(workspace.path);
+            }
             setSelectedFolder("settings");
           }}
           onSave={(title, content, tags) => {
-            if (note && workspace?.path) {
-              updateNote(workspace.path, note.path, title, content, tags);
+            const target = note || activeNoteRef;
+            if (target && workspace?.path) {
+              updateNote(workspace.path, target.path, title, content, tags);
             }
           }}
         />
@@ -203,20 +279,6 @@ export function HomeDashboard() {
     );
   }
 
-  const getSelectedFolderNode = () => {
-    let foundFolder: any = null;
-    const findRecursive = (folders: any[]) => {
-      for (const f of folders) {
-        if (f.id === selectedFolder || f.path === selectedFolder) {
-          foundFolder = f;
-          return;
-        }
-        if (f.children) findRecursive(f.children);
-      }
-    };
-    if (workspace?.folders) findRecursive(workspace.folders);
-    return foundFolder;
-  };
 
   const handleNewNote = async () => {
     if (!workspace) return;
@@ -290,7 +352,7 @@ export function HomeDashboard() {
         JSON.stringify(draftTitles),
         JSON.stringify(availableFolders),
         isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
-        isSystemMode ? "gemini-3.6-flash" : (config.aiModel || config.geminiModel || "gemini-3.6-flash"),
+        isSystemMode ? "gemini-3.6-flash" : ((!config.aiModel || config.aiModel === "gemini-2.0-flash") ? "gemini-3.6-flash" : config.aiModel),
         isSystemMode ? "system" : config.aiProvider
       );
 

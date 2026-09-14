@@ -17,9 +17,9 @@ export const PROVIDER_OPTIONS: AiProviderOption[] = [
     keyPlaceholder: "AIzaSy...",
     defaultModel: "gemini-3.6-flash",
     models: [
-      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", desc: "Recommended · Fast & state-of-the-art" },
+      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", desc: "Recommended · Latest & state-of-the-art" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "High efficiency & reasoning" },
-      { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Legacy fast model" },
+      { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", desc: "Fast multi-modal model" },
       { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", desc: "Complex reasoning & deep analysis" },
     ],
   },

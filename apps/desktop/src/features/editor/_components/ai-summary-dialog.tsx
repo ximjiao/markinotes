@@ -95,6 +95,8 @@ export function AiSummaryDialog({
         setStatus("completed");
       } else {
         const apiKey = (config.aiApiKey || config.geminiApiKey || "").trim() || undefined;
+        const rawModel = (config.aiModel || config.geminiModel || "").trim();
+        const resolvedModel = (!rawModel || rawModel === "gemini-2.0-flash") ? "gemini-3.6-flash" : rawModel;
 
         await noteIpc.summarizeStream(
           workspacePath,
@@ -103,18 +105,20 @@ export function AiSummaryDialog({
             setSummary((prev) => prev + chunk);
           },
           apiKey,
-          config.aiModel || config.geminiModel || "gemini-3.6-flash",
+          resolvedModel,
           config.aiProvider
         );
         setStatus("completed");
       }
     } catch (err: any) {
+      console.error("[MarkAI] Summary error:", err);
       setStatus("error");
       const raw = typeof err === "string" ? err : err?.message || "";
-      if (raw.toLowerCase().includes("api key") || raw.toLowerCase().includes("unauthorized") || raw.toLowerCase().includes("forbidden") || raw.toLowerCase().includes("not found")) {
-        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please configure in .env or Settings.");
+      const lower = raw.toLowerCase();
+      if (lower.includes("api key") || lower.includes("api_key") || lower.includes("unauthorized") || lower.includes("forbidden")) {
+        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please check your key in Settings or .env.");
       } else {
-        setErrorMessage(raw || "Couldn't generate summary. Please check your AI configuration in Settings and try again.");
+        setErrorMessage(raw || "An error occurred while generating AI summary.");
       }
     }
   };

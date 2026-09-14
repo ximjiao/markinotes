@@ -333,6 +333,19 @@ pub fn get_gemini_api_key(workspace_path: Option<&str>) -> Result<String, String
     resolve_api_key(Some("gemini"), workspace_path, None)
 }
 
+/// Sanitize and resolve Gemini model, upgrading legacy/deprecated models (like gemini-2.0-flash) to gemini-3.6-flash
+pub fn sanitize_gemini_model(model: Option<&str>) -> String {
+    let env_model = std::env::var("GEMINI_MODEL").ok();
+    let env_resolved = env_model.filter(|m| !m.is_empty() && m != "gemini-2.0-flash");
+
+    match model.filter(|m| !m.is_empty()) {
+        Some("gemini-2.0-flash") | None => {
+            env_resolved.unwrap_or_else(|| "gemini-3.6-flash".to_string())
+        }
+        Some(m) => m.to_string(),
+    }
+}
+
 // ==========================================
 // Streaming Implementation
 // ==========================================
@@ -349,13 +362,14 @@ pub async fn stream_ai_completion(
     match prov.as_str() {
         "system" | "cloud" => {
             if let Ok(server_url) = std::env::var("MARKINOTES_SERVER_URL") {
+                let chosen_model = sanitize_gemini_model(model);
                 let client = reqwest::Client::new();
                 let res = client
                     .post(&server_url)
                     .header("Authorization", format!("Bearer {api_key}"))
                     .json(&serde_json::json!({
                         "prompt": prompt,
-                        "model": model.unwrap_or("gemini-3.6-flash")
+                        "model": chosen_model
                     }))
                     .send()
                     .await
@@ -369,12 +383,8 @@ pub async fn stream_ai_completion(
                 let _ = on_chunk.send(text);
                 Ok(())
             } else if let Ok(gemini_key) = std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("MARKINOTES_AI_KEY")) {
-                let env_model = std::env::var("GEMINI_MODEL").ok();
-                let chosen_model = model
-                    .filter(|m| !m.is_empty())
-                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
-                    .unwrap_or("gemini-3.6-flash");
-                stream_gemini_summary(&gemini_key, Some(chosen_model), prompt, on_chunk).await
+                let chosen_model = sanitize_gemini_model(model);
+                stream_gemini_summary(&gemini_key, Some(&chosen_model), prompt, on_chunk).await
             } else if let Ok(openai_key) = std::env::var("OPENAI_API_KEY") {
                 let env_model = std::env::var("OPENAI_MODEL").ok();
                 let chosen_model = model
@@ -390,12 +400,8 @@ pub async fn stream_ai_completion(
                     .unwrap_or("claude-3-5-sonnet-20241022");
                 stream_anthropic_summary(&claude_key, Some(chosen_model), prompt, on_chunk).await
             } else if api_key.starts_with("AIzaSy") {
-                let env_model = std::env::var("GEMINI_MODEL").ok();
-                let chosen_model = model
-                    .filter(|m| !m.is_empty())
-                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
-                    .unwrap_or("gemini-3.6-flash");
-                stream_gemini_summary(api_key, Some(chosen_model), prompt, on_chunk).await
+                let chosen_model = sanitize_gemini_model(model);
+                stream_gemini_summary(api_key, Some(&chosen_model), prompt, on_chunk).await
             } else {
                 Err("System AI API key is not configured in .env. Please add GEMINI_API_KEY in .env or switch to BYOK mode in Settings.".to_string())
             }
@@ -419,11 +425,7 @@ pub async fn stream_gemini_summary(
     prompt: &str,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
-    let env_model = std::env::var("GEMINI_MODEL").ok();
-    let model_name = model
-        .filter(|m| !m.is_empty())
-        .or(env_model.as_deref().filter(|m| !m.is_empty()))
-        .unwrap_or("gemini-3.6-flash");
+    let model_name = sanitize_gemini_model(model);
 
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse&key={}",
@@ -674,11 +676,7 @@ pub async fn test_ai_connection(
                     model: "markinotes-smart-v2".to_string(),
                 })
             } else if let Ok(gemini_key) = std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("MARKINOTES_AI_KEY")) {
-                let env_model = std::env::var("GEMINI_MODEL").ok();
-                let model_name = model
-                    .filter(|m| !m.is_empty())
-                    .or(env_model.as_deref().filter(|m| !m.is_empty()))
-                    .unwrap_or("gemini-3.6-flash");
+                let model_name = sanitize_gemini_model(model);
                 let url = format!(
                     "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                     model_name, gemini_key
@@ -819,7 +817,7 @@ pub async fn test_ai_connection(
             })
         }
         _ => {
-            let model_name = model.filter(|m| !m.is_empty()).unwrap_or("gemini-3.6-flash");
+            let model_name = sanitize_gemini_model(model);
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                 model_name, api_key
@@ -903,7 +901,7 @@ pub async fn organize_drafts(
                 .or_else(|_| std::env::var("MARKINOTES_AI_KEY"))
                 .unwrap_or_else(|_| api_key.to_string());
             if key.starts_with("AIzaSy") {
-                let model_name = model.filter(|m| !m.is_empty()).unwrap_or("gemini-3.6-flash");
+                let model_name = sanitize_gemini_model(model);
                 let url = format!(
                     "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                     model_name, key
@@ -1032,11 +1030,7 @@ pub async fn organize_drafts(
             Err("OpenAI did not return valid text content".to_string())
         }
         _ => {
-            let env_model = std::env::var("GEMINI_MODEL").ok();
-            let model_name = model
-                .filter(|m| !m.is_empty())
-                .or(env_model.as_deref().filter(|m| !m.is_empty()))
-                .unwrap_or("gemini-3.6-flash");
+            let model_name = sanitize_gemini_model(model);
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                 model_name, api_key

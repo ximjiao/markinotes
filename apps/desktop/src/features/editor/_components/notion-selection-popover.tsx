@@ -51,6 +51,8 @@ export function NotionSelectionPopover({
   editor,
   workspacePath,
   noteId,
+  onAiApplied,
+  onAiUsed,
 }: NotionSelectionPopoverProps) {
   const [activeSubmenu, setActiveSubmenu] = useState<"turnInto" | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -186,6 +188,7 @@ export function NotionSelectionPopover({
     setAiStatus("streaming");
     setAiResult("");
     setErrorMessage("");
+    onAiUsed?.();
 
     try {
       const config = workspaceConfig.get();
@@ -212,6 +215,9 @@ export function NotionSelectionPopover({
         );
         workspaceConfig.consumeSystemAiQuota(1);
       } else {
+        const rawModel = (config.aiModel || config.geminiModel || "").trim();
+        const resolvedModel = (!rawModel || rawModel === "gemini-2.0-flash") ? "gemini-3.6-flash" : rawModel;
+
         await noteIpc.editWithAiStream(
           workspacePath || "",
           selectedText,
@@ -220,7 +226,7 @@ export function NotionSelectionPopover({
             setAiResult((prev) => prev + chunk);
           },
           config.aiApiKey || config.geminiApiKey,
-          config.aiModel || config.geminiModel || "gemini-3.6-flash",
+          resolvedModel,
           config.aiProvider
         );
       }
@@ -237,6 +243,7 @@ export function NotionSelectionPopover({
     const { from, to } = editor.state.selection;
     editor.chain().focus().insertContentAt({ from, to }, aiResult).run();
     handleResetAi();
+    onAiApplied?.("replace");
   };
 
   const handleInsertBelow = () => {
@@ -245,6 +252,7 @@ export function NotionSelectionPopover({
       const { to } = editor.state.selection;
       editor.chain().focus().insertContentAt(to, " " + aiResult).run();
       handleResetAi();
+      onAiApplied?.("insert");
       return;
     }
     const { to } = editor.state.selection;
@@ -255,6 +263,7 @@ export function NotionSelectionPopover({
       content: [{ type: "text", text: aiResult }],
     }).run();
     handleResetAi();
+    onAiApplied?.("insert");
   };
 
   const handleCopyAiResult = async () => {

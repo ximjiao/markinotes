@@ -35,6 +35,7 @@ export interface AiSummaryPanelProps {
   noteTitle?: string;
   onInsertSummary?: (summaryText: string) => void;
   onOpenSettings?: () => void;
+  onAiUsed?: () => void;
 }
 
 export interface PrettifiedSummaryProps {

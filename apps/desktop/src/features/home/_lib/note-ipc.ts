@@ -188,7 +188,8 @@ export const noteIpc = {
     onChunk: (chunk: string) => void,
     customApiKey?: string,
     customModel?: string,
-    provider?: string
+    provider?: string,
+    mode?: "strict" | "explore"
   ): Promise<void> => {
     if (isTauri()) {
       const channel = new Channel<string>();
@@ -200,12 +201,15 @@ export const noteIpc = {
         provider,
         customApiKey,
         customModel,
+        mode: mode || "strict",
         onChunk: channel,
       });
     }
 
     // Web fallback mock
-    const sampleWords = [" Based", " on", " the", " note,", " here", " is", " the", " detailed", " response."];
+    const sampleWords = mode === "explore"
+      ? [" Exploring", " beyond", " your", " note:", " here", " are", " creative", " ideas.\n\n", "How does this connect to your note?"]
+      : [" Grounded", " in", " your", " note:", " here", " is", " the", " verified", " answer."];
     for (const w of sampleWords) {
       await new Promise((r) => setTimeout(r, 40));
       onChunk(w);

@@ -19,6 +19,7 @@ import {
   Atom,
   Check,
   CheckSquare,
+  Compass,
   Copy,
   HelpCircle,
   History,
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   Send,
   Settings,
+  ShieldCheck,
   Sparkles,
   SquareArrowLeft,
   Trash2,
@@ -60,6 +62,7 @@ export function AiSummaryPanel({
   noteTitle = "Note",
   onInsertSummary,
   onOpenSettings,
+  onAiUsed,
 }: AiSummaryPanelProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
@@ -69,6 +72,21 @@ export function AiSummaryPanel({
   const [inputPrompt, setInputPrompt] = useState("");
   const [status, setStatus] = useState<"idle" | "streaming" | "completed" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [chatMode, setChatMode] = useState<"strict" | "explore">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("marki_ai_chat_mode");
+      if (saved === "strict" || saved === "explore") return saved;
+    }
+    return "strict";
+  });
+
+  const handleModeChange = (mode: "strict" | "explore") => {
+    setChatMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("marki_ai_chat_mode", mode);
+    }
+  };
+
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isAnimating, setIsAnimating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -256,10 +274,123 @@ export function AiSummaryPanel({
     setIsHistoryOpen(false);
   };
 
+  // Core streaming helper for both new messages and regenerating
+  const streamAiResponse = async (
+    chatPayload: Array<{ role: "user" | "assistant"; content: string }>,
+    assistantMsgId: string,
+    currentSessionId: string
+  ) => {
+    if (!workspacePath || !noteId) {
+      setErrorMessage("Note ID or workspace path not found.");
+      setStatus("error");
+      return;
+    }
+
+    setErrorMessage("");
+    setStatus("streaming");
+
+    try {
+      const config = workspaceConfig.get();
+      const isSystemMode = config.aiMode === "system";
+
+      if (isSystemMode) {
+        const quota = workspaceConfig.checkSystemAiQuota();
+        if (!quota.allowed) {
+          setStatus("error");
+          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
+          return;
+        }
+
+        await noteIpc.chatStream(
+          workspacePath,
+          noteId,
+          chatPayload,
+          (chunk) => {
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId
+                  ? {
+                    ...s,
+                    updatedAt: Date.now(),
+                    messages: s.messages.map((msg) =>
+                      msg.id === assistantMsgId
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    ),
+                  }
+                  : s
+              )
+            );
+          },
+          undefined,
+          "gemini-3.6-flash",
+          "system",
+          chatMode
+        );
+        workspaceConfig.consumeSystemAiQuota(1);
+        setStatus("completed");
+      } else {
+        const apiKey = (config.aiApiKey || config.geminiApiKey || "").trim() || undefined;
+        const rawModel = (config.aiModel || config.geminiModel || "").trim();
+        const resolvedModel = (!rawModel || rawModel === "gemini-2.0-flash") ? "gemini-3.6-flash" : rawModel;
+
+        await noteIpc.chatStream(
+          workspacePath,
+          noteId,
+          chatPayload,
+          (chunk) => {
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId
+                  ? {
+                    ...s,
+                    updatedAt: Date.now(),
+                    messages: s.messages.map((msg) =>
+                      msg.id === assistantMsgId
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    ),
+                  }
+                  : s
+              )
+            );
+          },
+          apiKey,
+          resolvedModel,
+          config.aiProvider,
+          chatMode
+        );
+        setStatus("completed");
+      }
+    } catch (err: any) {
+      console.error("[MarkAI] Generation error:", err);
+      setStatus("error");
+      const raw = typeof err === "string" ? err : err?.message || "";
+      const lower = raw.toLowerCase();
+
+      if (
+        lower.includes("api key") ||
+        lower.includes("api_key") ||
+        lower.includes("unauthorized") ||
+        lower.includes("forbidden") ||
+        lower.includes("401") ||
+        lower.includes("403")
+      ) {
+        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please check your key in Settings or .env.");
+      } else if (lower.includes("503") || lower.includes("unavailable")) {
+        setErrorMessage("Gemini API is currently experiencing high demand (HTTP 503 Service Unavailable). Please click Regenerate or try again in a few moments.");
+      } else {
+        setErrorMessage(raw || "An error occurred while generating AI response.");
+      }
+    }
+  };
+
   // Send a message
   const handleSendMessage = async (promptToSend?: string) => {
     const text = (promptToSend ?? inputPrompt).trim();
     if (!text || status === "streaming") return;
+
+    onAiUsed?.();
 
     if (!noteId || !workspacePath) {
       setErrorMessage("Note ID or workspace path not found.");
@@ -314,102 +445,109 @@ export function AiSummaryPanel({
     });
 
     setInputPrompt("");
-    setErrorMessage("");
-    setStatus("streaming");
 
-    try {
-      const config = workspaceConfig.get();
-      const isSystemMode = config.aiMode === "system";
+    const chatPayload = newHistory.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
-      if (isSystemMode) {
-        const quota = workspaceConfig.checkSystemAiQuota();
-        if (!quota.allowed) {
-          setStatus("error");
-          setErrorMessage("System AI Quota reached. Please open Settings to upgrade to Markinotes Pro or switch to 'Custom API Key' (BYOK) mode.");
-          return;
+    await streamAiResponse(chatPayload, assistantMsgId, currentSessionId);
+  };
+
+  // Regenerate answer when chat was not replied or connection encountered an error
+  const handleRegenerate = async (targetAssistantId?: string) => {
+    if (status === "streaming") return;
+
+    const currentMessages = activeSession?.messages || [];
+    if (currentMessages.length === 0) {
+      if (PRESET_CHIPS[0]?.prompt) {
+        handleSendMessage(PRESET_CHIPS[0].prompt);
+      }
+      return;
+    }
+
+    let targetIdx = -1;
+    if (targetAssistantId) {
+      targetIdx = currentMessages.findIndex((m) => m.id === targetAssistantId);
+    } else {
+      for (let i = currentMessages.length - 1; i >= 0; i--) {
+        if (currentMessages[i].role === "assistant") {
+          targetIdx = i;
+          break;
         }
-
-        const chatPayload = newHistory.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-        await noteIpc.chatStream(
-          workspacePath,
-          noteId,
-          chatPayload,
-          (chunk) => {
-            setSessions((prev) =>
-              prev.map((s) =>
-                s.id === currentSessionId
-                  ? {
-                    ...s,
-                    updatedAt: Date.now(),
-                    messages: s.messages.map((msg) =>
-                      msg.id === assistantMsgId
-                        ? { ...msg, content: msg.content + chunk }
-                        : msg
-                    ),
-                  }
-                  : s
-              )
-            );
-          },
-          undefined,
-          "gemini-3.6-flash",
-          "system"
-        );
-        workspaceConfig.consumeSystemAiQuota(1);
-        setStatus("completed");
-      } else {
-        const apiKey = (config.aiApiKey || config.geminiApiKey || "").trim() || undefined;
-        const chatPayload = newHistory.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-        await noteIpc.chatStream(
-          workspacePath,
-          noteId,
-          chatPayload,
-          (chunk) => {
-            setSessions((prev) =>
-              prev.map((s) =>
-                s.id === currentSessionId
-                  ? {
-                    ...s,
-                    updatedAt: Date.now(),
-                    messages: s.messages.map((msg) =>
-                      msg.id === assistantMsgId
-                        ? { ...msg, content: msg.content + chunk }
-                        : msg
-                    ),
-                  }
-                  : s
-              )
-            );
-          },
-          apiKey,
-          config.aiModel || config.geminiModel || "gemini-3.6-flash",
-          config.aiProvider
-        );
-        setStatus("completed");
       }
-    } catch (err: any) {
-      setStatus("error");
-      const raw = typeof err === "string" ? err : err?.message || "";
-      if (
-        raw.toLowerCase().includes("api key") ||
-        raw.toLowerCase().includes("unauthorized") ||
-        raw.toLowerCase().includes("forbidden") ||
-        raw.toLowerCase().includes("not found")
-      ) {
-        setErrorMessage("Failed to connect to AI. API Key is missing or invalid. Please configure in .env or Settings.");
-      } else if (raw.toLowerCase().includes("503") || raw.toLowerCase().includes("unavailable")) {
-        setErrorMessage("Gemini API is currently experiencing high demand (HTTP 503 Service Unavailable). Please click Retry or try again in a few moments.");
-      } else {
-        setErrorMessage(raw || "An error occurred while generating AI response.");
+    }
+
+    const currentSessionId = activeSessionId;
+
+    if (targetIdx >= 0) {
+      const targetAssistantMsg = currentMessages[targetIdx];
+      const assistantMsgId = targetAssistantMsg.id;
+
+      // History up to the message right before this assistant message
+      const priorHistory = currentMessages.slice(0, targetIdx);
+      if (priorHistory.length === 0) return;
+
+      // Reset content of this assistant message to empty before streaming
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+              ...s,
+              updatedAt: Date.now(),
+              messages: s.messages.map((msg) =>
+                msg.id === assistantMsgId ? { ...msg, content: "" } : msg
+              ),
+            }
+            : s
+        )
+      );
+
+      const chatPayload = priorHistory.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      await streamAiResponse(chatPayload, assistantMsgId, currentSessionId);
+    } else {
+      // If there is no assistant message yet (orphan user message)
+      let lastUserIdx = -1;
+      for (let i = currentMessages.length - 1; i >= 0; i--) {
+        if (currentMessages[i].role === "user") {
+          lastUserIdx = i;
+          break;
+        }
       }
+      if (lastUserIdx < 0) return;
+
+      const assistantMsgId = crypto.randomUUID();
+      const assistantPlaceholder: ChatMessage = {
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        viewMode: "prettified",
+      };
+
+      const historyToUse = currentMessages.slice(0, lastUserIdx + 1);
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+              ...s,
+              updatedAt: Date.now(),
+              messages: [...historyToUse, assistantPlaceholder],
+            }
+            : s
+        )
+      );
+
+      const chatPayload = historyToUse.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      await streamAiResponse(chatPayload, assistantMsgId, currentSessionId);
     }
   };
 
@@ -698,6 +836,30 @@ export function AiSummaryPanel({
           </div>
         </div>
 
+        {/* Chat Mode Control Bar */}
+        <div className="px-3.5 py-1.5 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-2 shrink-0">
+          <SegmentedTabs<"strict" | "explore">
+            size="xs"
+            value={chatMode}
+            onValueChange={handleModeChange}
+            options={[
+              {
+                value: "strict",
+                label: "Strict Note",
+                icon: <ShieldCheck className="h-3 w-3 text-emerald-500" />,
+              },
+              {
+                value: "explore",
+                label: "Explore",
+                icon: <Compass className="h-3 w-3 text-amber-500" />,
+              },
+            ]}
+          />
+          <span className="text-[10px] text-txt-muted truncate font-normal">
+            {chatMode === "strict" ? "Grounded refusal" : "Brainstorm & anchor"}
+          </span>
+        </div>
+
         {/* Scrollable Conversation Stream */}
         <div ref={scrollRef} className="flex-1 p-3.5 overflow-y-auto bg-background/50">
           {/* 1. Empty Hero State */}
@@ -707,11 +869,16 @@ export function AiSummaryPanel({
                 <Sparkles className="h-6 w-6" />
               </div>
               <div className="space-y-1 max-w-[260px]">
-                <h3 className="text-xs font-semibold text-txt-primary">
+                <h3 className="text-xs font-semibold text-txt-primary flex items-center justify-center gap-1.5">
                   AI Note Assistant
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 py-0 font-normal">
+                    {chatMode === "strict" ? "Strict Mode" : "Explore Mode"}
+                  </Badge>
                 </h3>
                 <p className="text-[11px] text-txt-muted leading-relaxed">
-                  Generate structured summaries or converse freely about this note.
+                  {chatMode === "strict"
+                    ? "Ask questions strictly grounded in this note. Out-of-context queries will be politely refused."
+                    : "Brainstorm and explore new ideas anchored to this note. MarkAI will ask how to connect insights back."}
                 </p>
               </div>
 
@@ -755,12 +922,27 @@ export function AiSummaryPanel({
                 const viewMode = msg.viewMode || "prettified";
 
                 if (isUser) {
+                  const isUnansweredLast = idx === messages.length - 1 && status !== "streaming";
                   return (
-                    <div key={msg.id} className="flex justify-end gap-2 pl-8">
+                    <div key={msg.id} className="flex flex-col items-end gap-1 pl-8">
                       <div className="rounded-2xl rounded-tr-xs bg-primary/50 text-primary-foreground px-2.5 py-1 text-xs leading-relaxed shadow-xs max-w-[88%] select-text border border-primary/20">
                         {msg.content}
                       </div>
-
+                      {isUnansweredLast && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-destructive pt-0.5">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>No response received</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRegenerate()}
+                            className="h-5 px-1.5 text-[10px] text-primary hover:bg-primary/10 gap-1 ml-1 cursor-pointer font-medium"
+                          >
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            <span>Regenerate answer</span>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -791,6 +973,24 @@ export function AiSummaryPanel({
                         <div className="flex items-center gap-2 text-txt-muted text-xs py-1">
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                           <span>Generating response...</span>
+                        </div>
+                      ) : !msg.content && status !== "streaming" ? (
+                        <div className="flex flex-col gap-2 py-1 text-txt-muted text-xs">
+                          <div className="flex items-center gap-1.5 text-destructive font-medium">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span>Chat was not replied or connection was interrupted.</span>
+                          </div>
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRegenerate(msg.id)}
+                              className="h-6 px-2.5 text-[11px] gap-1.5 border-primary/40 text-primary hover:bg-primary/10 cursor-pointer font-medium"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              <span>Regenerate answer</span>
+                            </Button>
+                          </div>
                         </div>
                       ) : viewMode === "prettified" ? (
                         <PrettifiedSummary
@@ -842,14 +1042,12 @@ export function AiSummaryPanel({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              const lastUser = [...messages].reverse().find((m) => m.role === "user");
-                              if (lastUser) handleSendMessage(lastUser.content);
-                            }}
-                            className="h-6 px-2 text-[10px] gap-1 text-txt-muted hover:text-txt-primary cursor-pointer ml-auto"
+                            onClick={() => handleRegenerate(msg.id)}
+                            className="h-6 px-2 text-[10px] gap-1 text-txt-muted hover:text-txt-primary cursor-pointer ml-auto hover:bg-primary/10 hover:text-primary transition-colors"
+                            title="Regenerate this answer"
                           >
                             <RefreshCw className="h-3 w-3" />
-                            <span>Retry</span>
+                            <span>Regenerate</span>
                           </Button>
                         )}
                       </div>
@@ -871,17 +1069,10 @@ export function AiSummaryPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const lastUser = [...messages].reverse().find((m) => m.role === "user");
-                      if (lastUser) {
-                        handleSendMessage(lastUser.content);
-                      } else {
-                        handleSendMessage(PRESET_CHIPS[0].prompt);
-                      }
-                    }}
-                    className="h-7 text-xs gap-1.5 border-destructive/30 hover:bg-destructive/10 text-destructive cursor-pointer"
+                    onClick={() => handleRegenerate()}
+                    className="h-7 text-xs gap-1.5 border-destructive/40 hover:bg-destructive/15 text-destructive font-medium cursor-pointer"
                   >
-                    <RefreshCw className="h-3 w-3" /> Retry
+                    <RefreshCw className="h-3 w-3" /> Regenerate answer
                   </Button>
                   {onOpenSettings && (
                     <Button
@@ -924,7 +1115,11 @@ export function AiSummaryPanel({
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything about this note..."
+              placeholder={
+                chatMode === "strict"
+                  ? "Ask anything grounded in this note (Strict Mode)..."
+                  : "Brainstorm or explore ideas based on this note (Explore Mode)..."
+              }
               rows={1}
               disabled={status === "streaming"}
               className="w-full resize-none bg-transparent px-3 py-2.5 text-xs text-txt-primary placeholder:text-txt-muted focus:outline-none max-h-24 min-h-[38px]"

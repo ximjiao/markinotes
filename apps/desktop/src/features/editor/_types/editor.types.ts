@@ -84,6 +84,8 @@ export interface NotionSelectionPopoverProps {
   editor: any;
   workspacePath?: string | null;
   noteId?: string;
+  onAiApplied?: (action: string) => void;
+  onAiUsed?: () => void;
 }
 
 export interface NotionBlockSideHandleProps {

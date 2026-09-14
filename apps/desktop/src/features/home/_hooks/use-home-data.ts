@@ -161,7 +161,7 @@ export function useHomeData() {
     if (selectedFolder === "recents") return true;
     if (selectedFolder === "starred") return !!note.isStarred;
     if (selectedFolder === "settings") return false;
-    if (selectedFolder === "drafts") return note.path.startsWith(`${workspace?.path}/Drafts`);
+    if (selectedFolder === "drafts") return note.path.startsWith(`${workspace?.path}/Drafts`) || note.tags?.some((t) => t.toLowerCase() === "draft");
     if (selectedFolder.startsWith("tag:")) {
       const tag = selectedFolder.split(":")[1];
       return note.tags?.includes(tag);

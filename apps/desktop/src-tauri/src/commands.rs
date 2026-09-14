@@ -48,10 +48,106 @@ pub fn workspace_init(root_path: String, folders: Vec<FolderInfo>) -> Result<(),
     Ok(())
 }
 
+fn sync_workspace_files(workspace_path: &str, conn: &Connection) {
+    let root = PathBuf::from(workspace_path);
+    if !root.exists() || !root.is_dir() {
+        return;
+    }
+
+    fn scan_dir(dir: &std::path::Path, conn: &Connection) {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let file_name = entry.file_name().to_string_lossy().to_string();
+
+                if file_name.starts_with('.') || file_name == "node_modules" {
+                    continue;
+                }
+
+                if path.is_dir() {
+                    scan_dir(&path, conn);
+                } else if path.is_file() {
+                    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                    if ext == "md" || ext == "markdown" {
+                        let path_str = path.to_string_lossy().to_string();
+
+                        let exists: bool = conn
+                            .query_row(
+                                "SELECT 1 FROM notes WHERE path = ?1",
+                                params![path_str],
+                                |_| Ok(true),
+                            )
+                            .unwrap_or(false);
+
+                        if !exists {
+                            let content = fs::read_to_string(&path).unwrap_or_default();
+                            let title = content
+                                .lines()
+                                .find(|line| !line.trim().is_empty())
+                                .map(|line| line.trim_start_matches('#').trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .unwrap_or_else(|| {
+                                    path.file_stem()
+                                        .map(|s| s.to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "Untitled Note".to_string())
+                                });
+
+                            let excerpt = content.chars().take(600).collect::<String>();
+                            let group_name = path
+                                .parent()
+                                .and_then(|p| p.file_name())
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_default();
+
+                            let updated_at = entry
+                                .metadata()
+                                .ok()
+                                .and_then(|m| m.modified().ok())
+                                .map(|time| {
+                                    let dt: chrono::DateTime<chrono::Utc> = time.into();
+                                    dt.to_rfc3339()
+                                })
+                                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+
+                            let id = Uuid::new_v4().to_string();
+                            let initial_context = format!("Title: {title}");
+
+                            let _ = conn.execute(
+                                "INSERT INTO notes (id, path, title, excerpt, group_name, updated_at, ai_context) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                                params![id, path_str, title, excerpt, group_name, updated_at, initial_context],
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    scan_dir(&root, conn);
+
+    // Clean up notes whose files no longer exist on disk
+    if let Ok(mut stmt) = conn.prepare("SELECT path FROM notes") {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            let mut paths_to_delete = Vec::new();
+            for path_res in rows.flatten() {
+                if !std::path::Path::new(&path_res).exists() {
+                    paths_to_delete.push(path_res);
+                }
+            }
+            for p in paths_to_delete {
+                let _ = conn.execute("DELETE FROM notes WHERE path = ?1", params![p]);
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    // Auto-discover and sync any files created directly in folder
+    sync_workspace_files(&workspace_path, &conn);
 
     let mut stmt = conn
         .prepare("SELECT id, path, title, excerpt, group_name, updated_at, is_starred, tags FROM notes ORDER BY updated_at DESC")
@@ -156,9 +252,10 @@ pub fn note_create(workspace_path: String, folder_path: String, title: String) -
     let group_name = PathBuf::from(&folder_path).file_name().unwrap_or_default().to_string_lossy().to_string();
     let updated_at = chrono::Utc::now().to_rfc3339();
 
+    let initial_context = format!("Title: {title}");
     conn.execute(
-        "INSERT INTO notes (id, path, title, excerpt, group_name, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, path_str, title, "", group_name, updated_at],
+        "INSERT INTO notes (id, path, title, excerpt, group_name, updated_at, ai_context) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![id, path_str, title, "", group_name, updated_at, initial_context],
     ).map_err(|e| e.to_string())?;
 
     Ok(NoteCardData {
@@ -261,9 +358,19 @@ pub async fn note_save_stream(
     let tags_str = tags.join(",");
     let excerpt = content.chars().take(100).collect::<String>();
 
+    let pointers = crate::ai::extract_top_word_pointers(&content, 10);
+    let ai_context = if pointers.is_empty() {
+        format!("Title: {title}")
+    } else {
+        format!(
+            "Title: {title}. Key topics: {}",
+            pointers.iter().map(|(w, _)| w.as_str()).collect::<Vec<_>>().join(", ")
+        )
+    };
+
     conn.execute(
-        "UPDATE notes SET title = ?1, excerpt = ?2, tags = ?3, updated_at = ?4 WHERE path = ?5",
-        params![title, excerpt, tags_str, updated_at, note_path],
+        "UPDATE notes SET title = ?1, excerpt = ?2, tags = ?3, updated_at = ?4, ai_context = ?5 WHERE path = ?6",
+        params![title, excerpt, tags_str, updated_at, ai_context, note_path],
     ).map_err(|e| e.to_string())?;
 
     Ok(content.len())
@@ -423,6 +530,7 @@ pub async fn note_chat_stream(
     provider: Option<String>,
     custom_api_key: Option<String>,
     custom_model: Option<String>,
+    mode: Option<String>,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
     let api_key = crate::ai::resolve_api_key(
@@ -434,16 +542,37 @@ pub async fn note_chat_stream(
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
 
-    let (path, title): (String, String) = conn
+    let (path, title, ai_context): (String, String, Option<String>) = conn
         .query_row(
-            "SELECT path, title FROM notes WHERE id = ?1",
+            "SELECT path, title, ai_context FROM notes WHERE id = ?1",
             params![note_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2).ok())),
         )
         .map_err(|e| format!("Note with ID '{note_id}' was not found: {e}"))?;
 
     let content = fs::read_to_string(&path)
         .map_err(|e| format!("Unable to read note file at '{path}': {e}"))?;
+
+    // If ai_context was not yet stored or empty, compute and cache it in the database
+    let note_context_summary = match ai_context.filter(|c| !c.trim().is_empty()) {
+        Some(c) => c,
+        None => {
+            let pointers = crate::ai::extract_top_word_pointers(&content, 10);
+            let computed = if pointers.is_empty() {
+                format!("Title: {title}")
+            } else {
+                format!(
+                    "Title: {title}. Key topics: {}",
+                    pointers.iter().map(|(w, _)| w.as_str()).collect::<Vec<_>>().join(", ")
+                )
+            };
+            let _ = conn.execute(
+                "UPDATE notes SET ai_context = ?1 WHERE id = ?2",
+                params![&computed, &note_id],
+            );
+            computed
+        }
+    };
 
     #[derive(serde::Deserialize)]
     struct ChatMessage {
@@ -458,11 +587,48 @@ pub async fn note_chat_stream(
         history_str.push_str(&format!("{label}: {}\n\n", msg.content));
     }
 
+    let chat_mode = mode.as_deref().unwrap_or("strict").to_lowercase();
+    let is_strict = chat_mode != "explore";
+
+    let mode_instructions = if is_strict {
+        format!(
+            "[MODE: STRICT NOTE CONTEXT (Prompt-Enforced Refusal)]\n\
+            1. STRICT CONTEXT GROUNDING:\n\
+               Answer ONLY based on the facts, concepts, and information directly provided in [NOTE CONTEXT] and [NOTE CONTEXT SUMMARY].\n\
+            2. OUT OF CONTEXT VALIDATION & REFUSAL:\n\
+               If the user asks questions that are OUT OF CONTEXT or UNRELATED to this note (for example: general knowledge, cooking recipes, random programming problems, unrelated facts, or topics not covered in this note):\n\
+               - You MUST REFUSE to answer the off-topic question.\n\
+               - Politely inform the user that their query is outside the scope of this note ('{title}').\n\
+               - State clearly (in the user's language):\n\
+                 * In English: 'This question is outside the context of the note \"{title}\". In Strict Mode, I can only answer questions directly relevant to this note. Relevant topics include: {note_context_summary}.'\n\
+                 * In Indonesian: 'Pertanyaan ini berada di luar konteks catatan \"{title}\". Dalam Mode Ketat (Strict Mode), saya hanya menjawab pertanyaan yang terkait langsung dengan catatan ini. Topik relevan meliputi: {note_context_summary}.'\n\
+               - Briefly mention what topics are relevant to this note and suggest questions the user can ask.\n\
+               - DO NOT provide the answer to the off-topic query.\n\
+            3. IN-CONTEXT RESPONSES:\n\
+               For relevant questions, provide clear, concise, well-structured answers using clean Markdown (with bullet points, bold keywords, headers, or code blocks where appropriate).\n\
+            4. Match the language used by the user (English or Indonesian)."
+        )
+    } else {
+        format!(
+            "[MODE: EXPLORE & BRAINSTORM (Note Anchor with Context Verification)]\n\
+            1. NOTE AS BASE ANCHOR:\n\
+               Use [NOTE CONTEXT] and [NOTE CONTEXT SUMMARY] as your primary base and anchor. You are encouraged to help the user brainstorm, expand on concepts, provide creative examples, counter-arguments, or related external knowledge that bridges back to the note's subject.\n\
+            2. MANDATORY CHECK-IN (RELATION TO NOTE):\n\
+               Every time you answer, you MUST actively link your thoughts back to the note. At the end of your response, ALWAYS ask the user how this relates to their note and whether they want to integrate it into their note.\n\
+               For example, conclude with a friendly check-in question:\n\
+               * In English: 'Does this align with what you are exploring for \"{title}\"? Would you like me to help draft or incorporate these points into your note?'\n\
+               * In Indonesian: 'Apakah ini berkaitan dengan rencana catatan \"{title}\"? Apakah Anda ingin saya bantu menyusun poin-poin ini ke dalam catatan Anda?'\n\
+            3. Format responses using clean, structured Markdown.\n\
+            4. Match the language used by the user (English or Indonesian)."
+        )
+    };
+
     let prompt = format!(
         "You are an intelligent, helpful AI assistant built directly into Markinotes (a modern markdown editor).\n\
         The user is reviewing or chatting about the following note.\n\n\
         [NOTE CONTEXT]:\n\
         Title: {title}\n\
+        Context Summary: {note_context_summary}\n\
         Content:\n\
         ---\n\
         {content}\n\
@@ -470,9 +636,7 @@ pub async fn note_chat_stream(
         [CONVERSATION HISTORY]:\n\
         {history_str}\n\
         [INSTRUCTIONS]:\n\
-        1. Answer the user's latest request clearly and directly based on the note context and conversation.\n\
-        2. Format responses using clean, structured Markdown (with bullet points, bold keywords, headers, or code blocks where appropriate).\n\
-        3. Match the language used by the user (English or Indonesian).\n\
+        {mode_instructions}\n\
         Assistant:"
     );
 

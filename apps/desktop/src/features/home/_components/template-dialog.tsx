@@ -249,7 +249,7 @@ export function TemplateDialog({ isOpen, onClose, onSelectTemplate, workspacePat
           setGeneratedMarkdown(fullOutput);
         },
         isSystemMode ? undefined : (config.aiApiKey || config.geminiApiKey || "").trim(),
-        isSystemMode ? "gemini-3.6-flash" : (config.aiModel || config.geminiModel || "gemini-3.6-flash"),
+        isSystemMode ? "gemini-3.6-flash" : ((!config.aiModel || config.aiModel === "gemini-2.0-flash") ? "gemini-3.6-flash" : config.aiModel),
         isSystemMode ? "system" : config.aiProvider
       );
 

@@ -101,6 +101,8 @@ import { NotionTablePillHandles } from "./notion-table-pill-handles";
 import { NotionSelectionPopover } from "./notion-selection-popover";
 import { NotionLinkHoverCard } from "./notion-link-hover-card";
 import { ImageDialog } from "./image-dialog";
+import { AiSaveConfirmDialog } from "./ai-save-confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 import { useUiStore } from "@/stores";
 
@@ -669,6 +671,9 @@ export function NovelEditor({
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [hasUsedAi, setHasUsedAi] = useState(false);
+  const [isAiConfirmDialogOpen, setIsAiConfirmDialogOpen] = useState(false);
+  const [isPendingExit, setIsPendingExit] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
@@ -686,14 +691,6 @@ export function NovelEditor({
     window.addEventListener("open-image-dialog", handleOpenImageDialog);
     return () => window.removeEventListener("open-image-dialog", handleOpenImageDialog);
   }, []);
-
-  const handleInsertSummary = (summaryMarkdown: string) => {
-    if (editorInstance) {
-      editorInstance.commands.focus("end");
-      editorInstance.commands.insertContent(`\n\n## 🤖 Summary\n\n${summaryMarkdown}\n\n`);
-      scheduleAutoSave();
-    }
-  };
 
   // Refs so the debounced timer always reads the latest values
   const titleRef = useRef(title);
@@ -714,9 +711,12 @@ export function NovelEditor({
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     setSaveCountdown(null);
     setSaveStatus("saving");
-    onSaveRef.current?.(titleRef.current, contentRef.current, tagsRef.current);
+    // Ensure we always save live markdown directly from editor if available
+    const liveContent = (editorInstance?.storage as any)?.markdown?.getMarkdown?.() ?? contentRef.current;
+    contentRef.current = liveContent;
+    onSaveRef.current?.(titleRef.current, liveContent, tagsRef.current);
     setSaveStatus("saved");
-  }, []);
+  }, [editorInstance]);
 
   /** Call this whenever content or title changes — starts/resets 3s countdown */
   const scheduleAutoSave = useCallback(() => {
@@ -739,6 +739,125 @@ export function NovelEditor({
     saveTimerRef.current = setTimeout(() => {
       performSave();
     }, 3000);
+  }, [performSave]);
+
+  // Save explicitly when confirmed by user
+  const handleConfirmSave = useCallback(() => {
+    performSave();
+    setHasUsedAi(false);
+    setIsAiConfirmDialogOpen(false);
+    toast({
+      title: "Note saved",
+      description: "All changes including AI content have been saved.",
+    });
+    if (isPendingExit) {
+      setIsPendingExit(false);
+      onBack?.();
+    }
+  }, [performSave, isPendingExit, onBack]);
+
+  // Fallback: save as draft with default title & tags, and keep auto-saving every time
+  const handleSaveAsDraft = useCallback(() => {
+    // 1. Default title: if empty or generic untitled, derive from first line or "Untitled Draft"
+    let draftTitle = titleRef.current?.trim();
+    if (!draftTitle || /^untitled(\s*note)?$/i.test(draftTitle)) {
+      const liveContent = (editorInstance?.storage as any)?.markdown?.getMarkdown?.() ?? contentRef.current ?? "";
+      const firstLine = liveContent
+        .split("\n")
+        .map((l: string) => l.replace(/^#+\s*/, "").trim())
+        .find((l: string) => l.length > 0);
+      draftTitle = firstLine ? firstLine.slice(0, 50) : "Untitled Draft";
+    }
+
+    // 2. Default tags: ensure "draft" tag is present
+    const currentTags = tagsRef.current || [];
+    const draftTags = currentTags.some((t: string) => t.toLowerCase() === "draft")
+      ? currentTags
+      : [...currentTags, "draft"];
+
+    // 3. Update React state and refs
+    setTitle(draftTitle);
+    titleRef.current = draftTitle;
+    setTags(draftTags);
+    tagsRef.current = draftTags;
+
+    const liveContent = (editorInstance?.storage as any)?.markdown?.getMarkdown?.() ?? contentRef.current;
+    contentRef.current = liveContent;
+    setContent(liveContent);
+
+    // 4. Save immediately
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    setSaveCountdown(null);
+    setSaveStatus("saving");
+    onSaveRef.current?.(draftTitle, liveContent, draftTags);
+    setSaveStatus("saved");
+
+    setHasUsedAi(false);
+    setIsAiConfirmDialogOpen(false);
+
+    toast({
+      title: "Saved as draft",
+      description: "Note saved to Drafts. Auto-save is active.",
+    });
+
+    if (isPendingExit) {
+      setIsPendingExit(false);
+      onBack?.();
+    }
+  }, [editorInstance, isPendingExit, onBack]);
+
+  const handleInsertSummary = useCallback((summaryMarkdown: string) => {
+    if (editorInstance) {
+      editorInstance.commands.focus("end");
+      editorInstance.commands.insertContent(`\n\n## 🤖 Summary\n\n${summaryMarkdown}\n\n`);
+      const liveMd = (editorInstance.storage as any)?.markdown?.getMarkdown?.() || editorInstance.getText();
+      contentRef.current = liveMd;
+      setContent(liveMd);
+      setHasUsedAi(true);
+      setIsAiConfirmDialogOpen(true);
+      scheduleAutoSave();
+    }
+  }, [editorInstance, scheduleAutoSave]);
+
+  const handleAiApplied = useCallback((_action: string) => {
+    if (editorInstance) {
+      const liveMd = (editorInstance.storage as any)?.markdown?.getMarkdown?.() || editorInstance.getText();
+      contentRef.current = liveMd;
+      setContent(liveMd);
+      setHasUsedAi(true);
+      setIsAiConfirmDialogOpen(true);
+      scheduleAutoSave();
+    }
+  }, [editorInstance, scheduleAutoSave]);
+
+  const handleBackClick = useCallback(() => {
+    if (hasUsedAi && saveStatus !== "saved") {
+      setIsPendingExit(true);
+      setIsAiConfirmDialogOpen(true);
+    } else {
+      if (saveStatus === "dirty") {
+        performSave();
+      }
+      onBack?.();
+    }
+  }, [hasUsedAi, saveStatus, performSave, onBack]);
+
+  // Keyboard shortcut: Cmd+S / Ctrl+S
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        performSave();
+        setHasUsedAi(false);
+        toast({
+          title: "Note saved",
+          description: "All changes have been saved.",
+        });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [performSave]);
 
   // Ensure we save when component unmounts if there are pending changes
@@ -851,7 +970,7 @@ export function NovelEditor({
           variant="ghost"
           size="sm"
           className="h-7 px-2 text-xs gap-1.5 text-txt-secondary hover:text-txt-primary shrink-0"
-          onClick={onBack}
+          onClick={handleBackClick}
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </Button>
@@ -1348,6 +1467,7 @@ export function NovelEditor({
                       }
 
                       const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
+                      contentRef.current = md;
                       setContent(md);
                       scheduleAutoSave();
                     }}
@@ -1409,6 +1529,8 @@ export function NovelEditor({
                           editor={editorInstance}
                           workspacePath={workspacePath}
                           noteId={noteId}
+                          onAiApplied={handleAiApplied}
+                          onAiUsed={() => setHasUsedAi(true)}
                         />
                       )}
                     </EditorBubble>
@@ -1428,6 +1550,7 @@ export function NovelEditor({
           noteTitle={title}
           onInsertSummary={handleInsertSummary}
           onOpenSettings={onOpenSettings}
+          onAiUsed={() => setHasUsedAi(true)}
         />
       </div>
 
@@ -1441,6 +1564,23 @@ export function NovelEditor({
             scheduleAutoSave();
           }
         }}
+      />
+
+      {/* 6. AI Save Confirmation Dialog */}
+      <AiSaveConfirmDialog
+        isOpen={isAiConfirmDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Dismissing or canceling without saving automatically saves as draft
+            handleSaveAsDraft();
+          } else {
+            setIsAiConfirmDialogOpen(true);
+          }
+        }}
+        title={title}
+        tags={tags}
+        onSave={handleConfirmSave}
+        onSaveAsDraft={handleSaveAsDraft}
       />
     </div>
   );

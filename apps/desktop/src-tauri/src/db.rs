@@ -28,10 +28,14 @@ pub fn init_db(workspace_path: &str) -> Result<()> {
             group_name TEXT,
             updated_at TEXT,
             is_starred INTEGER DEFAULT 0,
-            tags TEXT
+            tags TEXT,
+            ai_context TEXT
         )",
         [],
     )?;
+
+    // Safely migrate existing databases if ai_context is missing
+    let _ = conn.execute("ALTER TABLE notes ADD COLUMN ai_context TEXT", []);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS settings (
