@@ -102,6 +102,10 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
   // 2. Unescape basic markdown backslashes in general text
   cleanContent = cleanContent.replace(/\\([\[\]\(\)\-\*\_\\`#])/g, "$1");
 
+  // 3. Normalize split markdown images/links across newlines
+  cleanContent = cleanContent.replace(/!\[([^\]]*)\]\s*\n\s*\(([^)]+)\)/g, "![$1]($2)");
+  cleanContent = cleanContent.replace(/\[([^\]]*)\]\s*\n\s*\(([^)]+)\)/g, "[$1]($2)");
+
   const lines = cleanContent.split("\n");
   const elements: React.ReactNode[] = [];
 
@@ -125,6 +129,7 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
         .trim()
         .toLowerCase();
       const cleanTitle = title
+        .replace(/^#+\s*/, "")
         .replace(/[*_`~]/g, "")
         .trim()
         .toLowerCase();
@@ -135,7 +140,29 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
       }
     }
 
-    // 0. Embedded Kanban Board (<div data-type="kanban-board" ...)
+    // 0. Image Block (![alt](url) or <img src="..." />)
+    const imageMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/i) || trimmed.match(/^<img[^>]+src=["']([^"']+)["'][^>]*\/?>$/i);
+    if (imageMatch) {
+      const alt = imageMatch[1] || "Note image preview";
+      const src = imageMatch[2] || imageMatch[1];
+      elements.push(
+        <div key={`img-${i}`} className="my-1.5 w-full overflow-hidden rounded-lg border border-border/60 bg-secondary/20 shadow-2xs">
+          <img
+            src={src}
+            alt={alt}
+            className="w-full h-28 object-cover rounded-lg hover:scale-102 transition-transform duration-300"
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget.parentElement as HTMLElement)?.style.setProperty("display", "none");
+            }}
+          />
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // 0.1 Embedded Kanban Board (<div data-type="kanban-board" ...)
     if (
       trimmed.includes('data-type="kanban-board"') ||
       trimmed.includes("data-type='kanban-board'") ||

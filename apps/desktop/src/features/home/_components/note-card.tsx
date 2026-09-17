@@ -22,7 +22,19 @@ import type { NoteCardData, NoteCardProps } from "../_types/home.types";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/formatters";
 import { NotePreviewRenderer } from "./note-preview-renderer";
+import { MiniFormattedInline } from "../_lib/note-preview-parser";
 import { noteIpc } from "../_lib/note-ipc";
+
+function getCleanCardTitle(rawTitle: string): string {
+  if (!rawTitle) return "Untitled";
+  let clean = rawTitle.trim();
+  clean = clean.replace(/^#+\s*/, "");
+  const linkMatch = clean.match(/^\[([^\]]+)\](?:\([^)]*\))?$/);
+  if (linkMatch) {
+    clean = linkMatch[1];
+  }
+  return clean.trim() || "Untitled";
+}
 
 export function NoteCard({
   note,
@@ -114,7 +126,7 @@ export function NoteCard({
       {/* Main Content Preview Block with Fade-Out Gradient */}
       <CardContent className={cn("relative flex-1 flex flex-col justify-start gap-1 overflow-hidden", isKanban ? "px-3 py-1" : "p-4 pt-1 gap-1.5")}>
         <CardTitle className={cn("font-semibold text-txt-primary line-clamp-2 leading-tight group-hover:text-txt-brand transition-colors shrink-0", isKanban ? "text-xs" : "text-sm")}>
-          {note.title}
+          <MiniFormattedInline text={getCleanCardTitle(note.title)} />
         </CardTitle>
         <div className={cn("overflow-hidden w-full flex-1", isKanban ? "max-h-[38px]" : "")}>
           <NotePreviewRenderer content={note.excerpt} title={note.title} />

@@ -925,7 +925,7 @@ export function AiSummaryPanel({
                   const isUnansweredLast = idx === messages.length - 1 && status !== "streaming";
                   return (
                     <div key={msg.id} className="flex flex-col items-end gap-1 pl-8">
-                      <div className="rounded-2xl rounded-tr-xs bg-primary/50 text-primary-foreground px-2.5 py-1 text-xs leading-relaxed shadow-xs max-w-[88%] select-text border border-primary/20">
+                      <div className="rounded-2xl rounded-tr-xs bg-primary text-primary-foreground dark:bg-primary/25 dark:text-primary-foreground dark:border dark:border-primary/30 px-3 py-1.5 text-xs leading-relaxed shadow-xs max-w-[88%] select-text">
                         {msg.content}
                       </div>
                       {isUnansweredLast && (
@@ -1117,12 +1117,12 @@ export function AiSummaryPanel({
               onKeyDown={handleKeyDown}
               placeholder={
                 chatMode === "strict"
-                  ? "Ask anything grounded in this note (Strict Mode)..."
-                  : "Brainstorm or explore ideas based on this note (Explore Mode)..."
+                  ? "Ask anything grounded in this note..."
+                  : "Ask or brainstorm ideas with AI..."
               }
               rows={1}
               disabled={status === "streaming"}
-              className="w-full resize-none bg-transparent px-3 py-2.5 text-xs text-txt-primary placeholder:text-txt-muted focus:outline-none max-h-24 min-h-[38px]"
+              className="w-full resize-none bg-transparent px-3 py-2.5 text-xs text-txt-primary placeholder:text-txt-muted placeholder:truncate focus:outline-none max-h-24 min-h-[38px]"
             />
 
             <div className="pr-1.5 shrink-0 flex items-center">

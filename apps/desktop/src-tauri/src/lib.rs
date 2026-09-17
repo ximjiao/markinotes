@@ -30,6 +30,7 @@ pub fn run() {
             note_toggle_star,
             note_move,
             reveal_in_finder,
+            open_external_url,
             folder_rename,
             note_summarize_stream,
             note_chat_stream,

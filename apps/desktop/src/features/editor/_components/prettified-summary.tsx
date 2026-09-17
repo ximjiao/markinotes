@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Info, Lightbulb, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PrettifiedSummaryProps } from "../_types/ai-chat.types";
+import { noteIpc } from "@/features/home/_lib/note-ipc";
 
 /**
  * Inline Markdown Parser for AI Responses
@@ -11,8 +12,10 @@ import type { PrettifiedSummaryProps } from "../_types/ai-chat.types";
 export function FormattedInline({ text }: { text: string }) {
   if (!text) return null;
 
-  // Unescape markdown characters often escaped by LLMs (e.g. \`code\` -> `code`)
-  const normalized = text.replace(/\\([`*_~[\]()])/g, "$1");
+  // 1. Unescape escaped characters and strip stray heading symbols inside quotes/brackets (e.g. "## Title" -> "Title")
+  const normalized = text
+    .replace(/\\([`*_~[\]()])/g, "$1")
+    .replace(/(["'(\[]|^|\s)#{1,6}\s+/g, "$1");
 
   const parts: React.ReactNode[] = [];
   let remaining = normalized;
@@ -20,21 +23,23 @@ export function FormattedInline({ text }: { text: string }) {
 
   while (remaining.length > 0) {
     const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
-    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    const boldItalicMatch = remaining.match(/(\*\*\*|___)(.+?)\1/);
+    const boldMatch = remaining.match(/(\*\*|__)(.+?)\1/);
     const codeMatch = remaining.match(/`([^`]+)`/);
-    const italicMatch = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
+    const italicMatch = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)|(?<!_)_([^_]+)_(?!_)/);
     const strikeMatch = remaining.match(/~~([^~]+)~~/);
     const markMatch = remaining.match(/==([^=]+)==/);
     const mathMatch = remaining.match(/\$([^$]+)\$/);
 
     const candidates = [
-      linkMatch && linkMatch.index !== undefined ? { type: "link", index: linkMatch.index, match: linkMatch } : null,
-      boldMatch && boldMatch.index !== undefined ? { type: "bold", index: boldMatch.index, match: boldMatch } : null,
-      codeMatch && codeMatch.index !== undefined ? { type: "code", index: codeMatch.index, match: codeMatch } : null,
-      italicMatch && italicMatch.index !== undefined ? { type: "italic", index: italicMatch.index, match: italicMatch } : null,
-      strikeMatch && strikeMatch.index !== undefined ? { type: "strike", index: strikeMatch.index, match: strikeMatch } : null,
-      markMatch && markMatch.index !== undefined ? { type: "mark", index: markMatch.index, match: markMatch } : null,
-      mathMatch && mathMatch.index !== undefined ? { type: "math", index: mathMatch.index, match: mathMatch } : null,
+      linkMatch && linkMatch.index !== undefined ? { type: "link", index: linkMatch.index, match: linkMatch, inner: linkMatch[1], href: linkMatch[2] } : null,
+      boldItalicMatch && boldItalicMatch.index !== undefined ? { type: "boldItalic", index: boldItalicMatch.index, match: boldItalicMatch, inner: boldItalicMatch[2] } : null,
+      boldMatch && boldMatch.index !== undefined ? { type: "bold", index: boldMatch.index, match: boldMatch, inner: boldMatch[2] } : null,
+      codeMatch && codeMatch.index !== undefined ? { type: "code", index: codeMatch.index, match: codeMatch, inner: codeMatch[1] } : null,
+      italicMatch && italicMatch.index !== undefined ? { type: "italic", index: italicMatch.index, match: italicMatch, inner: italicMatch[1] || italicMatch[2] } : null,
+      strikeMatch && strikeMatch.index !== undefined ? { type: "strike", index: strikeMatch.index, match: strikeMatch, inner: strikeMatch[1] } : null,
+      markMatch && markMatch.index !== undefined ? { type: "mark", index: markMatch.index, match: markMatch, inner: markMatch[1] } : null,
+      mathMatch && mathMatch.index !== undefined ? { type: "math", index: mathMatch.index, match: mathMatch, inner: mathMatch[1] } : null,
     ]
       .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => a.index - b.index);
@@ -49,19 +54,32 @@ export function FormattedInline({ text }: { text: string }) {
     if (before) parts.push(before);
 
     const fullMatchLength = first.match[0].length;
-    const innerContent = first.match[1];
+    const innerContent = first.inner;
 
     if (first.type === "link") {
       parts.push(
         <a
           key={key++}
-          href={first.match[2]}
+          href={first.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2 hover:opacity-80 transition-opacity font-medium"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (first.href) {
+              noteIpc.openExternalUrl(first.href);
+            }
+          }}
+          className="text-primary underline underline-offset-2 hover:opacity-80 transition-opacity font-medium cursor-pointer"
         >
           <FormattedInline text={innerContent} />
         </a>
+      );
+    } else if (first.type === "boldItalic") {
+      parts.push(
+        <strong key={key++} className="font-bold italic text-txt-primary">
+          <FormattedInline text={innerContent} />
+        </strong>
       );
     } else if (first.type === "bold") {
       parts.push(
@@ -259,7 +277,7 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
       }
     }
 
-    // 3. Blockquotes (multi-line grouped)
+    // 3. Blockquotes & GitHub-style Callouts
     if (trimmed.startsWith(">")) {
       const quoteLines: string[] = [];
       const quoteStartIdx = i;
@@ -267,6 +285,60 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
         quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
         i++;
       }
+
+      const firstLine = quoteLines[0] || "";
+      const alertMatch = firstLine.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO)\]\s*(.*)$/i);
+
+      if (alertMatch) {
+        const alertType = alertMatch[1].toUpperCase();
+        const alertTitleExtra = alertMatch[2];
+        const remainingAlertLines = quoteLines.slice(1);
+        if (alertTitleExtra) {
+          remainingAlertLines.unshift(alertTitleExtra);
+        }
+
+        let alertStyle = {
+          border: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+          label: "Note",
+          icon: <Info className="h-3.5 w-3.5 text-blue-500 shrink-0" />,
+        };
+
+        if (alertType === "TIP") {
+          alertStyle = {
+            border: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+            label: "Tip",
+            icon: <Lightbulb className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
+          };
+        } else if (alertType === "IMPORTANT") {
+          alertStyle = {
+            border: "border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300",
+            label: "Important",
+            icon: <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" />,
+          };
+        } else if (alertType === "WARNING" || alertType === "CAUTION") {
+          alertStyle = {
+            border: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+            label: alertType === "CAUTION" ? "Caution" : "Warning",
+            icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />,
+          };
+        }
+
+        elements.push(
+          <div key={`alert-${quoteStartIdx}`} className={cn("my-2 p-3 rounded-xl border text-xs space-y-1", alertStyle.border)}>
+            <div className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider">
+              {alertStyle.icon}
+              <span>{alertStyle.label}</span>
+            </div>
+            {remainingAlertLines.map((ql, qIdx) => (
+              <p key={qIdx} className="leading-relaxed text-txt-primary">
+                <FormattedInline text={ql} />
+              </p>
+            ))}
+          </div>
+        );
+        continue;
+      }
+
       elements.push(
         <div key={`quote-${quoteStartIdx}`} className="my-1.5 p-2.5 rounded-r-lg bg-primary/5 border-l-2 border-primary text-xs text-txt-secondary space-y-1">
           {quoteLines.map((ql, qIdx) => (
@@ -320,12 +392,16 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
       continue;
     }
 
-    // 7. Headings
+    // 7. Headings (with trailing hash cleanup)
+    const cleanHeadingText = (raw: string, hashCount: number) => {
+      return raw.slice(hashCount).replace(/\s*#+$/, "").trim();
+    };
+
     if (trimmed.startsWith("# ")) {
       elements.push(
         <div key={`h1-${i}`} className="flex items-center gap-2 pt-2 pb-0.5 border-b border-border/40 text-sm font-bold text-txt-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          <FormattedInline text={trimmed.slice(2)} />
+          <FormattedInline text={cleanHeadingText(trimmed, 2)} />
         </div>
       );
       i++;
@@ -336,7 +412,7 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
       elements.push(
         <div key={`h2-${i}`} className="flex items-center gap-1.5 pt-2 pb-0.5 text-xs font-bold text-primary uppercase tracking-wider">
           <Sparkles className="h-3 w-3 text-primary shrink-0" />
-          <FormattedInline text={trimmed.slice(3)} />
+          <FormattedInline text={cleanHeadingText(trimmed, 3)} />
         </div>
       );
       i++;
@@ -346,7 +422,7 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
     if (trimmed.startsWith("### ")) {
       elements.push(
         <div key={`h3-${i}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
-          <FormattedInline text={trimmed.slice(4)} />
+          <FormattedInline text={cleanHeadingText(trimmed, 4)} />
         </div>
       );
       i++;
@@ -357,7 +433,7 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
       elements.push(
         <div key={`h4-${i}`} className="text-xs font-semibold text-txt-primary pt-1.5 pb-0.5 flex items-center gap-1.5">
           <span className="h-1 w-1 rounded-[1px] bg-primary/70 shrink-0" />
-          <FormattedInline text={trimmed.slice(5)} />
+          <FormattedInline text={cleanHeadingText(trimmed, 5)} />
         </div>
       );
       i++;
@@ -365,7 +441,7 @@ export function PrettifiedSummary({ content, isStreaming }: PrettifiedSummaryPro
     }
 
     if (trimmed.startsWith("##### ") || trimmed.startsWith("###### ")) {
-      const content = trimmed.replace(/^#+\s+/, "");
+      const content = trimmed.replace(/^#+\s+/, "").replace(/\s*#+$/, "").trim();
       elements.push(
         <div key={`h5-${i}`} className="text-[11px] font-semibold text-txt-secondary uppercase tracking-wider pt-1.5 pb-0.5">
           <FormattedInline text={content} />

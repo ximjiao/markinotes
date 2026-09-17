@@ -26,8 +26,10 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
 import { Mark, mergeAttributes, Extension } from "@tiptap/core";
+import { AllSelection } from "@tiptap/pm/state";
 import { CustomImageExtension } from "./custom-image-extension";
 import { CustomKanbanExtension } from "./custom-kanban-extension";
+import { CustomTocExtension } from "./custom-toc-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -43,6 +45,7 @@ import {
   Code,
   Table as TableIcon,
   Columns3 as KanbanIcon,
+  ListTree,
   Quote,
   Minus,
   Bold,
@@ -103,7 +106,6 @@ import { NotionTablePillHandles } from "./notion-table-pill-handles";
 import { NotionSelectionPopover } from "./notion-selection-popover";
 import { NotionLinkHoverCard } from "./notion-link-hover-card";
 import { ImageDialog } from "./image-dialog";
-import { AiSaveConfirmDialog } from "./ai-save-confirm-dialog";
 import { toast } from "@/hooks/use-toast";
 import { noteIpc } from "@/features/home/_lib/note-ipc";
 import { useUiStore } from "@/stores";
@@ -197,6 +199,16 @@ const rawSlashItems: CustomSlashItem[] = [
     searchTerms: ["kanban", "board", "trello", "card", "task"],
     command: ({ editor, range }: any) => {
       editor.chain().focus().deleteRange(range).insertKanbanBoard().run();
+    },
+  },
+  {
+    title: "Table of Contents",
+    description: "Auto-updating outline of headings",
+    icon: <ListTree className="h-4 w-4" />,
+    badge: "toc",
+    searchTerms: ["toc", "table of contents", "outline", "headings", "index", "daftar isi"],
+    command: ({ editor, range }: any) => {
+      editor.chain().focus().deleteRange(range).insertTableOfContents().run();
     },
   },
   {
@@ -567,7 +579,34 @@ const IndentExtension = Extension.create({
 
 const lowlight = createLowlight(common);
 
+const SelectAllExtension = Extension.create({
+  name: "selectAllShortcut",
+  addKeyboardShortcuts() {
+    return {
+      "Mod-a": () => {
+        try {
+          const { state, view } = this.editor;
+          view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
+          return true;
+        } catch {
+          return this.editor.commands.selectAll();
+        }
+      },
+      "Mod-A": () => {
+        try {
+          const { state, view } = this.editor;
+          view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
+          return true;
+        } catch {
+          return this.editor.commands.selectAll();
+        }
+      },
+    };
+  },
+});
+
 const defaultExtensions = [
+  SelectAllExtension,
   // 1. StarterKit prioritized first for input rules (1., -, *, >, ```)
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -654,6 +693,7 @@ const defaultExtensions = [
   }),
   CustomImageExtension,
   CustomKanbanExtension,
+  CustomTocExtension,
   slashCommand,
   GlobalDragHandle,
   Markdown.configure({
@@ -662,6 +702,21 @@ const defaultExtensions = [
     transformCopiedText: true,
   }),
 ];
+
+function cleanMarkdownTitle(raw: string): string {
+  if (!raw) return "";
+  let clean = raw.trim();
+  // Strip markdown headings like #, ##, ###
+  clean = clean.replace(/^#+\s*/, "");
+  // If title is a markdown link [Title](url), extract Title
+  const linkMatch = clean.match(/^\[([^\]]+)\](?:\([^)]*\))?$/);
+  if (linkMatch) {
+    clean = linkMatch[1];
+  }
+  // Strip bold/italic/strikethrough/code markers from title
+  clean = clean.replace(/[*_`~]/g, "");
+  return clean.trim();
+}
 
 export function NovelEditor({
   initialTitle = "Getting Started with Markidown",
@@ -674,7 +729,7 @@ export function NovelEditor({
   noteId,
   workspacePath,
 }: NovelEditorProps) {
-  const [title, setTitle] = useState(initialTitle);
+  const [title, setTitle] = useState(() => cleanMarkdownTitle(initialTitle) || "Untitled");
   const [tags, setTags] = useState<string[]>(initialTags);
   const [isTitleCustom, setIsTitleCustom] = useState(false);
   const [content, setContent] = useState(initialContent);
@@ -684,9 +739,6 @@ export function NovelEditor({
   const [saveCountdown, setSaveCountdown] = useState<number | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
-  const [hasUsedAi, setHasUsedAi] = useState(false);
-  const [isAiConfirmDialogOpen, setIsAiConfirmDialogOpen] = useState(false);
-  const [isPendingExit, setIsPendingExit] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
@@ -754,72 +806,6 @@ export function NovelEditor({
     }, 3000);
   }, [performSave]);
 
-  // Save explicitly when confirmed by user
-  const handleConfirmSave = useCallback(() => {
-    performSave();
-    setHasUsedAi(false);
-    setIsAiConfirmDialogOpen(false);
-    toast({
-      title: "Note saved",
-      description: "All changes including AI content have been saved.",
-    });
-    if (isPendingExit) {
-      setIsPendingExit(false);
-      onBack?.();
-    }
-  }, [performSave, isPendingExit, onBack]);
-
-  // Fallback: save as draft with default title & tags, and keep auto-saving every time
-  const handleSaveAsDraft = useCallback(() => {
-    // 1. Default title: if empty or generic untitled, derive from first line or "Untitled Draft"
-    let draftTitle = titleRef.current?.trim();
-    if (!draftTitle || /^untitled(\s*note)?$/i.test(draftTitle)) {
-      const liveContent = (editorInstance?.storage as any)?.markdown?.getMarkdown?.() ?? contentRef.current ?? "";
-      const firstLine = liveContent
-        .split("\n")
-        .map((l: string) => l.replace(/^#+\s*/, "").trim())
-        .find((l: string) => l.length > 0);
-      draftTitle = firstLine ? firstLine.slice(0, 50) : "Untitled Draft";
-    }
-
-    // 2. Default tags: ensure "draft" tag is present
-    const currentTags = tagsRef.current || [];
-    const draftTags = currentTags.some((t: string) => t.toLowerCase() === "draft")
-      ? currentTags
-      : [...currentTags, "draft"];
-
-    // 3. Update React state and refs
-    setTitle(draftTitle);
-    titleRef.current = draftTitle;
-    setTags(draftTags);
-    tagsRef.current = draftTags;
-
-    const liveContent = (editorInstance?.storage as any)?.markdown?.getMarkdown?.() ?? contentRef.current;
-    contentRef.current = liveContent;
-    setContent(liveContent);
-
-    // 4. Save immediately
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-    setSaveCountdown(null);
-    setSaveStatus("saving");
-    onSaveRef.current?.(draftTitle, liveContent, draftTags);
-    setSaveStatus("saved");
-
-    setHasUsedAi(false);
-    setIsAiConfirmDialogOpen(false);
-
-    toast({
-      title: "Saved as draft",
-      description: "Note saved to Drafts. Auto-save is active.",
-    });
-
-    if (isPendingExit) {
-      setIsPendingExit(false);
-      onBack?.();
-    }
-  }, [editorInstance, isPendingExit, onBack]);
-
   const handleInsertSummary = useCallback((summaryMarkdown: string) => {
     if (editorInstance) {
       editorInstance.commands.focus("end");
@@ -827,8 +813,6 @@ export function NovelEditor({
       const liveMd = (editorInstance.storage as any)?.markdown?.getMarkdown?.() || editorInstance.getText();
       contentRef.current = liveMd;
       setContent(liveMd);
-      setHasUsedAi(true);
-      setIsAiConfirmDialogOpen(true);
       scheduleAutoSave();
     }
   }, [editorInstance, scheduleAutoSave]);
@@ -838,40 +822,55 @@ export function NovelEditor({
       const liveMd = (editorInstance.storage as any)?.markdown?.getMarkdown?.() || editorInstance.getText();
       contentRef.current = liveMd;
       setContent(liveMd);
-      setHasUsedAi(true);
-      setIsAiConfirmDialogOpen(true);
       scheduleAutoSave();
     }
   }, [editorInstance, scheduleAutoSave]);
 
   const handleBackClick = useCallback(() => {
-    if (hasUsedAi && saveStatus !== "saved") {
-      setIsPendingExit(true);
-      setIsAiConfirmDialogOpen(true);
-    } else {
-      if (saveStatus === "dirty") {
-        performSave();
-      }
-      onBack?.();
+    if (saveStatus === "dirty") {
+      performSave();
     }
-  }, [hasUsedAi, saveStatus, performSave, onBack]);
+    onBack?.();
+  }, [saveStatus, performSave, onBack]);
 
-  // Keyboard shortcut: Cmd+S / Ctrl+S
+  // Keyboard shortcut: Cmd+S / Ctrl+S and Cmd+A / Ctrl+A
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Save (Cmd+S / Ctrl+S)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         performSave();
-        setHasUsedAi(false);
         toast({
           title: "Note saved",
           description: "All changes have been saved.",
         });
+        return;
+      }
+
+      // 2. Select All (Cmd+A / Ctrl+A)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        const active = document.activeElement as HTMLElement | null;
+        const isOtherInput =
+          active &&
+          (active.tagName === "INPUT" ||
+            active.tagName === "TEXTAREA" ||
+            (active.isContentEditable && !active.closest(".ProseMirror")));
+
+        if (!isOtherInput && editorInstance && !editorInstance.isDestroyed) {
+          e.preventDefault();
+          try {
+            const { state, view } = editorInstance;
+            view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
+            editorInstance.commands.focus();
+          } catch {
+            editorInstance.chain().focus().selectAll().run();
+          }
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [performSave]);
+  }, [performSave, editorInstance]);
 
   // Ensure we save when component unmounts if there are pending changes
   useEffect(() => {
@@ -1348,7 +1347,30 @@ export function NovelEditor({
                     editorProps={{
                       handleDOMEvents: {
                         keydown: (_view: unknown, event: KeyboardEvent) => {
-                          // 1. Undo / Redo
+                          // 1. Select All (Cmd+A / Ctrl+A)
+                          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+                            event.preventDefault();
+                            const editorView = _view as any;
+                            if (editorView?.dispatch && editorView?.state) {
+                              try {
+                                editorView.dispatch(editorView.state.tr.setSelection(new AllSelection(editorView.state.doc)));
+                                return true;
+                              } catch {
+                                // fallback below
+                              }
+                            }
+                            if (editorInstance && !editorInstance.isDestroyed) {
+                              try {
+                                const { state, view } = editorInstance;
+                                view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
+                              } catch {
+                                editorInstance.chain().focus().selectAll().run();
+                              }
+                            }
+                            return true;
+                          }
+
+                          // 2. Undo / Redo
                           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
                             event.preventDefault();
                             if (event.shiftKey) {
@@ -1476,7 +1498,10 @@ export function NovelEditor({
                       // Auto-sync document title if not explicitly edited
                       if (!isTitleCustom) {
                         const firstLine = text.split("\n")[0]?.trim();
-                        if (firstLine) setTitle(firstLine.slice(0, 50));
+                        if (firstLine) {
+                          const cleaned = cleanMarkdownTitle(firstLine);
+                          if (cleaned) setTitle(cleaned.slice(0, 60));
+                        }
                       }
 
                       const md = (editor.storage as any)?.markdown?.getMarkdown?.() || editor.getText();
@@ -1547,7 +1572,6 @@ export function NovelEditor({
                           workspacePath={workspacePath}
                           noteId={noteId}
                           onAiApplied={handleAiApplied}
-                          onAiUsed={() => setHasUsedAi(true)}
                         />
                       )}
                     </EditorBubble>
@@ -1567,7 +1591,6 @@ export function NovelEditor({
           noteTitle={title}
           onInsertSummary={handleInsertSummary}
           onOpenSettings={onOpenSettings}
-          onAiUsed={() => setHasUsedAi(true)}
         />
       </div>
 
@@ -1581,23 +1604,6 @@ export function NovelEditor({
             scheduleAutoSave();
           }
         }}
-      />
-
-      {/* 6. AI Save Confirmation Dialog */}
-      <AiSaveConfirmDialog
-        isOpen={isAiConfirmDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            // Dismissing or canceling without saving automatically saves as draft
-            handleSaveAsDraft();
-          } else {
-            setIsAiConfirmDialogOpen(true);
-          }
-        }}
-        title={title}
-        tags={tags}
-        onSave={handleConfirmSave}
-        onSaveAsDraft={handleSaveAsDraft}
       />
     </div>
   );

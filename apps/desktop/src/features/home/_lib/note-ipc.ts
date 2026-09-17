@@ -112,6 +112,15 @@ export const noteIpc = {
     localStorage.removeItem(`marki_content_${notePath}`);
   },
 
+  openExternalUrl: async (url: string): Promise<void> => {
+    if (isTauri()) {
+      return invoke("open_external_url", { url });
+    }
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  },
+
   toggleStar: async (workspacePath: string, notePath: string, starred: boolean): Promise<NoteCardData> => {
     if (isTauri()) {
       return invoke("note_toggle_star", { workspacePath, notePath, starred });

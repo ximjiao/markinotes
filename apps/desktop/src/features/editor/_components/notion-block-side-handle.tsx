@@ -28,6 +28,7 @@ import {
   AlignRight,
   AlignJustify,
   Columns3,
+  ListTree,
   Table as TableIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -218,6 +219,7 @@ export function NotionBlockSideHandle({
     }
 
     const tag = hoveredElement.tagName.toLowerCase();
+    const isToc = !!hoveredElement.closest("[data-type='table-of-contents']");
     const isKanban = !!hoveredElement.closest("[data-type='kanban-board'], [data-node-view-wrapper]");
     const isTable = !!hoveredElement.closest(".tableWrapper, table") || tag === "table";
     const isTaskList = hoveredElement.getAttribute("data-type") === "taskItem" || !!hoveredElement.closest("[data-type='taskList']");
@@ -227,7 +229,10 @@ export function NotionBlockSideHandle({
     let label = "Text";
     let type = "paragraph";
 
-    if (isKanban) {
+    if (isToc) {
+      label = "Table of Contents";
+      type = "tableOfContents";
+    } else if (isKanban) {
       label = "Kanban Board";
       type = "kanbanBoard";
     } else if (isTable) {
@@ -568,6 +573,8 @@ export function NotionBlockSideHandle({
       (editor.chain().focus() as any).deleteRange({ from: range.from, to: range.to }).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
     } else if (type === "kanban") {
       (editor.chain().focus() as any).deleteRange({ from: range.from, to: range.to }).insertKanbanBoard().run();
+    } else if (type === "toc") {
+      (editor.chain().focus() as any).deleteRange({ from: range.from, to: range.to }).insertTableOfContents().run();
     }
     setMenuOpen(false);
   };
@@ -799,6 +806,9 @@ export function NotionBlockSideHandle({
                     </NotionMenuItem>
                     <NotionMenuItem icon={<Columns3 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("kanban")}>
                       Kanban Board
+                    </NotionMenuItem>
+                    <NotionMenuItem icon={<ListTree className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("toc")}>
+                      Table of Contents
                     </NotionMenuItem>
                   </PopoverContent>
                 </Popover>

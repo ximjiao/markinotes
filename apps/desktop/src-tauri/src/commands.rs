@@ -17,6 +17,32 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", &url])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn folder_rename(workspace_path: String, old_path: String, new_path: String) -> Result<(), String> {
     std::fs::rename(&old_path, &new_path).map_err(|e| e.to_string())?;
 
@@ -84,7 +110,15 @@ fn sync_workspace_files(workspace_path: &str, conn: &Connection) {
                             let title = content
                                 .lines()
                                 .find(|line| !line.trim().is_empty())
-                                .map(|line| line.trim_start_matches('#').trim().to_string())
+                                .map(|line| {
+                                    let mut s = line.trim().trim_start_matches('#').trim();
+                                    if s.starts_with('[') && s.contains(']') {
+                                        if let Some(end_bracket) = s.find(']') {
+                                            s = &s[1..end_bracket];
+                                        }
+                                    }
+                                    s.replace(['*', '_', '`', '~'], "").trim().to_string()
+                                })
                                 .filter(|s| !s.is_empty())
                                 .unwrap_or_else(|| {
                                     path.file_stem()

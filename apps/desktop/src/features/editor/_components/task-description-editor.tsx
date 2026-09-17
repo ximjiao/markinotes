@@ -28,6 +28,8 @@ import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import TextAlign from "@tiptap/extension-text-align";
 import type { Editor } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
+import { AllSelection } from "@tiptap/pm/state";
 import { CustomImageExtension } from "./custom-image-extension";
 import { NotionBlockSideHandle } from "./notion-block-side-handle";
 import {
@@ -287,7 +289,30 @@ export function TaskDescriptionEditor({
                 keydown: (_view: unknown, event: KeyboardEvent) => {
                   event.stopPropagation();
 
-                  // 1. Undo / Redo
+                  // 1. Select All (Cmd+A / Ctrl+A)
+                  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+                    event.preventDefault();
+                    const editorView = _view as any;
+                    if (editorView?.dispatch && editorView?.state) {
+                      try {
+                        editorView.dispatch(editorView.state.tr.setSelection(new AllSelection(editorView.state.doc)));
+                        return true;
+                      } catch {
+                        // fallback
+                      }
+                    }
+                    if (editorInstance && !editorInstance.isDestroyed) {
+                      try {
+                        const { state, view } = editorInstance;
+                        view.dispatch(state.tr.setSelection(new AllSelection(state.doc)));
+                      } catch {
+                        editorInstance.chain().focus().selectAll().run();
+                      }
+                    }
+                    return true;
+                  }
+
+                  // 2. Undo / Redo
                   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
                     event.preventDefault();
                     if (event.shiftKey) {

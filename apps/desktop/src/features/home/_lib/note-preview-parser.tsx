@@ -2,21 +2,45 @@
 
 import React from "react";
 
-// Inline Markdown Parser for bold, italic, code, strikethrough, links in note card preview
+// Inline Markdown Parser for bold, italic, code, strikethrough, links, and images in note card preview
 export function MiniFormattedInline({ text }: { text: string }) {
   if (!text) return null;
 
-  // 1. Clean trailing backslashes used for hard breaks in markdown
-  const clean = text.replace(/\\+$/, "").trim().replace(/\\([\[\]\(\)\-\*\_\\`#|])/g, "$1");
+  // 1. Clean trailing backslashes and normalize image/link line breaks
+  const clean = text
+    .replace(/\\+$/, "")
+    .trim()
+    .replace(/\\([\[\]\(\)\-\*\_\\`#|])/g, "$1")
+    .replace(/(["'(\[]|^|\s)#{1,6}\s+/g, "$1");
 
-  // 2. Regex tokens: **bold**, *italic*, `code`, ~~strike~~, [text](url)
-  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|`[^`]+`|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/g;
+  // 2. Regex tokens: ![alt](url), **bold**, *italic*, `code`, ~~strike~~, [text](url)
+  const regex = /(!\[[^\]]*\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|`[^`]+`|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/g;
   const parts = clean.split(regex);
 
   return (
     <>
       {parts.map((part, index) => {
         if (!part) return null;
+
+        // Image ![alt](url)
+        const imgMatch = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+        if (imgMatch) {
+          const alt = imgMatch[1] || "Image preview";
+          const src = imgMatch[2];
+          return (
+            <span key={index} className="block my-1 w-full overflow-hidden rounded-md border border-border/50 bg-secondary/20 shadow-2xs">
+              <img
+                src={src}
+                alt={alt}
+                className="w-full h-24 object-cover rounded-md"
+                loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget.parentElement as HTMLElement)?.style.setProperty("display", "none");
+                }}
+              />
+            </span>
+          );
+        }
 
         // Bold
         if ((part.startsWith("**") && part.endsWith("**")) || (part.startsWith("__") && part.endsWith("__"))) {
@@ -62,7 +86,7 @@ export function MiniFormattedInline({ text }: { text: string }) {
         if (linkMatch) {
           return (
             <span key={index} className="text-txt-brand font-medium">
-              {linkMatch[1]}
+              <MiniFormattedInline text={linkMatch[1]} />
             </span>
           );
         }
