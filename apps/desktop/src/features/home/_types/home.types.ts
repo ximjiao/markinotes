@@ -1,7 +1,7 @@
 import type { LocalFolderNode } from "../../workspace/_types/folder.types";
 import type { NoteTemplate } from "../_lib/templates-data";
 
-export type ViewMode = "grid" | "list";
+export type ViewMode = "grid" | "list" | "board";
 
 export interface NoteCardData {
   id: string;
@@ -13,6 +13,10 @@ export interface NoteCardData {
   isStarred?: boolean;
   tags?: string[];
   coverColor?: string;
+  status?: string;
+  parent?: string;
+  priority?: "Low" | "Medium" | "High" | "Urgent";
+  dueDate?: string;
 }
 
 export interface WorkspaceFolderInfo {
@@ -29,6 +33,8 @@ export interface AIOrganizeResponse {
 
 export interface NoteCardProps {
   note: NoteCardData;
+  variant?: "grid" | "kanban";
+  className?: string;
   onOpen?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleStar?: (id: string) => void;
@@ -44,6 +50,36 @@ export interface NoteGridProps {
   onToggleStar?: (id: string) => void;
   onMove?: (id: string) => void;
   onExport?: (id: string) => void;
+}
+
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  color?: string;
+  dotColor?: string;
+}
+
+export interface NoteKanbanBoardProps {
+  notes: NoteCardData[];
+  workspacePath?: string | null;
+  onOpenNote?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onToggleStar?: (id: string) => void;
+  onMove?: (id: string) => void;
+  onExport?: (id: string) => void;
+  onUpdateStatus?: (id: string, newStatus: string) => void;
+  onCreateNoteInColumn?: (status: string) => void;
+}
+
+export interface KanbanCardProps {
+  note: NoteCardData;
+  onOpen?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onToggleStar?: (id: string) => void;
+  onMove?: (id: string) => void;
+  onExport?: (id: string) => void;
+  onDragStart?: (e: React.DragEvent, noteId: string) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 export interface NotePreviewRendererProps {

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useCallback } from "react";
-import { ArrowLeft, LayoutGrid, List, Sparkles } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, Sparkles, Columns3 } from "lucide-react";
 import { HomeHeader } from "./home-header";
 import { HomeSidebar } from "./home-sidebar";
 import { NoteGrid } from "./note-grid";
+import { NoteKanbanBoard } from "./note-kanban-board";
 import { OnboardingView } from "./onboarding-view";
 import { AppShell } from "@/components/shared";
 import { NovelEditor } from "@features/editor";
@@ -50,6 +51,7 @@ export function HomeDashboard() {
   const deleteNote = useNotesStore((s) => s.deleteNote);
   const toggleStar = useNotesStore((s) => s.toggleStar);
   const moveNote = useNotesStore((s) => s.moveNote);
+  const updateNoteStatus = useNotesStore((s) => s.updateNoteStatus);
 
   const isTemplateDialogOpen = useUiStore((s) => s.isTemplateDialogOpen);
   const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
@@ -73,7 +75,7 @@ export function HomeDashboard() {
   const movingNote = movingNoteId ? notes.find((n) => n.id === movingNoteId) : undefined;
   const activeNote = activeNoteRef ? (notes.find((n) => n.id === activeNoteRef.id) ?? activeNoteRef) : undefined;
 
-  const getSelectedFolderNode = useCallback(() => {
+  const getSelectedFolderNode = useCallback((): LocalFolderNode | null => {
     const list: LocalFolderNode[] =
       folders && folders.length > 0
         ? folders
@@ -302,6 +304,29 @@ export function HomeDashboard() {
     }
   };
 
+  const handleCreateNoteInColumn = async (status: string) => {
+    if (!workspace) return;
+    let folderPath = workspace.folders[0]?.path || workspace.path;
+    if (
+      selectedFolder !== "recents" &&
+      selectedFolder !== "starred" &&
+      selectedFolder !== "templates" &&
+      selectedFolder !== "drafts"
+    ) {
+      const folder = getSelectedFolderNode();
+      if (folder) folderPath = folder.path;
+    } else {
+      folderPath = `${workspace.path}/Drafts`;
+    }
+
+    const newNote = await createNote(workspace.path, folderPath, `Untitled Note`);
+    if (newNote) {
+      await updateNoteStatus(workspace.path, newNote.id, status);
+      refreshWorkspace();
+      openNote(newNote.id, newNote.path, newNote.title);
+    }
+  };
+
   const handleUseTemplate = async (template: NoteTemplate) => {
     if (!workspace) return;
     const content = template.content.replace(
@@ -492,40 +517,79 @@ export function HomeDashboard() {
               options={[
                 { value: "grid", icon: <LayoutGrid className="h-3.5 w-3.5" /> },
                 { value: "list", icon: <List className="h-3.5 w-3.5" /> },
+                { value: "board", icon: <Columns3 className="h-3.5 w-3.5" /> },
               ]}
             />
           </div>
         </div>
 
-        <NoteGrid
-          notes={filteredNotes}
-          viewMode={viewMode}
-          onOpenNote={(id) => openNote(id)}
-          onMove={(id) => setMovingNoteId(id)}
-          onDelete={async (id) => {
-            if (!workspace) return;
-            const note = notes.find((n) => n.id === id);
-            if (note) await deleteNote(workspace.path, note.path);
-          }}
-          onToggleStar={async (id) => {
-            if (!workspace) return;
-            const note = notes.find((n) => n.id === id);
-            if (note) await toggleStar(workspace.path, note.path, !note.isStarred);
-          }}
-          onExport={async (id) => {
-            const note = notes.find((n) => n.id === id);
-            if (note) {
-              const content = await noteIpc.read(note.path);
-              const doc: any = {
-                id: note.id,
-                path: note.path,
-                content: content || "",
-                frontmatter: { title: note.title },
-              };
-              exportDocument(doc, "", "md");
-            }
-          }}
-        />
+        {viewMode === "board" ? (
+          <NoteKanbanBoard
+            notes={filteredNotes}
+            workspacePath={workspace?.path}
+            onOpenNote={(id) => openNote(id)}
+            onMove={(id) => setMovingNoteId(id)}
+            onDelete={async (id) => {
+              if (!workspace) return;
+              const note = notes.find((n) => n.id === id);
+              if (note) await deleteNote(workspace.path, note.path);
+            }}
+            onToggleStar={async (id) => {
+              if (!workspace) return;
+              const note = notes.find((n) => n.id === id);
+              if (note) await toggleStar(workspace.path, note.path, !note.isStarred);
+            }}
+            onExport={async (id) => {
+              const note = notes.find((n) => n.id === id);
+              if (note) {
+                const content = await noteIpc.read(note.path);
+                const doc: any = {
+                  id: note.id,
+                  path: note.path,
+                  content: content || "",
+                  frontmatter: { title: note.title },
+                };
+                exportDocument(doc, "", "md");
+              }
+            }}
+            onUpdateStatus={(id, newStatus) => {
+              if (workspace) {
+                updateNoteStatus(workspace.path, id, newStatus);
+              }
+            }}
+            onCreateNoteInColumn={handleCreateNoteInColumn}
+          />
+        ) : (
+          <NoteGrid
+            notes={filteredNotes}
+            viewMode={viewMode}
+            onOpenNote={(id) => openNote(id)}
+            onMove={(id) => setMovingNoteId(id)}
+            onDelete={async (id) => {
+              if (!workspace) return;
+              const note = notes.find((n) => n.id === id);
+              if (note) await deleteNote(workspace.path, note.path);
+            }}
+            onToggleStar={async (id) => {
+              if (!workspace) return;
+              const note = notes.find((n) => n.id === id);
+              if (note) await toggleStar(workspace.path, note.path, !note.isStarred);
+            }}
+            onExport={async (id) => {
+              const note = notes.find((n) => n.id === id);
+              if (note) {
+                const content = await noteIpc.read(note.path);
+                const doc: any = {
+                  id: note.id,
+                  path: note.path,
+                  content: content || "",
+                  frontmatter: { title: note.title },
+                };
+                exportDocument(doc, "", "md");
+              }
+            }}
+          />
+        )}
       </div>
 
       <TemplateDialog

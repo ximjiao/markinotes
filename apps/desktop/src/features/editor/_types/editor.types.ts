@@ -91,6 +91,8 @@ export interface NotionSelectionPopoverProps {
 export interface NotionBlockSideHandleProps {
   editor: Editor | null;
   onOpenSlashMenu?: () => void;
+  gutterOffset?: number;
+  clampInsideContainer?: boolean;
 }
 
 export interface NotionTablePillHandlesProps {

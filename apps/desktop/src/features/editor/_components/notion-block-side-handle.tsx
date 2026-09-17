@@ -27,6 +27,8 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  Columns3,
+  Table as TableIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
@@ -42,9 +44,14 @@ import {
 import type { NotionBlockSideHandleProps } from "../_types/editor.types";
 import { TABLE_COLORS, TEXT_COLORS, BG_HIGHLIGHTS } from "../_lib/editor-constants";
 
-export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSideHandleProps) {
+export function NotionBlockSideHandle({
+  editor,
+  onOpenSlashMenu,
+  gutterOffset = 54,
+  clampInsideContainer = false,
+}: NotionBlockSideHandleProps) {
   const [topPos, setTopPos] = useState<number | null>(null);
-  const [leftPos, setLeftPos] = useState<number>(-76);
+  const [leftPos, setLeftPos] = useState<number>(-gutterOffset);
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [dropIndicatorTop, setDropIndicatorTop] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -66,14 +73,20 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
     const editorDom = editor.view.dom;
     const BLOCK_SELECTOR = "p, h1, h2, h3, h4, li, blockquote, pre, [data-type='taskItem'], [data-type='imageBlock'], [data-node-view-wrapper], .image-block-node-view, .tableWrapper, table";
 
+    const getContainerRect = () => {
+      const parent = (editorDom.closest(".relative") || editorDom.parentElement || editorDom) as HTMLElement;
+      return parent.getBoundingClientRect();
+    };
+
     const updatePosition = (block?: HTMLElement | null) => {
       const elem = block || hoveredElementRef.current;
       if (!elem || !editorDom.contains(elem) || isDragging) return;
-      const editorRect = editorDom.getBoundingClientRect();
+      const containerRect = getContainerRect();
       const blockRect = elem.getBoundingClientRect();
-      setTopPos(blockRect.top - editorRect.top + 4);
-      // Shifted -76px (added 24px) to ensure clear visual separation from table row pill handles
-      setLeftPos(blockRect.left - editorRect.left - 76);
+      setTopPos(blockRect.top - containerRect.top + 4);
+      
+      const targetLeft = blockRect.left - containerRect.left - gutterOffset;
+      setLeftPos(clampInsideContainer ? Math.max(6, targetLeft) : targetLeft);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -87,9 +100,11 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
         }
 
         const editorRect = editorDom.getBoundingClientRect();
+        const containerRect = getContainerRect();
 
         // If cursor is in the left gutter / gap area (moving from block to the handle on the left)
-        if (e.clientX >= editorRect.left - 120 && e.clientX <= editorRect.left + 30) {
+        const leftBound = clampInsideContainer ? containerRect.left : editorRect.left - 120;
+        if (e.clientX >= leftBound && e.clientX <= editorRect.left + 30) {
           const elemAtY = document.elementFromPoint(editorRect.left + 40, e.clientY) as HTMLElement | null;
           const blockAtY = elemAtY?.closest(BLOCK_SELECTOR) as HTMLElement | null;
           if (blockAtY && editorDom.contains(blockAtY)) {
@@ -133,12 +148,77 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
   }, [editor, isDragging, menuOpen]);
 
   // Block Helper Utilities
+  const getNodeRange = (elem?: HTMLElement | null) => {
+    const targetElem = elem || hoveredElement;
+    if (!editor || editor.isDestroyed || !targetElem) return null;
+    try {
+      const editorDom = editor.view.dom;
+      if (!editorDom.contains(targetElem)) return null;
+
+      // 1. If inside a table or custom nodeview wrapper (e.g. Kanban or Image), find container
+      const tableParent = targetElem.closest(".tableWrapper, table") as HTMLElement | null;
+      const nodeViewParent = targetElem.closest("[data-node-view-wrapper], .image-block-node-view") as HTMLElement | null;
+      const actualTarget = tableParent || nodeViewParent || targetElem;
+
+      // 2. Find position in ProseMirror doc
+      let domPos = 0;
+      try {
+        domPos = editor.view.posAtDOM(actualTarget, 0);
+      } catch {
+        return null;
+      }
+
+      const doc = editor.state.doc;
+      const safePos = Math.max(0, Math.min(domPos, doc.content.size));
+      const resolved = doc.resolve(safePos);
+
+      // Case 1: Pos is at doc level (depth 0, e.g. atom nodes like Kanban/Image)
+      if (resolved.depth === 0) {
+        let node = doc.nodeAt(safePos);
+        let from = safePos;
+        if (!node && safePos > 0) {
+          node = doc.nodeAt(safePos - 1);
+          from = safePos - 1;
+        }
+        if (node) {
+          return { from, to: from + node.nodeSize, node, depth: 1, isListChild: false, resolved };
+        }
+      }
+
+      // Case 2: Pos is inside a block (depth >= 1)
+      let targetDepth = 1;
+      let isListChild = false;
+      for (let d = resolved.depth; d >= 1; d--) {
+        const nodeName = resolved.node(d).type.name;
+        if (nodeName === "listItem" || nodeName === "taskItem") {
+          targetDepth = d;
+          isListChild = true;
+          break;
+        }
+      }
+
+      const from = resolved.before(targetDepth);
+      const to = resolved.after(targetDepth);
+      const node = doc.nodeAt(from) || resolved.node(targetDepth);
+
+      if (node) {
+        return { from, to, node, depth: targetDepth, isListChild, resolved };
+      }
+    } catch (err) {
+      console.warn("getNodeRange error:", err);
+    }
+    return null;
+  };
+
+  const getBlockPosRange = () => getNodeRange(hoveredElement);
+
   const getBlockInfo = () => {
     if (!hoveredElement) {
       return { type: "paragraph", label: "Text", wordCount: 0, charCount: 0, isTable: false };
     }
 
     const tag = hoveredElement.tagName.toLowerCase();
+    const isKanban = !!hoveredElement.closest("[data-type='kanban-board'], [data-node-view-wrapper]");
     const isTable = !!hoveredElement.closest(".tableWrapper, table") || tag === "table";
     const isTaskList = hoveredElement.getAttribute("data-type") === "taskItem" || !!hoveredElement.closest("[data-type='taskList']");
     const isOrderedList = tag === "li" && !!hoveredElement.closest("ol");
@@ -147,7 +227,10 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
     let label = "Text";
     let type = "paragraph";
 
-    if (isTable) {
+    if (isKanban) {
+      label = "Kanban Board";
+      type = "kanbanBoard";
+    } else if (isTable) {
       label = "Table";
       type = "table";
     } else if (tag === "h1") {
@@ -184,31 +267,6 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
     const charCount = text.length;
 
     return { type, label, wordCount: words, charCount, isTable };
-  };
-
-  const getBlockPosRange = () => {
-    if (!editor || !hoveredElement) return null;
-    try {
-      const domPos = editor.view.posAtDOM(hoveredElement, 0);
-      const resolved = editor.state.doc.resolve(domPos);
-
-      const isListItem = hoveredElement.tagName.toLowerCase() === "li" || !!hoveredElement.closest("li");
-      const isTaskItem =
-        hoveredElement.getAttribute("data-type") === "taskItem" ||
-        !!hoveredElement.closest("[data-type='taskItem']");
-
-      let depth = 1;
-      if ((isListItem || isTaskItem) && resolved.depth > 1) {
-        depth = resolved.depth;
-      }
-
-      const from = resolved.before(depth);
-      const to = resolved.after(depth);
-      const node = editor.state.doc.nodeAt(from);
-      return { from, to, node, depth, resolved };
-    } catch {
-      return null;
-    }
   };
 
   const getTableNodeAndPos = () => {
@@ -389,81 +447,37 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
         // Drag action completed
         if (targetBlockElem && targetBlockElem !== sourceNodeElem) {
           try {
-            const sourceDOMPos = editor.view.posAtDOM(sourceNodeElem, 0);
-            const targetDOMPos = editor.view.posAtDOM(targetBlockElem, 0);
+            const sourceRange = getNodeRange(sourceNodeElem);
+            const targetRange = getNodeRange(targetBlockElem);
 
-            const sourceResolved = editor.state.doc.resolve(sourceDOMPos);
-            const targetResolved = editor.state.doc.resolve(targetDOMPos);
+            if (!sourceRange || !targetRange || !sourceRange.node) return;
+            if (sourceRange.from === targetRange.from) return;
 
-            // Determine source depth (if inside listItem or taskItem, target that specific item)
-            let sourceDepth = 1;
-            for (let d = sourceResolved.depth; d >= 1; d--) {
-              const nodeName = sourceResolved.node(d).type.name;
-              if (nodeName === "listItem" || nodeName === "taskItem") {
-                sourceDepth = d;
-                break;
+            const sourceNode = sourceRange.node;
+            const sourceFrom = sourceRange.from;
+            const sourceTo = sourceRange.to;
+            const rawTargetPos = targetRange.to;
+
+            let finalNode = sourceNode;
+
+            // Moving a list item out to standard root level
+            if (sourceRange.isListChild && !targetRange.isListChild) {
+              const listType = editor.schema.nodes.bulletList || editor.schema.nodes.taskList;
+              if (listType) {
+                finalNode = listType.create(null, [sourceNode]);
               }
             }
 
-            const sourceStartPos = sourceResolved.before(sourceDepth);
-            const sourceEndPos = sourceResolved.after(sourceDepth);
-            const nodeToMove = editor.state.doc.nodeAt(sourceStartPos);
+            const tr = editor.state.tr;
+            // Atomic delete of the source node
+            tr.delete(sourceFrom, sourceTo);
+            const mappedTargetPos = tr.mapping.map(rawTargetPos);
 
-            if (nodeToMove) {
-              const isSourceListChild = nodeToMove.type.name === "listItem" || nodeToMove.type.name === "taskItem";
-
-              // Determine target depth
-              let targetDepth = 1;
-              let isTargetListChild = false;
-              for (let d = targetResolved.depth; d >= 1; d--) {
-                const nodeName = targetResolved.node(d).type.name;
-                if (nodeName === "listItem" || nodeName === "taskItem") {
-                  targetDepth = d;
-                  isTargetListChild = true;
-                  break;
-                }
-              }
-
-              let finalNode = nodeToMove;
-
-              // Case 1: Moving a listItem/taskItem OUTSIDE into a non-list root location
-              if (isSourceListChild && !isTargetListChild) {
-                // Wrap the single item in its corresponding list type to create a new list block
-                const parentListNode = sourceResolved.node(sourceDepth - 1);
-                const listType = parentListNode ? parentListNode.type : editor.schema.nodes.bulletList;
-                if (listType) {
-                  finalNode = listType.create(parentListNode?.attrs || null, [nodeToMove]);
-                }
-              }
-
-              // Case 2: Moving a regular block (e.g. Paragraph) INTO a list item
-              if (!isSourceListChild && isTargetListChild) {
-                // Split target list at targetDepth and insert between the lists
-                const tr = editor.state.tr;
-                tr.delete(sourceStartPos, sourceEndPos);
-                const rawSplitPos = targetResolved.after(targetDepth);
-                const mappedSplitPos = tr.mapping.map(rawSplitPos);
-                try {
-                  tr.split(mappedSplitPos);
-                } catch {}
-                const mappedInsertPos = tr.mapping.map(mappedSplitPos);
-                tr.insert(mappedInsertPos, finalNode);
-                editor.view.dispatch(tr);
-                return;
-              }
-
-              // Case 3: Moving inside another list or standard block reorder
-              const rawTargetPos = targetResolved.after(targetDepth);
-              const tr = editor.state.tr;
-              tr.delete(sourceStartPos, sourceEndPos);
-              const mappedTargetPos = tr.mapping.map(rawTargetPos);
-
-              try {
-                tr.insert(mappedTargetPos, finalNode);
-                editor.view.dispatch(tr);
-              } catch (err) {
-                console.error("Drag transaction insert failed:", err);
-              }
+            try {
+              tr.insert(mappedTargetPos, finalNode);
+              editor.view.dispatch(tr);
+            } catch (err) {
+              console.error("Drag transaction insert failed:", err);
             }
           } catch (err) {
             console.error("Drag handler error:", err);
@@ -550,6 +564,10 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
       editor.chain().focus().toggleBlockquote().run();
     } else if (type === "codeBlock") {
       editor.chain().focus().toggleCodeBlock().run();
+    } else if (type === "table") {
+      (editor.chain().focus() as any).deleteRange({ from: range.from, to: range.to }).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    } else if (type === "kanban") {
+      (editor.chain().focus() as any).deleteRange({ from: range.from, to: range.to }).insertKanbanBoard().run();
     }
     setMenuOpen(false);
   };
@@ -775,6 +793,12 @@ export function NotionBlockSideHandle({ editor, onOpenSlashMenu }: NotionBlockSi
                     </NotionMenuItem>
                     <NotionMenuItem icon={<Code2 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("codeBlock")}>
                       Code
+                    </NotionMenuItem>
+                    <NotionMenuItem icon={<TableIcon className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("table")}>
+                      Table
+                    </NotionMenuItem>
+                    <NotionMenuItem icon={<Columns3 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("kanban")}>
+                      Kanban Board
                     </NotionMenuItem>
                   </PopoverContent>
                 </Popover>

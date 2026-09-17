@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import type { Editor } from "@tiptap/react";
-import { Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Code, Table, Quote, Minus, Image as ImageIcon } from "lucide-react";
+import { Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Code, Table, Columns3, Quote, Minus, Image as ImageIcon } from "lucide-react";
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import type { SlashCommandMenuProps } from "../_types/editor.types";
 
@@ -91,9 +91,15 @@ export function SlashCommandMenu({ editor, isOpen, onClose, onOpenImageDialog }:
     },
     {
       title: "Table",
-      description: "Insert a 3x3 table",
+      description: "Insert a 3x3 table grid",
       icon: Table,
       action: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    {
+      title: "Kanban Board",
+      description: "Insert an interactive Kanban board",
+      icon: Columns3,
+      action: () => (editor.chain().focus() as any).insertKanbanBoard().run(),
     },
     {
       title: "Quote",

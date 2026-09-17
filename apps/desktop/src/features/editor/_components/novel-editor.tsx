@@ -27,6 +27,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
 import { Mark, mergeAttributes, Extension } from "@tiptap/core";
 import { CustomImageExtension } from "./custom-image-extension";
+import { CustomKanbanExtension } from "./custom-kanban-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -41,6 +42,7 @@ import {
   CheckSquare,
   Code,
   Table as TableIcon,
+  Columns3 as KanbanIcon,
   Quote,
   Minus,
   Bold,
@@ -185,6 +187,16 @@ const rawSlashItems: CustomSlashItem[] = [
     searchTerms: ["table", "grid"],
     command: ({ editor, range }: any) => {
       editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    },
+  },
+  {
+    title: "Kanban Board",
+    description: "Insert an interactive Kanban board",
+    icon: <KanbanIcon className="h-4 w-4" />,
+    badge: "board",
+    searchTerms: ["kanban", "board", "trello", "card", "task"],
+    command: ({ editor, range }: any) => {
+      editor.chain().focus().deleteRange(range).insertKanbanBoard().run();
     },
   },
   {
@@ -641,6 +653,7 @@ const defaultExtensions = [
     },
   }),
   CustomImageExtension,
+  CustomKanbanExtension,
   slashCommand,
   GlobalDragHandle,
   Markdown.configure({
@@ -1517,7 +1530,11 @@ export function NovelEditor({
                         if (state.selection.empty || state.selection.from === state.selection.to) {
                           return false;
                         }
-                        if (editor.isActive("image")) {
+                        if (editor.isActive("image") || editor.isActive("kanbanBoard")) {
+                          return false;
+                        }
+                        // If it's a NodeSelection (e.g. clicking on an atom block), don't show text formatting bubble
+                        if ((state.selection as any).node) {
                           return false;
                         }
                         return true;

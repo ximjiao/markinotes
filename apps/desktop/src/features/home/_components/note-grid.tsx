@@ -7,7 +7,7 @@ import { formatRelativeTime } from "@/lib/formatters";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Folder, MoreHorizontal, Star, Trash2, FolderOutput } from "lucide-react";
+import { FileText, Folder, FolderOpen, MoreHorizontal, Star, Trash2, FolderOutput } from "lucide-react";
 import { EmptyState } from "@/components/shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { noteIpc } from "../_lib/note-ipc";
 
 export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, onMove, onExport }: NoteGridProps) {
   if (notes.length === 0) {
@@ -160,6 +161,17 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                               Export
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (note.path) {
+                                await noteIpc.revealInFinder(note.path);
+                              }
+                            }}
+                          >
+                            <FolderOpen className="mr-2 h-4 w-4" />
+                            Open in Folder
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onToggleStar?.(note.id)}>
                             <Star className="mr-2 h-4 w-4" />
                             {note.isStarred ? "Unstar" : "Star"}

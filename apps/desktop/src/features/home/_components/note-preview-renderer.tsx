@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Columns3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NotePreviewRendererProps } from "../_types/home.types";
 import {
@@ -8,6 +9,87 @@ import {
   parseTableRow,
   isTableSeparatorRow,
 } from "../_lib/note-preview-parser";
+
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function parseKanbanBlockData(fullBlock: string): {
+  title: string;
+  columns: { id: string; title: string; cards?: { id: string; title: string; tags?: string[] }[] }[];
+} {
+  const titleMatch = fullBlock.match(/data-title=(?:\\?["'])(.*?)(?:\\?["'])/);
+  const title = titleMatch ? titleMatch[1] : "Kanban Board";
+
+  // Data extraction - match everything starting with data-kanban-data=" until the matching quote or end of string
+  let rawJson = "";
+  const matchWithEndQuote = fullBlock.match(/data-kanban-data=(?:\\?["'])([\s\S]*?)(?:\\?["'])(?:\s|>|\/|$)/);
+  if (matchWithEndQuote && matchWithEndQuote[1].trim()) {
+    rawJson = matchWithEndQuote[1];
+  } else {
+    const matchOpen = fullBlock.match(/data-kanban-data=(?:\\?["'])([\s\S]*)/);
+    if (matchOpen) {
+      rawJson = matchOpen[1];
+    }
+  }
+
+  const decoded = decodeHtmlEntities(rawJson).replace(/\\"/g, '"');
+
+  // 1. Direct JSON parse
+  try {
+    const parsed = JSON.parse(decoded);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return { title, columns: parsed };
+    }
+  } catch {}
+
+  // 2. Slicing back from the end to repair truncated JSON
+  for (let idx = decoded.lastIndexOf("}"); idx > 0; idx = decoded.lastIndexOf("}", idx - 1)) {
+    const slice = decoded.slice(0, idx + 1);
+    try {
+      const parsed = JSON.parse(slice + "]");
+      if (Array.isArray(parsed) && parsed.length > 0) return { title, columns: parsed };
+    } catch {}
+    try {
+      const parsed = JSON.parse(slice + "]}]");
+      if (Array.isArray(parsed) && parsed.length > 0) return { title, columns: parsed };
+    } catch {}
+  }
+
+  // 3. Fallback: Regex extraction of columns and cards
+  const cols: { id: string; title: string; cards: { id: string; title: string; tags?: string[] }[] }[] = [];
+  const colRegex = /\{"id":"([^"]+)","title":"([^"]+)"(?:,"cards":\[([\s\S]*?)\])?/g;
+  let m;
+  while ((m = colRegex.exec(decoded)) !== null) {
+    const cards: { id: string; title: string; tags?: string[] }[] = [];
+    if (m[3]) {
+      const cardRegex = /\{"id":"([^"]+)","title":"([^"]+)"/g;
+      let cm;
+      while ((cm = cardRegex.exec(m[3])) !== null) {
+        cards.push({ id: cm[1], title: cm[2] });
+      }
+    }
+    cols.push({ id: m[1], title: m[2], cards });
+  }
+
+  if (cols.length > 0) {
+    return { title, columns: cols };
+  }
+
+  return {
+    title,
+    columns: [
+      { id: "todo", title: "To Do", cards: [] },
+      { id: "in-progress", title: "In Progress", cards: [] },
+      { id: "done", title: "Done", cards: [] },
+    ],
+  };
+}
 
 export function NotePreviewRenderer({ content, title, className }: NotePreviewRendererProps) {
   if (!content || !content.trim()) {
@@ -35,9 +117,111 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
       continue;
     }
 
-    // Skip the first heading if it's identical to the note title
-    if (!hasSkippedTitle && title && trimmed.replace(/^#+\s*/, "").trim().toLowerCase() === title.trim().toLowerCase()) {
-      hasSkippedTitle = true;
+    // Skip the first heading or first line if it matches the note title
+    if (!hasSkippedTitle && title) {
+      const cleanLine = trimmed
+        .replace(/^#+\s*/, "")
+        .replace(/[*_`~]/g, "")
+        .trim()
+        .toLowerCase();
+      const cleanTitle = title
+        .replace(/[*_`~]/g, "")
+        .trim()
+        .toLowerCase();
+      if (cleanLine && cleanTitle && (cleanLine === cleanTitle || cleanLine.startsWith(cleanTitle) || cleanTitle.startsWith(cleanLine))) {
+        hasSkippedTitle = true;
+        i++;
+        continue;
+      }
+    }
+
+    // 0. Embedded Kanban Board (<div data-type="kanban-board" ...)
+    if (
+      trimmed.includes('data-type="kanban-board"') ||
+      trimmed.includes("data-type='kanban-board'") ||
+      trimmed.includes('data-type=\\"kanban-board\\"') ||
+      trimmed.includes("data-kanban-data")
+    ) {
+      let fullBlock = trimmed;
+      const kanbanStartIdx = i;
+      while (i + 1 < lines.length && !lines[i].includes("</div>") && !lines[i].endsWith("/>")) {
+        i++;
+        fullBlock += " " + lines[i].trim();
+      }
+      i++;
+
+      const { title: boardTitle, columns } = parseKanbanBlockData(fullBlock);
+      const totalTasks = columns.reduce((acc, col) => acc + (col.cards?.length || 0), 0);
+
+      elements.push(
+        <div
+          key={`kanban-${kanbanStartIdx}`}
+          className="my-1.5 w-full overflow-hidden rounded-lg border border-border/80 bg-secondary/30 p-2 shadow-2xs space-y-1.5"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between gap-1 text-txt-secondary pb-1 border-b border-border/40">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Columns3 className="h-3.5 w-3.5 text-txt-brand shrink-0" />
+              <span className="text-[10.5px] font-semibold text-txt-primary truncate">
+                {boardTitle}
+              </span>
+            </div>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-secondary text-txt-muted font-medium shrink-0 border border-border/40">
+              {columns.length} cols · {totalTasks} tasks
+            </span>
+          </div>
+
+          {/* Mini Columns */}
+          <div className="grid grid-flow-col auto-cols-fr gap-1.5 overflow-hidden">
+            {columns.slice(0, 3).map((col, cIdx) => (
+              <div
+                key={col.id || cIdx}
+                className="flex flex-col gap-1 p-1.5 rounded-md bg-card/90 border border-border/50 min-w-0"
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[9px] font-semibold text-txt-secondary truncate">
+                    {col.title}
+                  </span>
+                  <span className="text-[8px] px-1 py-0 rounded-full bg-secondary/80 text-txt-muted shrink-0 font-medium">
+                    {col.cards?.length || 0}
+                  </span>
+                </div>
+                {col.cards && col.cards.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {col.cards.slice(0, 2).map((c) => (
+                      <div
+                        key={c.id}
+                        className="px-1.5 py-0.5 rounded bg-background/90 border border-border/40 text-[8.5px] text-txt-primary truncate leading-tight flex items-center justify-between gap-1 shadow-2xs"
+                      >
+                        <span className="truncate">{c.title}</span>
+                        {c.tags && c.tags.length > 0 && (
+                          <span className="text-[7.5px] px-1 py-0 rounded bg-secondary text-txt-muted shrink-0">
+                            #{c.tags[0]}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {col.cards.length > 2 && (
+                      <span className="text-[8px] text-txt-muted pl-0.5 font-medium">
+                        +{col.cards.length - 2} more
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-1 text-[8px] text-txt-muted/50 italic text-center">
+                    Empty
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+      continue;
+    }
+
+    // Skip stray opening/closing HTML tags
+    if (/^<\/?(div|span|p|section)[^>]*>$/i.test(trimmed)) {
       i++;
       continue;
     }
@@ -164,11 +348,8 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
     // 5. Headings
     if (trimmed.startsWith("# ")) {
       elements.push(
-        <div key={`h1-${i}`} className="pt-1 pb-0.5 text-xs font-bold text-txt-primary flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-          <span className="truncate">
-            <MiniFormattedInline text={trimmed.slice(2)} />
-          </span>
+        <div key={`h1-${i}`} className="pt-1 pb-0.5 text-xs font-bold text-txt-primary truncate">
+          <MiniFormattedInline text={trimmed.slice(2)} />
         </div>
       );
       i++;
@@ -251,7 +432,18 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
       continue;
     }
 
-    // 9. Standard Paragraph
+    // 9. Standard Paragraph (Guard against unparsed HTML tags, JSON or attribute fragments)
+    if (
+      /^<\/?(div|span|p|section|table|tr|td|th)[^>]*>$/i.test(trimmed) ||
+      trimmed.includes("&quot;") ||
+      trimmed.startsWith("<div") ||
+      trimmed.startsWith("data-") ||
+      trimmed.endsWith("</div>")
+    ) {
+      i++;
+      continue;
+    }
+
     elements.push(
       <p key={`p-${i}`} className="text-[11px] text-txt-secondary leading-relaxed font-normal">
         <MiniFormattedInline text={trimmed} />

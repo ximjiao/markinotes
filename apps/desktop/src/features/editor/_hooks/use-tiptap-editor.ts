@@ -11,6 +11,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Link } from "@tiptap/extension-link";
 import { CustomImageExtension } from "../_components/custom-image-extension";
+import { CustomKanbanExtension } from "../_components/custom-kanban-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -70,6 +71,7 @@ export function useTiptapEditor({
         defaultAlignment: "left",
       }),
       CustomImageExtension,
+      CustomKanbanExtension,
       Markdown.configure({
         html: true,
         transformPastedText: true,

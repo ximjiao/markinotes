@@ -281,6 +281,13 @@ export const noteIpc = {
       return invoke("workspace_set_setting", { workspacePath, key, value });
     }
     localStorage.setItem(`marki_setting_${workspacePath}_${key}`, value);
+  },
+
+  revealInFinder: async (path: string): Promise<void> => {
+    if (isTauri()) {
+      return invoke("reveal_in_finder", { path });
+    }
+    console.log("Reveal in finder (web fallback):", path);
   }
 };
 

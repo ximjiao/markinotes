@@ -159,9 +159,9 @@ pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
             let tags_str: Option<String> = row.get(7)?;
             let tags = tags_str.map(|s| s.split(',').map(|t| t.to_string()).collect());
 
-            // Read live excerpt directly from file content to guarantee 600 chars length for all notes
+            // Read live excerpt directly from file content to guarantee 3000 chars length for all notes (rich previews)
             let excerpt = match fs::read_to_string(&path_str) {
-                Ok(content) => content.chars().take(600).collect::<String>(),
+                Ok(content) => content.chars().take(3000).collect::<String>(),
                 Err(_) => row.get::<_, String>(3).unwrap_or_default(),
             };
 
@@ -245,6 +245,7 @@ pub fn note_create(workspace_path: String, folder_path: String, title: String) -
     let content = format!("# {}\n\n", title);
     fs::write(&path, &content).map_err(|e| e.to_string())?;
 
+    init_db(&workspace_path).map_err(|e| e.to_string())?;
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
     

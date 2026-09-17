@@ -34,6 +34,7 @@ interface NotesState {
   deleteNote: (workspacePath: string, notePath: string) => Promise<void>;
   toggleStar: (workspacePath: string, notePath: string, starred: boolean) => Promise<void>;
   moveNote: (workspacePath: string, notePath: string, newFolderPath: string) => Promise<void>;
+  updateNoteStatus: (workspacePath: string, noteId: string, status: string) => Promise<void>;
 }
 
 export const useNotesStore = create<NotesState>()(
@@ -56,7 +57,26 @@ export const useNotesStore = create<NotesState>()(
         if (!workspacePath) return;
         try {
           const data = await noteIpc.list(workspacePath);
-          set({ notes: data });
+          const statusKey = `marki_status_${workspacePath}`;
+          const existingMapStr = typeof window !== "undefined" ? localStorage.getItem(statusKey) : null;
+          const statusMap = existingMapStr ? JSON.parse(existingMapStr) : {};
+
+          const enriched = data.map((n) => {
+            let status = statusMap[n.id];
+            if (!status) {
+              const lowerTags = (n.tags || []).map((t) => t.toLowerCase());
+              if (lowerTags.includes("done") || lowerTags.includes("completed")) status = "Done";
+              else if (lowerTags.includes("in-progress") || lowerTags.includes("doing") || lowerTags.includes("wip")) status = "In Progress";
+              else if (lowerTags.includes("review")) status = "Review";
+              else status = "To Do";
+            }
+            return {
+              ...n,
+              status,
+            };
+          });
+
+          set({ notes: enriched });
         } catch (e) {
           console.error("Failed to load notes in store:", e);
         }
@@ -117,7 +137,15 @@ export const useNotesStore = create<NotesState>()(
         if (!workspacePath) return null;
         try {
           const newNote = await noteIpc.create(workspacePath, folderPath, title);
-          await get().loadNotes(workspacePath);
+          if (newNote) {
+            set((state) => {
+              const exists = state.notes.some((n) => n.id === newNote.id || n.path === newNote.path);
+              return {
+                notes: exists ? state.notes : [newNote, ...state.notes],
+              };
+            });
+            await get().loadNotes(workspacePath);
+          }
           return newNote;
         } catch (e) {
           console.error("Failed to create note:", e);
@@ -137,7 +165,7 @@ export const useNotesStore = create<NotesState>()(
                 ? {
                     ...n,
                     title,
-                    excerpt: content.substring(0, 600),
+                    excerpt: content.substring(0, 3000),
                     tags: tags.length > 0 ? tags : n.tags,
                   }
                 : n
@@ -182,6 +210,28 @@ export const useNotesStore = create<NotesState>()(
           console.error("Failed to move note:", e);
           throw e;
         }
+      },
+
+      updateNoteStatus: async (workspacePath: string, noteId: string, status: string) => {
+        if (!workspacePath || !noteId) return;
+
+        // Persist status in local storage map for workspace unconditionally
+        try {
+          const statusKey = `marki_status_${workspacePath}`;
+          const existingMapStr = typeof window !== "undefined" ? localStorage.getItem(statusKey) : null;
+          const statusMap = existingMapStr ? JSON.parse(existingMapStr) : {};
+          statusMap[noteId] = status;
+          if (typeof window !== "undefined") {
+            localStorage.setItem(statusKey, JSON.stringify(statusMap));
+          }
+        } catch (e) {
+          console.error("Failed to save note status to localStorage:", e);
+        }
+
+        // Optimistic update in notes state
+        set((state) => ({
+          notes: state.notes.map((n) => (n.id === noteId ? { ...n, status } : n)),
+        }));
       },
     }),
     {
