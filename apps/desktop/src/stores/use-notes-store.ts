@@ -2,7 +2,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { NoteCardData, ViewMode } from "../features/home/_types/home.types";
 import { noteIpc } from "../features/home/_lib/note-ipc";
+import { workspaceConfig } from "../features/workspace/_lib/workspace-config";
 import { stripMarkdown } from "@/lib/utils";
+import { generateSmartExcerpt } from "../features/home/_lib/excerpt-utils";
 
 interface ActiveNoteRef {
   id: string;
@@ -22,7 +24,7 @@ interface NotesState {
   isContentLoading: boolean;
 
   // Actions
-  loadNotes: (workspacePath: string) => Promise<void>;
+  loadNotes: (workspacePath: string, extraPaths?: string[]) => Promise<void>;
   setSelectedFolder: (folder: string) => void;
   setSearchQuery: (query: string) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -53,10 +55,12 @@ export const useNotesStore = create<NotesState>()(
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setViewMode: (viewMode) => set({ viewMode }),
 
-      loadNotes: async (workspacePath: string) => {
+      loadNotes: async (workspacePath: string, extraPaths?: string[]) => {
         if (!workspacePath) return;
         try {
-          const data = await noteIpc.list(workspacePath);
+          const config = workspaceConfig.get();
+          const allExtras = extraPaths || (config.folders || []).map((f) => f.path).filter((p) => p && p !== workspacePath);
+          const data = await noteIpc.list(workspacePath, allExtras);
           const statusKey = `marki_status_${workspacePath}`;
           const existingMapStr = typeof window !== "undefined" ? localStorage.getItem(statusKey) : null;
           const statusMap = existingMapStr ? JSON.parse(existingMapStr) : {};
@@ -165,7 +169,7 @@ export const useNotesStore = create<NotesState>()(
                 ? {
                     ...n,
                     title,
-                    excerpt: content.substring(0, 3000),
+                    excerpt: generateSmartExcerpt(content, 3000),
                     tags: tags.length > 0 ? tags : n.tags,
                   }
                 : n

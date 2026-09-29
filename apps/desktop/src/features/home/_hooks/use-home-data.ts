@@ -5,6 +5,7 @@ import type { NoteCardData, ViewMode, WorkspaceFolderInfo } from "../_types/home
 import { noteIpc } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { stripMarkdown } from "@/lib/utils";
+import { generateSmartExcerpt } from "../_lib/excerpt-utils";
 
 export function useHomeData() {
   const [workspace, setWorkspace] = useState<WorkspaceFolderInfo | null>(null);
@@ -89,7 +90,7 @@ export function useHomeData() {
       // Optimistic update - don't reload list to avoid focus loss
       setNotes(prev => prev.map(n =>
         n.path === notePath
-          ? { ...n, title, excerpt: content.substring(0, 3000) }
+          ? { ...n, title, excerpt: generateSmartExcerpt(content, 3000) }
           : n
       ));
     } catch (e) {

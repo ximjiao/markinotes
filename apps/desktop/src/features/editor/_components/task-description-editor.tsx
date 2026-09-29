@@ -209,7 +209,6 @@ export function TaskDescriptionEditor({
     }),
     CodeBlockLowlight.configure({
       lowlight,
-      defaultLanguage: "javascript",
     }),
     Placeholder.configure({
       placeholder,

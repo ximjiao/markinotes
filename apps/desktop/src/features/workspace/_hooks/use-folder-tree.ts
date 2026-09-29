@@ -137,9 +137,6 @@ export function useFolderTree() {
       
       workspaceConfig.set({ folders: newFolders });
       setFolders(newFolders);
-      
-      // Need to reload window to refresh all paths in notes
-      window.location.reload();
     }
   }, []);
 

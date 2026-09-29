@@ -63,6 +63,80 @@ pub struct FolderInfo {
     path: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderNodeDto {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub note_count: usize,
+    pub is_expanded: bool,
+    pub children: Vec<FolderNodeDto>,
+}
+
+fn scan_folder_tree(dir: &std::path::Path) -> Vec<FolderNodeDto> {
+    let mut folders = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        let mut dir_entries: Vec<_> = entries
+            .flatten()
+            .filter(|e| {
+                let file_name = e.file_name().to_string_lossy().to_string();
+                !file_name.starts_with('.')
+                    && file_name != "node_modules"
+                    && file_name != "target"
+                    && file_name != "dist"
+                    && file_name != "build"
+                    && file_name != ".obsidian"
+                    && file_name != ".git"
+                    && e.path().is_dir()
+            })
+            .collect();
+
+        dir_entries.sort_by_key(|e| e.file_name());
+
+        for entry in dir_entries {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            let path_str = path.to_string_lossy().to_string();
+
+            let mut direct_notes = 0;
+            if let Ok(files) = fs::read_dir(&path) {
+                for file in files.flatten() {
+                    let file_path = file.path();
+                    if file_path.is_file() {
+                        let ext = file_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                        if ext == "md" || ext == "markdown" {
+                            direct_notes += 1;
+                        }
+                    }
+                }
+            }
+
+            let sub_children = scan_folder_tree(&path);
+            let total_notes = direct_notes + sub_children.iter().map(|c| c.note_count).sum::<usize>();
+
+            folders.push(FolderNodeDto {
+                id: Uuid::new_v4().to_string(),
+                name,
+                path: path_str,
+                note_count: total_notes,
+                is_expanded: false,
+                children: sub_children,
+            });
+        }
+    }
+    folders
+}
+
+#[tauri::command]
+pub fn workspace_scan_folder_tree(workspace_path: String) -> Result<Vec<FolderNodeDto>, String> {
+    let root = PathBuf::from(&workspace_path);
+    if !root.exists() || !root.is_dir() {
+        return Ok(Vec::new());
+    }
+    Ok(scan_folder_tree(&root))
+}
+
 #[tauri::command]
 pub fn workspace_init(root_path: String, folders: Vec<FolderInfo>) -> Result<(), String> {
     init_db(&root_path).map_err(|e| e.to_string())?;
@@ -72,6 +146,40 @@ pub fn workspace_init(root_path: String, folders: Vec<FolderInfo>) -> Result<(),
         let _ = fs::create_dir_all(&folder.path);
     }
     Ok(())
+}
+
+fn generate_smart_excerpt(content: &str, max_text_chars: usize) -> String {
+    if content.is_empty() {
+        return String::new();
+    }
+
+    // Check if content contains base64 image data (e.g. data:image/...;base64,...)
+    if let Some(start_idx) = content.find("data:image/") {
+        if let Some(end_idx) = content[start_idx..].find(')') {
+            let full_img_end = start_idx + end_idx;
+            let img_start = content[..start_idx].rfind("![").unwrap_or(start_idx);
+            let first_img = &content[img_start..=full_img_end];
+
+            let mut remaining = String::new();
+            remaining.push_str(&content[..img_start]);
+            remaining.push_str(&content[full_img_end + 1..]);
+            let remaining_trimmed: String = remaining.chars().take(max_text_chars).collect();
+            return format!("{}\n\n{}", first_img, remaining_trimmed.trim());
+        } else if let Some(end_idx) = content[start_idx..].find('"') {
+            let full_img_end = start_idx + end_idx;
+            let img_start = content[..start_idx].rfind("<img").unwrap_or(start_idx);
+            let close_bracket = content[full_img_end..].find('>').map(|i| full_img_end + i).unwrap_or(full_img_end);
+            let first_img = &content[img_start..=close_bracket];
+
+            let mut remaining = String::new();
+            remaining.push_str(&content[..img_start]);
+            remaining.push_str(&content[close_bracket + 1..]);
+            let remaining_trimmed: String = remaining.chars().take(max_text_chars).collect();
+            return format!("{}\n\n{}", first_img, remaining_trimmed.trim());
+        }
+    }
+
+    content.chars().take(max_text_chars).collect()
 }
 
 fn sync_workspace_files(workspace_path: &str, conn: &Connection) {
@@ -126,7 +234,7 @@ fn sync_workspace_files(workspace_path: &str, conn: &Connection) {
                                         .unwrap_or_else(|| "Untitled Note".to_string())
                                 });
 
-                            let excerpt = content.chars().take(600).collect::<String>();
+                            let excerpt = generate_smart_excerpt(&content, 3000);
                             let group_name = path
                                 .parent()
                                 .and_then(|p| p.file_name())
@@ -176,12 +284,21 @@ fn sync_workspace_files(workspace_path: &str, conn: &Connection) {
 }
 
 #[tauri::command]
-pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
+pub fn note_list(workspace_path: String, extra_paths: Option<Vec<String>>) -> Result<Vec<NoteCardData>, String> {
     let db_path = get_db_path(&workspace_path);
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
 
-    // Auto-discover and sync any files created directly in folder
+    // Auto-discover and sync main workspace
     sync_workspace_files(&workspace_path, &conn);
+
+    // Also auto-discover and sync any extra/added folders
+    if let Some(extras) = extra_paths {
+        for extra in extras {
+            if !extra.is_empty() && extra != workspace_path {
+                sync_workspace_files(&extra, &conn);
+            }
+        }
+    }
 
     let mut stmt = conn
         .prepare("SELECT id, path, title, excerpt, group_name, updated_at, is_starred, tags FROM notes ORDER BY updated_at DESC")
@@ -195,7 +312,7 @@ pub fn note_list(workspace_path: String) -> Result<Vec<NoteCardData>, String> {
 
             // Read live excerpt directly from file content to guarantee 3000 chars length for all notes (rich previews)
             let excerpt = match fs::read_to_string(&path_str) {
-                Ok(content) => content.chars().take(3000).collect::<String>(),
+                Ok(content) => generate_smart_excerpt(&content, 3000),
                 Err(_) => row.get::<_, String>(3).unwrap_or_default(),
             };
 
@@ -343,7 +460,7 @@ pub fn note_update(workspace_path: String, note_path: String, title: String, con
     
     let updated_at = chrono::Utc::now().to_rfc3339();
     let tags_str = tags.join(",");
-    let excerpt = content.chars().take(600).collect::<String>();
+    let excerpt = generate_smart_excerpt(&content, 3000);
     
     conn.execute(
         "UPDATE notes SET title = ?1, excerpt = ?2, tags = ?3, updated_at = ?4 WHERE path = ?5",

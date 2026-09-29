@@ -771,43 +771,92 @@ export function NotionBlockSideHandle({
                   <PopoverContent
                     side="right"
                     align="start"
-                    className="w-48 p-1.5 bg-popover text-txt-primary border border-border rounded-xl shadow-xl z-50 text-xs"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    className="w-48 p-1.5 bg-popover text-txt-primary border border-border rounded-xl shadow-xl z-50 text-xs space-y-0.5"
                   >
                     <NotionMenuSectionHeader>Turn into</NotionMenuSectionHeader>
-                    <NotionMenuItem icon={<Type className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("paragraph")}>
+                    <NotionMenuItem
+                      icon={<Type className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "paragraph"}
+                      onClick={() => handleTurnInto("paragraph")}
+                    >
                       Text
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Heading1 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 1 })}>
+                    <NotionMenuItem
+                      icon={<Heading1 className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "h1"}
+                      onClick={() => handleTurnInto("heading", { level: 1 })}
+                    >
                       Heading 1
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Heading2 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 2 })}>
+                    <NotionMenuItem
+                      icon={<Heading2 className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "h2"}
+                      onClick={() => handleTurnInto("heading", { level: 2 })}
+                    >
                       Heading 2
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Heading3 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 3 })}>
+                    <NotionMenuItem
+                      icon={<Heading3 className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "h3"}
+                      onClick={() => handleTurnInto("heading", { level: 3 })}
+                    >
                       Heading 3
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<List className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("bulletList")}>
+                    <NotionMenuItem
+                      icon={<List className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "bulletList"}
+                      onClick={() => handleTurnInto("bulletList")}
+                    >
                       Bulleted list
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("orderedList")}>
+                    <NotionMenuItem
+                      icon={<ListOrdered className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "orderedList"}
+                      onClick={() => handleTurnInto("orderedList")}
+                    >
                       Numbered list
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<CheckSquare className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("taskList")}>
+                    <NotionMenuItem
+                      icon={<CheckSquare className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "taskList"}
+                      onClick={() => handleTurnInto("taskList")}
+                    >
                       To-do list
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Quote className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("blockquote")}>
+                    <NotionMenuItem
+                      icon={<Quote className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "blockquote"}
+                      onClick={() => handleTurnInto("blockquote")}
+                    >
                       Quote
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Code2 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("codeBlock")}>
+                    <NotionMenuItem
+                      icon={<Code2 className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "codeBlock"}
+                      onClick={() => handleTurnInto("codeBlock")}
+                    >
                       Code
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<TableIcon className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("table")}>
+                    <NotionMenuItem
+                      icon={<TableIcon className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "table"}
+                      onClick={() => handleTurnInto("table")}
+                    >
                       Table
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<Columns3 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("kanban")}>
+                    <NotionMenuItem
+                      icon={<Columns3 className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "kanbanBoard"}
+                      onClick={() => handleTurnInto("kanban")}
+                    >
                       Kanban Board
                     </NotionMenuItem>
-                    <NotionMenuItem icon={<ListTree className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("toc")}>
+                    <NotionMenuItem
+                      icon={<ListTree className="h-3.5 w-3.5" />}
+                      active={blockInfo.type === "tableOfContents"}
+                      onClick={() => handleTurnInto("toc")}
+                    >
                       Table of Contents
                     </NotionMenuItem>
                   </PopoverContent>

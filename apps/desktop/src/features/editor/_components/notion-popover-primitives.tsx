@@ -42,21 +42,21 @@ export function NotionMenuItem({
     <button
       type="button"
       className={cn(
-        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer select-none",
-        active && "bg-accent/60 font-medium",
-        destructive
-          ? "text-destructive hover:bg-destructive/15 focus:bg-destructive/15"
-          : "text-txt-primary hover:bg-accent focus:bg-accent",
+        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer select-none outline-none",
+        active
+          ? "bg-accent/80 text-txt-primary font-medium"
+          : "text-txt-primary hover:bg-accent focus-visible:bg-accent",
+        destructive && "text-destructive hover:bg-destructive/15 focus-visible:bg-destructive/15",
         className
       )}
       {...props}
     >
       <div className="flex items-center gap-2 min-w-0">
-        {icon && <span className={cn("shrink-0", destructive && "text-destructive")}>{icon}</span>}
+        {icon && <span className={cn("shrink-0", destructive ? "text-destructive" : active ? "text-primary" : "text-txt-muted")}>{icon}</span>}
         <span className="truncate">{children}</span>
       </div>
       <div className="flex items-center gap-1.5 shrink-0 ml-2">
-        {active && <Check className="h-3.5 w-3.5 text-txt-brand shrink-0" />}
+        {active && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
         {shortcut && <span className={cn("text-[10px]", destructive ? "text-destructive/80" : "text-txt-muted")}>{shortcut}</span>}
         {hasSubmenu && <ChevronRight className="h-3 w-3 text-txt-muted shrink-0" />}
       </div>

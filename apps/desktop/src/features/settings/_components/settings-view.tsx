@@ -262,9 +262,30 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
       const { open } = await import("@tauri-apps/plugin-dialog");
       const selected = await open({ directory: true, multiple: false, title: "Select Workspace Folder" });
       if (selected && typeof selected === "string") {
-        workspaceConfig.set({ rootPath: selected });
-        toast.success("Workspace path updated");
-        onWorkspaceChanged();
+        try {
+          const scannedTree = await noteIpc.scanFolderTree(selected);
+          const finalFolders =
+            scannedTree && scannedTree.length > 0
+              ? scannedTree
+              : [
+                  {
+                    id: crypto.randomUUID(),
+                    name: "Getting Started",
+                    path: `${selected}/Getting Started`,
+                    noteCount: 0,
+                  },
+                ];
+          const name = selected.split(/[/\\]/).pop() || "My Workspace";
+          workspaceConfig.set({ rootPath: selected, name, folders: finalFolders });
+          setFolders(finalFolders);
+          toast.success("Workspace updated");
+          onWorkspaceChanged();
+        } catch (e) {
+          console.error("Failed to scan workspace tree:", e);
+          workspaceConfig.set({ rootPath: selected });
+          toast.success("Workspace path updated");
+          onWorkspaceChanged();
+        }
       }
     } else {
       const path = prompt("Enter new workspace path:", rootPath);
@@ -290,17 +311,40 @@ export function SettingsView({ onWorkspaceChanged }: SettingsViewProps) {
           return;
         }
 
-        const newFolder: LocalFolderNode = {
-          id: crypto.randomUUID(),
-          name,
-          path: selected,
-          noteCount: 0,
-        };
-        const newFolders = [...folders, newFolder];
-        setFolders(newFolders);
-        workspaceConfig.set({ folders: newFolders });
-        toast.success(`"${newFolder.name}" added`);
-        onWorkspaceChanged();
+        try {
+          const scannedChildren = await noteIpc.scanFolderTree(selected);
+          const totalNotes = (scannedChildren || []).reduce(
+            (acc: number, c: any) => acc + (c.noteCount || 0),
+            0
+          );
+
+          const newFolder: LocalFolderNode = {
+            id: crypto.randomUUID(),
+            name,
+            path: selected,
+            noteCount: totalNotes,
+            isExpanded: false,
+            children: scannedChildren || [],
+          };
+          const newFolders = [...folders, newFolder];
+          setFolders(newFolders);
+          workspaceConfig.set({ folders: newFolders });
+          toast.success(`"${newFolder.name}" added with subfolders`);
+          onWorkspaceChanged();
+        } catch (e) {
+          console.error("Failed to scan folder children:", e);
+          const newFolder: LocalFolderNode = {
+            id: crypto.randomUUID(),
+            name,
+            path: selected,
+            noteCount: 0,
+          };
+          const newFolders = [...folders, newFolder];
+          setFolders(newFolders);
+          workspaceConfig.set({ folders: newFolders });
+          toast.success(`"${newFolder.name}" added`);
+          onWorkspaceChanged();
+        }
       }
     } else {
       const name = prompt("Enter new folder name:");

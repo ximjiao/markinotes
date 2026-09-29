@@ -3,10 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
-import { BookOpen, ListTree, Trash2, ArrowUpRight, RefreshCw } from "lucide-react";
+import { BookOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { UI_COPY } from "@/lib/constants/copy";
 
 export interface TocHeadingItem {
   id: string;
@@ -17,7 +16,6 @@ export interface TocHeadingItem {
 
 export function TocBlockNodeView({ editor, deleteNode }: NodeViewProps) {
   const [headings, setHeadings] = useState<TocHeadingItem[]>([]);
-  const [activePos, setActivePos] = useState<number | null>(null);
 
   // Extract all headings from the editor document
   const extractHeadings = useCallback(() => {
@@ -67,8 +65,6 @@ export function TocBlockNodeView({ editor, deleteNode }: NodeViewProps) {
   const handleJumpToHeading = (pos: number) => {
     if (!editor || editor.isDestroyed) return;
 
-    setActivePos(pos);
-
     try {
       editor.commands.setTextSelection(pos + 1);
       editor.commands.focus();
@@ -81,9 +77,9 @@ export function TocBlockNodeView({ editor, deleteNode }: NodeViewProps) {
         });
 
         // Flash highlight effect
-        domNode.classList.add("ring-2", "ring-primary", "ring-offset-2", "rounded-md", "transition-all", "duration-500");
+        domNode.classList.add("ring-2", "ring-primary", "ring-offset-4", "rounded-md", "transition-all", "duration-500");
         setTimeout(() => {
-          domNode.classList.remove("ring-2", "ring-primary", "ring-offset-2", "rounded-md");
+          domNode.classList.remove("ring-2", "ring-primary", "ring-offset-4", "rounded-md");
         }, 1500);
       }
     } catch (e) {
@@ -92,114 +88,52 @@ export function TocBlockNodeView({ editor, deleteNode }: NodeViewProps) {
   };
 
   return (
-    <NodeViewWrapper className="my-4 select-none">
-      <div className="group/toc relative w-full rounded-2xl border border-border/80 bg-surface/50 dark:bg-surface/30 backdrop-blur-sm p-4 transition-all duration-200 shadow-xs hover:border-primary/40 hover:shadow-sm">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between pb-3 border-b border-border/60">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 rounded-lg bg-primary/10 text-primary shrink-0">
-              <ListTree className="h-4 w-4" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-txt-primary tracking-tight">
-                Table of Contents
-              </span>
-              <Badge
-                variant="secondary"
-                className="h-5 px-1.5 text-[10px] font-semibold text-txt-muted bg-secondary/80 border-border/60"
-              >
-                {headings.length} {headings.length === 1 ? "section" : "sections"}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 opacity-0 group-hover/toc:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={extractHeadings}
-              title="Refresh outline"
-              className="h-7 w-7 text-txt-muted hover:text-txt-primary hover:bg-secondary rounded-lg cursor-pointer"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={deleteNode}
-              title="Delete Table of Contents"
-              className="h-7 w-7 text-txt-muted hover:text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
+    <NodeViewWrapper className="my-3 select-none">
+      <div className="group/toc relative w-full py-1">
+        {/* Floating Delete Button on Hover */}
+        <button
+          type="button"
+          onClick={deleteNode}
+          title={UI_COPY.editor.toc.deleteTitle}
+          className="absolute -top-1 right-0 opacity-0 group-hover/toc:opacity-100 transition-opacity p-1 text-txt-muted hover:text-destructive rounded cursor-pointer z-10"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
 
         {/* Headings List */}
-        <div className="pt-3 space-y-0.5">
-          {headings.length === 0 ? (
-            <div className="py-4 text-center text-txt-muted flex flex-col items-center justify-center gap-1.5 border border-dashed border-border/50 rounded-xl bg-secondary/20">
-              <BookOpen className="h-5 w-5 text-txt-muted/60 mb-0.5" />
-              <span className="text-xs font-medium text-txt-secondary">No headings found</span>
-              <span className="text-[11px] text-txt-muted/80 max-w-xs">
-                Add headings using <kbd className="px-1 py-0.5 rounded bg-background border text-[10px]"># H1</kbd>, <kbd className="px-1 py-0.5 rounded bg-background border text-[10px]">## H2</kbd>, or <kbd className="px-1 py-0.5 rounded bg-background border text-[10px]">### H3</kbd> to automatically populate this outline.
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {headings.map((item) => {
-                const isActive = activePos === item.pos;
-                const indentClass =
-                  item.level === 1
-                    ? "pl-2 font-semibold text-xs text-txt-primary"
-                    : item.level === 2
-                    ? "pl-6 font-medium text-[11.5px] text-txt-secondary"
-                    : item.level === 3
-                    ? "pl-10 text-[11px] text-txt-muted hover:text-txt-secondary"
-                    : "pl-14 text-[10.5px] text-txt-muted/80";
+        {headings.length === 0 ? (
+          <div className="py-2 text-txt-muted/70 flex items-center gap-2 text-sm italic">
+            <BookOpen className="h-4 w-4 opacity-50" />
+            <span>{UI_COPY.editor.toc.empty}</span>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {headings.map((item) => {
+              const indentClass =
+                item.level === 1
+                  ? "pl-0"
+                  : item.level === 2
+                  ? "pl-6"
+                  : item.level === 3
+                  ? "pl-12"
+                  : "pl-16";
 
-                return (
-                  <div
-                    key={item.id}
+              return (
+                <div key={item.id} className={cn("leading-relaxed", indentClass)}>
+                  <span
                     onClick={() => handleJumpToHeading(item.pos)}
-                    className={cn(
-                      "group/item relative flex items-center justify-between py-1.5 pr-2.5 rounded-lg cursor-pointer transition-colors duration-150",
-                      indentClass,
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-accent/60 hover:text-txt-primary"
-                    )}
+                    className="inline-block cursor-pointer text-txt-secondary hover:text-txt-primary underline decoration-border hover:decoration-txt-primary underline-offset-4 decoration-[1.5px] transition-colors text-[14px]"
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {/* Level Indicator Dot/Bullet */}
-                      {item.level === 1 && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                      )}
-                      {item.level === 2 && (
-                        <span className="h-1 w-1 rounded-full bg-txt-muted shrink-0" />
-                      )}
-                      {item.level >= 3 && (
-                        <span className="h-0.5 w-2 rounded bg-border shrink-0" />
-                      )}
-
-                      <span className="truncate leading-normal">
-                        {item.text}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                      <span className="text-[9px] font-mono text-txt-muted uppercase px-1 rounded bg-secondary/80">
-                        H{item.level}
-                      </span>
-                      <ArrowUpRight className="h-3 w-3 text-txt-muted group-hover/item:text-primary" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    {item.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </NodeViewWrapper>
   );
 }
+
+

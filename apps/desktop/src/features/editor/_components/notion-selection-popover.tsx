@@ -63,6 +63,24 @@ export function NotionSelectionPopover({
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [isColorOpen, setIsColorOpen] = useState(false);
+  const [, setSelectionTick] = useState(0);
+
+  // Subscribe to live editor selection changes to immediately re-render bubble states
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const handleSelectionChange = () => {
+      setSelectionTick((prev) => prev + 1);
+    };
+
+    editor.on("selectionUpdate", handleSelectionChange);
+    editor.on("transaction", handleSelectionChange);
+
+    return () => {
+      editor.off("selectionUpdate", handleSelectionChange);
+      editor.off("transaction", handleSelectionChange);
+    };
+  }, [editor]);
 
   const isInTable = (() => {
     if (!editor || !editor.state) return false;
@@ -94,52 +112,56 @@ export function NotionSelectionPopover({
     setIsColorOpen(false);
   };
 
-  // Determine current active block type by inspecting the ProseMirror ancestor tree at selection start
+  // Determine current active block type by inspecting Tiptap active state and ProseMirror tree
   const getCurrentBlockInfo = () => {
-    if (!editor || !editor.state) return { label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
+    if (!editor || editor.isDestroyed || !editor.state) {
+      return { type: "paragraph", label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
+    }
+
+    if (editor.isActive("table") || editor.isActive("tableCell") || editor.isActive("tableHeader")) {
+      return { type: "table", label: "Table Cell", icon: <Type className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("heading", { level: 1 })) {
+      return { type: "heading", level: 1, label: "Heading 1", icon: <Heading1 className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("heading", { level: 2 })) {
+      return { type: "heading", level: 2, label: "Heading 2", icon: <Heading2 className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("heading", { level: 3 })) {
+      return { type: "heading", level: 3, label: "Heading 3", icon: <Heading3 className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("taskList") || editor.isActive("taskItem")) {
+      return { type: "taskList", label: "To-do list", icon: <CheckSquare className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("bulletList")) {
+      return { type: "bulletList", label: "Bulleted list", icon: <List className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("orderedList")) {
+      return { type: "orderedList", label: "Numbered list", icon: <ListOrdered className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("blockquote")) {
+      return { type: "blockquote", label: "Quote", icon: <Quote className="h-3.5 w-3.5" /> };
+    }
+    if (editor.isActive("codeBlock")) {
+      return { type: "codeBlock", label: "Code", icon: <Code className="h-3.5 w-3.5" /> };
+    }
 
     const { selection } = editor.state;
-    const { $from } = selection;
-
-    let inTable = false;
-    let headingLevel: number | null = null;
-    let inTaskList = false;
-    let inBulletList = false;
-    let inOrderedList = false;
-    let inBlockquote = false;
-    let inCodeBlock = false;
-
-    for (let d = $from.depth; d > 0; d--) {
-      const node = $from.node(d);
-      const name = node.type.name;
-      if (name === "table" || name === "tableCell" || name === "tableHeader") {
-        inTable = true;
-      } else if (name === "heading") {
-        headingLevel = node.attrs.level;
-      } else if (name === "taskList" || name === "taskItem") {
-        inTaskList = true;
-      } else if (name === "bulletList") {
-        inBulletList = true;
-      } else if (name === "orderedList") {
-        inOrderedList = true;
-      } else if (name === "blockquote") {
-        inBlockquote = true;
-      } else if (name === "codeBlock") {
-        inCodeBlock = true;
+    if (selection) {
+      const { $from } = selection;
+      for (let d = $from.depth; d > 0; d--) {
+        const node = $from.node(d);
+        const name = node.type.name;
+        if (name === "heading") {
+          const level = node.attrs.level || 1;
+          if (level === 1) return { type: "heading", level: 1, label: "Heading 1", icon: <Heading1 className="h-3.5 w-3.5" /> };
+          if (level === 2) return { type: "heading", level: 2, label: "Heading 2", icon: <Heading2 className="h-3.5 w-3.5" /> };
+          if (level === 3) return { type: "heading", level: 3, label: "Heading 3", icon: <Heading3 className="h-3.5 w-3.5" /> };
+        }
       }
     }
 
-    if (inTable) return { label: "Table Cell", icon: <Type className="h-3.5 w-3.5" /> };
-    if (headingLevel === 1) return { label: "Heading 1", icon: <Heading1 className="h-3.5 w-3.5" /> };
-    if (headingLevel === 2) return { label: "Heading 2", icon: <Heading2 className="h-3.5 w-3.5" /> };
-    if (headingLevel === 3) return { label: "Heading 3", icon: <Heading3 className="h-3.5 w-3.5" /> };
-    if (inTaskList) return { label: "To-do list", icon: <CheckSquare className="h-3.5 w-3.5" /> };
-    if (inBulletList) return { label: "Bulleted list", icon: <List className="h-3.5 w-3.5" /> };
-    if (inOrderedList) return { label: "Numbered list", icon: <ListOrdered className="h-3.5 w-3.5" /> };
-    if (inBlockquote) return { label: "Quote", icon: <Quote className="h-3.5 w-3.5" /> };
-    if (inCodeBlock) return { label: "Code", icon: <Code className="h-3.5 w-3.5" /> };
-
-    return { label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
+    return { type: "paragraph", label: "Text", icon: <Type className="h-3.5 w-3.5" /> };
   };
 
   const blockInfo = getCurrentBlockInfo();
@@ -297,33 +319,74 @@ export function NotionSelectionPopover({
               <ChevronDown className="h-3 w-3 text-txt-muted shrink-0 ml-0.5" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent side="bottom" align="start" className="w-48 p-1.5 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs space-y-0.5">
+          <PopoverContent
+            side="bottom"
+            align="start"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            className="w-48 p-1.5 bg-popover border border-border rounded-xl shadow-xl z-50 text-xs space-y-0.5"
+          >
             <NotionMenuSectionHeader>Turn into</NotionMenuSectionHeader>
-            <NotionMenuItem icon={<Type className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("paragraph")}>
+            <NotionMenuItem
+              icon={<Type className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "paragraph"}
+              onClick={() => handleTurnInto("paragraph")}
+            >
               Text
             </NotionMenuItem>
-            <NotionMenuItem icon={<Heading1 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 1 })}>
+            <NotionMenuItem
+              icon={<Heading1 className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "heading" && blockInfo.level === 1}
+              onClick={() => handleTurnInto("heading", { level: 1 })}
+            >
               Heading 1
             </NotionMenuItem>
-            <NotionMenuItem icon={<Heading2 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 2 })}>
+            <NotionMenuItem
+              icon={<Heading2 className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "heading" && blockInfo.level === 2}
+              onClick={() => handleTurnInto("heading", { level: 2 })}
+            >
               Heading 2
             </NotionMenuItem>
-            <NotionMenuItem icon={<Heading3 className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("heading", { level: 3 })}>
+            <NotionMenuItem
+              icon={<Heading3 className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "heading" && blockInfo.level === 3}
+              onClick={() => handleTurnInto("heading", { level: 3 })}
+            >
               Heading 3
             </NotionMenuItem>
-            <NotionMenuItem icon={<List className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("bulletList")}>
+            <NotionMenuItem
+              icon={<List className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "bulletList"}
+              onClick={() => handleTurnInto("bulletList")}
+            >
               Bulleted list
             </NotionMenuItem>
-            <NotionMenuItem icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("orderedList")}>
+            <NotionMenuItem
+              icon={<ListOrdered className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "orderedList"}
+              onClick={() => handleTurnInto("orderedList")}
+            >
               Numbered list
             </NotionMenuItem>
-            <NotionMenuItem icon={<CheckSquare className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("taskList")}>
+            <NotionMenuItem
+              icon={<CheckSquare className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "taskList"}
+              onClick={() => handleTurnInto("taskList")}
+            >
               To-do list
             </NotionMenuItem>
-            <NotionMenuItem icon={<Quote className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("blockquote")}>
+            <NotionMenuItem
+              icon={<Quote className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "blockquote"}
+              onClick={() => handleTurnInto("blockquote")}
+            >
               Quote
             </NotionMenuItem>
-            <NotionMenuItem icon={<Code className="h-3.5 w-3.5" />} onClick={() => handleTurnInto("codeBlock")}>
+            <NotionMenuItem
+              icon={<Code className="h-3.5 w-3.5" />}
+              active={blockInfo.type === "codeBlock"}
+              onClick={() => handleTurnInto("codeBlock")}
+            >
               Code
             </NotionMenuItem>
           </PopoverContent>

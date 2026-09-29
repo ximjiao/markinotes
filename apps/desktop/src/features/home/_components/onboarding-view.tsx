@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isTauri } from "../_lib/note-ipc";
+import { isTauri, noteIpc } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { invoke } from "@tauri-apps/api/core";
 import type { OnboardingViewProps } from "../_types/home.types";
@@ -15,6 +15,7 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
   const [step, setStep] = useState(1);
   const [rootPath, setRootPath] = useState("");
   const [workspaceName, setWorkspaceName] = useState("My Workspace");
+  const [discoveredFolders, setDiscoveredFolders] = useState<any[]>([]);
 
   const handleChooseFolder = async () => {
     if (isTauri()) {
@@ -26,6 +27,17 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
       });
       if (selected && typeof selected === "string") {
         setRootPath(selected);
+        const folderBaseName = selected.split(/[/\\]/).pop() || "My Workspace";
+        setWorkspaceName(folderBaseName);
+
+        // Auto-scan existing folder hierarchy
+        try {
+          const tree = await noteIpc.scanFolderTree(selected);
+          setDiscoveredFolders(tree || []);
+        } catch (e) {
+          console.error("Failed to scan folder tree:", e);
+        }
+
         setStep(2);
       }
     } else {
@@ -33,49 +45,60 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
       const path = prompt("Enter a mock path for web dev (e.g. /Users/guest/Documents/Notes):");
       if (path) {
         setRootPath(path);
+        const folderBaseName = path.split(/[/\\]/).pop() || "My Workspace";
+        setWorkspaceName(folderBaseName);
         setStep(2);
       }
     }
   };
 
   const handleComplete = async () => {
-    // Initial default folders
-    const defaultFolders = [
-      { id: crypto.randomUUID(), name: "Getting Started", path: `${rootPath}/Getting Started`, noteCount: 1 },
-    ];
-    
+    const finalFolders =
+      discoveredFolders.length > 0
+        ? discoveredFolders
+        : [
+            {
+              id: crypto.randomUUID(),
+              name: "Getting Started",
+              path: `${rootPath}/Getting Started`,
+              noteCount: 0,
+            },
+          ];
+
     workspaceConfig.set({
       rootPath,
       name: workspaceName,
-      folders: defaultFolders,
+      folders: finalFolders,
       setupDone: true,
     });
-    
+
     if (isTauri()) {
       try {
-        await invoke("workspace_init", { rootPath, folders: defaultFolders });
-        
-        // Create sample note
-        const sampleNote: any = await invoke("note_create", { 
-          workspacePath: rootPath, 
-          folderPath: `${rootPath}/Getting Started`, 
-          title: "Welcome to Markidown!" 
-        });
-        
-        const sampleContent = `# Welcome to Markidown!\n\nThis is your first note. Feel free to edit it or create a new one.\n\n- Hit \`/\` to see slash commands.\n- Use the sidebar to organize your thoughts.`;
-        
-        await invoke("note_update", {
-          workspacePath: rootPath,
-          notePath: sampleNote.path,
-          title: "Welcome to Markidown!",
-          content: sampleContent,
-          tags: ["getting-started"]
-        });
+        await invoke("workspace_init", { rootPath, folders: finalFolders });
+
+        // If it's a completely new empty folder, create welcome note
+        if (discoveredFolders.length === 0) {
+          const sampleNote: any = await invoke("note_create", {
+            workspacePath: rootPath,
+            folderPath: `${rootPath}/Getting Started`,
+            title: "Welcome to Markidown!",
+          });
+
+          const sampleContent = `# Welcome to Markidown!\n\nThis is your first note. Feel free to edit it or create a new one.\n\n- Hit \`/\` to see slash commands.\n- Use the sidebar to organize your thoughts.`;
+
+          await invoke("note_update", {
+            workspacePath: rootPath,
+            notePath: sampleNote.path,
+            title: "Welcome to Markidown!",
+            content: sampleContent,
+            tags: ["getting-started"],
+          });
+        }
       } catch (err) {
         console.error(err);
       }
     }
-    
+
     onSelectFolder();
   };
 
@@ -141,10 +164,21 @@ export function OnboardingView({ onSelectFolder }: OnboardingViewProps) {
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold">Folder Structure Preview</Label>
-                <div className="p-3 bg-muted/30 rounded-md border border-border/50 font-mono text-[11px] text-txt-secondary">
+                <div className="p-3 bg-muted/30 rounded-md border border-border/50 font-mono text-[11px] text-txt-secondary max-h-40 overflow-y-auto">
                   <div className="text-txt-primary font-semibold mb-1">📁 {workspaceName}</div>
-                  <div className="ml-4 pl-2 border-l border-border/60">
-                    <div>└── 📁 Getting Started</div>
+                  <div className="ml-4 pl-2 border-l border-border/60 space-y-1">
+                    {discoveredFolders.length > 0 ? (
+                      discoveredFolders.map((f: any) => (
+                        <div key={f.id} className="flex items-center justify-between">
+                          <span>└── 📁 {f.name}</span>
+                          {f.noteCount > 0 && (
+                            <span className="text-[10px] text-txt-muted">({f.noteCount} notes)</span>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div>└── 📁 Getting Started</div>
+                    )}
                   </div>
                 </div>
               </div>

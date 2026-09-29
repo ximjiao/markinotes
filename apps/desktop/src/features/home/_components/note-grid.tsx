@@ -17,13 +17,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { noteIpc } from "../_lib/note-ipc";
+import { UI_COPY } from "@/lib/constants/copy";
 
 export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, onMove, onExport }: NoteGridProps) {
   if (notes.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-12">
         <EmptyState
-          title="No documents found"
+          title={UI_COPY.home.emptyNotes}
           description="Create a new document or change your search query."
         />
       </div>
@@ -147,18 +148,18 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => onOpenNote?.(note.id)}>
                             <FileText className="mr-2 h-4 w-4" />
-                            Open
+                            {UI_COPY.actions.open}
                           </DropdownMenuItem>
                           {onMove && (
                             <DropdownMenuItem onClick={() => onMove(note.id)}>
                               <FolderOutput className="mr-2 h-4 w-4" />
-                              Move
+                              {UI_COPY.actions.move}
                             </DropdownMenuItem>
                           )}
                           {onExport && (
                             <DropdownMenuItem onClick={() => onExport(note.id)}>
                               <FileText className="mr-2 h-4 w-4" />
-                              Export
+                              {UI_COPY.actions.export}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -170,15 +171,15 @@ export function NoteGrid({ notes, viewMode, onOpenNote, onDelete, onToggleStar, 
                             }}
                           >
                             <FolderOpen className="mr-2 h-4 w-4" />
-                            Open in Folder
+                            {UI_COPY.actions.showInFolder}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onToggleStar?.(note.id)}>
                             <Star className="mr-2 h-4 w-4" />
-                            {note.isStarred ? "Unstar" : "Star"}
+                            {note.isStarred ? UI_COPY.actions.unstar : UI_COPY.actions.star}
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete?.(note.id)}>
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            {UI_COPY.actions.delete}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

@@ -14,13 +14,20 @@ export interface BufferedNoteData {
 }
 
 export const noteIpc = {
-  list: async (workspacePath: string): Promise<NoteCardData[]> => {
+  list: async (workspacePath: string, extraPaths?: string[]): Promise<NoteCardData[]> => {
     if (isTauri()) {
-      return invoke("note_list", { workspacePath });
+      return invoke("note_list", { workspacePath, extraPaths: extraPaths || [] });
     }
     // Web fallback
     const stored = localStorage.getItem(`marki_notes_${workspacePath}`);
     return stored ? JSON.parse(stored) : [];
+  },
+
+  scanFolderTree: async (workspacePath: string): Promise<any[]> => {
+    if (isTauri()) {
+      return invoke("workspace_scan_folder_tree", { workspacePath });
+    }
+    return [];
   },
 
   getAllTags: async (workspacePath: string): Promise<string[]> => {

@@ -23,17 +23,23 @@ import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/formatters";
 import { NotePreviewRenderer } from "./note-preview-renderer";
 import { MiniFormattedInline } from "../_lib/note-preview-parser";
+import { UI_COPY } from "@/lib/constants/copy";
 import { noteIpc } from "../_lib/note-ipc";
 
 function getCleanCardTitle(rawTitle: string): string {
-  if (!rawTitle) return "Untitled";
+  if (!rawTitle) return UI_COPY.editor.untitledNote;
   let clean = rawTitle.trim();
-  clean = clean.replace(/^#+\s*/, "");
-  const linkMatch = clean.match(/^\[([^\]]+)\](?:\([^)]*\))?$/);
-  if (linkMatch) {
-    clean = linkMatch[1];
-  }
-  return clean.trim() || "Untitled";
+  clean = clean.replace(/^[#\s]+/, "");
+  clean = clean.replace(/\*\*(.*?)\*\*/g, "$1");
+  clean = clean.replace(/\*(.*?)\*/g, "$1");
+  clean = clean.replace(/__(.*?)__/g, "$1");
+  clean = clean.replace(/_(.*?)_/g, "$1");
+  clean = clean.replace(/~~(.*?)~~/g, "$1");
+  clean = clean.replace(/`([^`]+)`/g, "$1");
+  clean = clean.replace(/!\[([^\]]*)\]\((.*?)\)/g, "$1");
+  clean = clean.replace(/\[([^\]]+)\]\((.*?)\)/g, "$1");
+  clean = clean.replace(/<[^>]*>/g, "");
+  return clean.trim() || UI_COPY.editor.untitledNote;
 }
 
 export function NoteCard({
@@ -86,18 +92,18 @@ export function NoteCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44 border-border bg-popover shadow-xl rounded-xl">
               <DropdownMenuItem onClick={() => onOpen?.(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
-                <FileEdit className="h-4 w-4" /> Open Note
+                <FileEdit className="h-4 w-4" /> {UI_COPY.actions.openNote}
               </DropdownMenuItem>
               
               {onMove && (
                 <DropdownMenuItem onClick={() => onMove(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
-                  <FolderOutput className="h-4 w-4" /> Move
+                  <FolderOutput className="h-4 w-4" /> {UI_COPY.actions.move}
                 </DropdownMenuItem>
               )}
 
               {onExport && (
                 <DropdownMenuItem onClick={() => onExport(note.id)} className="cursor-pointer gap-2 px-3 py-2 text-xs">
-                  <FileText className="h-4 w-4" /> Export
+                  <FileText className="h-4 w-4" /> {UI_COPY.actions.export}
                 </DropdownMenuItem>
               )}
 
@@ -110,13 +116,13 @@ export function NoteCard({
                 }}
                 className="cursor-pointer gap-2 px-3 py-2 text-xs"
               >
-                <FolderOpen className="h-4 w-4" /> Open in Folder
+                <FolderOpen className="h-4 w-4" /> {UI_COPY.actions.showInFolder}
               </DropdownMenuItem>
               
               <DropdownMenuSeparator className="bg-border" />
               
               <DropdownMenuItem className="cursor-pointer gap-2 px-3 py-2 text-xs text-destructive focus:text-destructive" onClick={() => onDelete?.(note.id)}>
-                <Trash2 className="h-4 w-4" /> Delete
+                <Trash2 className="h-4 w-4" /> {UI_COPY.actions.delete}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

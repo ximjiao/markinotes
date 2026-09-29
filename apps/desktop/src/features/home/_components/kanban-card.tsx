@@ -31,6 +31,7 @@ import type { KanbanCardProps } from "../_types/home.types";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/formatters";
 import { noteIpc } from "../_lib/note-ipc";
+import { UI_COPY } from "@/lib/constants/copy";
 
 export function KanbanCard({
   note,
@@ -114,7 +115,7 @@ export function KanbanCard({
                   onClick={() => onOpen?.(note.id)}
                   className="cursor-pointer gap-2 px-3 py-2 text-xs"
                 >
-                  <FileEdit className="h-3.5 w-3.5" /> Open Note
+                  <FileEdit className="h-3.5 w-3.5" /> {UI_COPY.actions.openNote}
                 </DropdownMenuItem>
 
                 {onMove && (
@@ -122,7 +123,7 @@ export function KanbanCard({
                     onClick={() => onMove(note.id)}
                     className="cursor-pointer gap-2 px-3 py-2 text-xs"
                   >
-                    <FolderOutput className="h-3.5 w-3.5" /> Move
+                    <FolderOutput className="h-3.5 w-3.5" /> {UI_COPY.actions.move}
                   </DropdownMenuItem>
                 )}
 
@@ -131,7 +132,7 @@ export function KanbanCard({
                     onClick={() => onExport(note.id)}
                     className="cursor-pointer gap-2 px-3 py-2 text-xs"
                   >
-                    <FileText className="h-3.5 w-3.5" /> Export
+                    <FileText className="h-3.5 w-3.5" /> {UI_COPY.actions.export}
                   </DropdownMenuItem>
                 )}
 
@@ -144,7 +145,7 @@ export function KanbanCard({
                   }}
                   className="cursor-pointer gap-2 px-3 py-2 text-xs"
                 >
-                  <FolderOpen className="h-3.5 w-3.5" /> Open in Folder
+                  <FolderOpen className="h-3.5 w-3.5" /> {UI_COPY.actions.showInFolder}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className="bg-border" />
@@ -153,7 +154,7 @@ export function KanbanCard({
                   className="cursor-pointer gap-2 px-3 py-2 text-xs text-destructive focus:text-destructive"
                   onClick={() => onDelete?.(note.id)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                  <Trash2 className="h-3.5 w-3.5" /> {UI_COPY.actions.delete}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

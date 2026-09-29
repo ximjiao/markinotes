@@ -7,8 +7,13 @@ import { HomeSidebar } from "./home-sidebar";
 import { NoteGrid } from "./note-grid";
 import { NoteKanbanBoard } from "./note-kanban-board";
 import { OnboardingView } from "./onboarding-view";
+import dynamic from "next/dynamic";
 import { AppShell } from "@/components/shared";
-import { NovelEditor } from "@features/editor";
+
+const NovelEditor = dynamic(
+  () => import("@features/editor").then((m) => m.NovelEditor),
+  { ssr: false }
+);
 import { SettingsView } from "../../settings/_components/settings-view";
 import { MoveNoteDialog } from "./move-note-dialog";
 import { TemplateDialog } from "./template-dialog";
@@ -21,6 +26,7 @@ import { noteIpc, isTauri } from "../_lib/note-ipc";
 import { workspaceConfig } from "../../workspace/_lib/workspace-config";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore, useNotesStore, useUiStore } from "@/stores";
+import { UI_COPY } from "@/lib/constants/copy";
 
 import type { LocalFolderNode } from "../../workspace/_types/folder.types";
 
@@ -471,11 +477,11 @@ export function HomeDashboard() {
     ? `#${selectedFolder.split(":")[1]}`
     : getSelectedFolderNode()?.name ||
       (selectedFolder === "recents"
-        ? "Recents"
+        ? UI_COPY.home.recents
         : selectedFolder === "starred"
-        ? "Starred"
+        ? UI_COPY.home.starred
         : selectedFolder === "drafts"
-        ? "Drafts"
+        ? UI_COPY.home.drafts
         : selectedFolder);
 
   return (
@@ -484,7 +490,7 @@ export function HomeDashboard() {
         <HomeSidebar
           onCreateNote={async (folderPath) => {
             if (!workspace) return;
-            const newNote = await createNote(workspace.path, folderPath, "Untitled Note");
+            const newNote = await createNote(workspace.path, folderPath, UI_COPY.editor.untitledNote);
             if (newNote) openNote(newNote.id, newNote.path, newNote.title);
           }}
         />
@@ -493,9 +499,9 @@ export function HomeDashboard() {
     >
       <div className="flex flex-col flex-1 h-full overflow-hidden bg-background">
         <div className="px-6 pt-4 pb-2 flex items-center justify-between">
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-txt-primary">{currentFolderName}</h2>
-            <span className="text-xs text-txt-muted">{filteredNotes.length} documents</span>
+            <span className="text-xs text-txt-muted">{UI_COPY.home.documentsCount(filteredNotes.length)}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -507,7 +513,7 @@ export function HomeDashboard() {
                 className="h-7 text-xs gap-1.5 font-medium text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:text-purple-700 dark:hover:text-purple-300 transition-colors shadow-xs rounded-lg"
               >
                 <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                Organize with AI
+                {UI_COPY.home.organizeWithAi}
               </Button>
             )}
             <SegmentedTabs

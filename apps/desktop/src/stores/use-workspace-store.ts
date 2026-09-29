@@ -4,6 +4,7 @@ import type { WorkspaceFolderInfo } from "../features/home/_types/home.types";
 import { workspaceConfig } from "../features/workspace/_lib/workspace-config";
 import { noteIpc, isTauri } from "../features/home/_lib/note-ipc";
 import { invoke } from "@tauri-apps/api/core";
+import { useNotesStore } from "./use-notes-store";
 
 interface WorkspaceState {
   workspace: WorkspaceFolderInfo | null;
@@ -31,7 +32,23 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   initWorkspace: async () => {
     const config = workspaceConfig.get();
     if (config.setupDone && config.rootPath) {
-      const currentFolders = config.folders || [];
+      let currentFolders = config.folders || [];
+
+      // Try auto-scanning to catch any new or deleted subfolders on disk
+      try {
+        const liveTree = await noteIpc.scanFolderTree(config.rootPath);
+        if (liveTree && liveTree.length > 0) {
+          // Keep existing external folders that are outside rootPath
+          const externalFolders = currentFolders.filter(
+            (f) => f.path && !f.path.startsWith(config.rootPath)
+          );
+          currentFolders = [...liveTree, ...externalFolders];
+          workspaceConfig.set({ folders: currentFolders });
+        }
+      } catch (e) {
+        console.error("Failed to live scan folder tree:", e);
+      }
+
       const ws: WorkspaceFolderInfo = {
         name: config.name,
         path: config.rootPath,
@@ -205,8 +222,16 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         workspace: state.workspace ? { ...state.workspace, folders: newFolders } : null,
       }));
 
-      // Reload to ensure all notes query the updated path from SQLite
-      window.location.reload();
+      // Soft state refresh: update notes from SQLite without unmounting/reloading the browser window
+      try {
+        await useNotesStore.getState().loadNotes(rootPath);
+        const currentSelected = useNotesStore.getState().selectedFolder;
+        if (currentSelected === oldPath) {
+          useNotesStore.getState().setSelectedFolder(newPath);
+        }
+      } catch (e) {
+        console.error("Failed to refresh notes after folder rename:", e);
+      }
     }
   },
 

@@ -19,6 +19,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             workspace_init,
+            workspace_scan_folder_tree,
             note_list,
             note_create,
             note_get_all_tags,

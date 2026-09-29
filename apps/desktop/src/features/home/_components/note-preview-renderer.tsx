@@ -8,6 +8,8 @@ import {
   MiniFormattedInline,
   parseTableRow,
   isTableSeparatorRow,
+  extractImageInfo,
+  resolveImageSrc,
 } from "../_lib/note-preview-parser";
 
 function decodeHtmlEntities(str: string): string {
@@ -140,16 +142,14 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
       }
     }
 
-    // 0. Image Block (![alt](url) or <img src="..." />)
-    const imageMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/i) || trimmed.match(/^<img[^>]+src=["']([^"']+)["'][^>]*\/?>$/i);
-    if (imageMatch) {
-      const alt = imageMatch[1] || "Note image preview";
-      const src = imageMatch[2] || imageMatch[1];
+    // 0. Image Block (![alt](url) or <img ... src="..." />)
+    const imgInfo = extractImageInfo(trimmed);
+    if (imgInfo && imgInfo.src) {
       elements.push(
         <div key={`img-${i}`} className="my-1.5 w-full overflow-hidden rounded-lg border border-border/60 bg-secondary/20 shadow-2xs">
           <img
-            src={src}
-            alt={alt}
+            src={imgInfo.src}
+            alt={imgInfo.alt || "Note image preview"}
             className="w-full h-28 object-cover rounded-lg hover:scale-102 transition-transform duration-300"
             loading="lazy"
             onError={(e) => {
@@ -247,8 +247,63 @@ export function NotePreviewRenderer({ content, title, className }: NotePreviewRe
       continue;
     }
 
+    // 0.2 Embedded Table of Contents (<div data-type="table-of-contents" ...)
+    if (
+      trimmed.includes('data-type="table-of-contents"') ||
+      trimmed.includes("data-type='table-of-contents'") ||
+      trimmed.includes('data-type=\\"table-of-contents\\"')
+    ) {
+      const tocStartIdx = i;
+      while (i + 1 < lines.length && !lines[i].includes("</div>") && !lines[i].endsWith("/>")) {
+        i++;
+      }
+      i++;
+
+      // Extract headings from all remaining lines in the document for the mini TOC preview
+      const previewHeadings: { level: number; text: string }[] = [];
+      for (const line of lines) {
+        const hMatch = line.trim().match(/^(#{1,3})\s+(.*)$/);
+        if (hMatch) {
+          const level = hMatch[1].length;
+          const text = hMatch[2].replace(/[*_`~]/g, "").trim();
+          if (text) {
+            previewHeadings.push({ level, text });
+          }
+        }
+      }
+
+      if (previewHeadings.length > 0) {
+        elements.push(
+          <div
+            key={`toc-${tocStartIdx}`}
+            className="my-1 w-full space-y-0.5 select-none font-sans"
+          >
+            {previewHeadings.slice(0, 3).map((h, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "text-[10px] leading-snug truncate text-txt-secondary/90",
+                  h.level === 1 ? "pl-0 font-medium text-txt-primary/90" : h.level === 2 ? "pl-2.5 text-[9.5px]" : "pl-5 text-[9px]"
+                )}
+              >
+                <span className="underline decoration-border underline-offset-2 decoration-[1px]">
+                  {h.text}
+                </span>
+              </div>
+            ))}
+            {previewHeadings.length > 3 && (
+              <div className="text-[8.5px] text-txt-muted pl-2.5">
+                +{previewHeadings.length - 3} more sections...
+              </div>
+            )}
+          </div>
+        );
+      }
+      continue;
+    }
+
     // Skip stray opening/closing HTML tags
-    if (/^<\/?(div|span|p|section)[^>]*>$/i.test(trimmed)) {
+    if (/^<\/?(div|span|p|section)[^>]*>/i.test(trimmed)) {
       i++;
       continue;
     }

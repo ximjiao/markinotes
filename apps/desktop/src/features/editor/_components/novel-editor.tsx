@@ -30,6 +30,7 @@ import { AllSelection } from "@tiptap/pm/state";
 import { CustomImageExtension } from "./custom-image-extension";
 import { CustomKanbanExtension } from "./custom-kanban-extension";
 import { CustomTocExtension } from "./custom-toc-extension";
+import { CustomWhiteboardExtension } from "@/features/whiteboard/_components/custom-whiteboard-extension";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -45,6 +46,7 @@ import {
   Code,
   Table as TableIcon,
   Columns3 as KanbanIcon,
+  Sparkles as FlowIcon,
   ListTree,
   Quote,
   Minus,
@@ -199,6 +201,16 @@ const rawSlashItems: CustomSlashItem[] = [
     searchTerms: ["kanban", "board", "trello", "card", "task"],
     command: ({ editor, range }: any) => {
       editor.chain().focus().deleteRange(range).insertKanbanBoard().run();
+    },
+  },
+  {
+    title: "Flow Board",
+    description: "Insert a FigJam-style whiteboard flow",
+    icon: <FlowIcon className="h-4 w-4" />,
+    badge: "flow",
+    searchTerms: ["flow", "figjam", "whiteboard", "diagram", "canvas", "mindmap"],
+    command: ({ editor, range }: any) => {
+      editor.chain().focus().deleteRange(range).insertWhiteboardBlock().run();
     },
   },
   {
@@ -617,7 +629,6 @@ const defaultExtensions = [
   }),
   CodeBlockLowlight.configure({
     lowlight,
-    defaultLanguage: "javascript",
   }),
 
   // 2. Dynamic Notion Block Placeholder
@@ -693,6 +704,7 @@ const defaultExtensions = [
   }),
   CustomImageExtension,
   CustomKanbanExtension,
+  CustomWhiteboardExtension,
   CustomTocExtension,
   slashCommand,
   GlobalDragHandle,
